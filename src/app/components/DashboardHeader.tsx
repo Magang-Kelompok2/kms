@@ -1,7 +1,7 @@
 import { BookOpen, Bell, User, Moon, Sun, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,

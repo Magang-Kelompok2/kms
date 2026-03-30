@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { classes, materials, assignments, quizzes, userAccess } from "../data/mockData";

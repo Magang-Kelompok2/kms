@@ -3,7 +3,7 @@ import { DashboardHeader } from "../components/DashboardHeader";
 import { classes, materials, assignments, quizzes, userAccess } from "../data/mockData";
 import { Card } from "../components/ui/card";
 import { BookOpen, FileText, ClipboardCheck, Calendar } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "../components/ui/badge";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 
