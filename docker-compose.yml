@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:15-alpine # Gunakan alpine supaya lebih ringan
+    container_name: taxacore-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-alpha123}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alpha123}
+      POSTGRES_DB: ${POSTGRES_DB:-taxacore}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  minio:
+    image: minio/minio:latest # JANGAN pakai "8.0.7", gunakan latest
+    container_name: taxacore-minio
+    # Tambahkan console-address supaya bisa buka dashboard MinIO di port 9001
+    command: server /data --console-address ":9001" 
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: alpha
+      MINIO_ROOT_PASSWORD: alpha123
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9000:9000" # Untuk API (Backend)
+      - "9001:9001" # Untuk Dashboard (Browser)
+
+  backend:
+    build:
+      context: ./backend
+    container_name: taxacore-backend
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - minio
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules # Agar node_modules container tidak tertimpa lokal
+    ports:
+      - "4000:4000"
+    # Pastikan di package.json ada script "dev"
+    command: ["npm", "run", "dev"]
+
+volumes:
+  pgdata:
+  miniodata:

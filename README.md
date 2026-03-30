@@ -1,89 +1,123 @@
-# Taxacore
+﻿# Taxacore
 
-A React + TypeScript + Vite dashboard template with Tailwind v4, Radix UI components, and client-side routing.
+A React + TypeScript + Vite learning dashboard with MinIO storage and PostgreSQL metadata support.
+
+## What is included
+
+- `frontend` React app in `src/`
+- `backend` Express + TypeScript service in `backend/`
+- MinIO object storage for PDFs, videos, and uploads
+- PostgreSQL for metadata
+- Docker Compose to run backend, MinIO, and PostgreSQL together
+- DBeaver support for inspecting the PostgreSQL database
 
 ## Prerequisites
 
 - Node.js 18 or newer
 - npm 10 or newer
+- Docker and Docker Compose
+- DBeaver (optional, for database browsing)
 
-## Setup
+## Local setup
 
-1. Buka folder proyek:
-
-```bash
-cd taxacore
-```
-
-2. Install dependency:
+1. Install frontend dependencies:
 
 ```bash
 npm install
 ```
 
-## Available scripts
+2. Run Docker Compose:
 
-- `npm run dev` - Jalankan development server dengan hot reload
-- `npm run build` - Build aplikasi untuk produksi
-- `npm run preview` - Preview bundle hasil build
-- `npm run lint` - Jalankan pemeriksaan ESLint
+```bash
+docker compose up --build
+```
 
-## Start development
+3. Open the React app:
 
 ```bash
 npm run dev
 ```
 
-Lalu buka browser di `http://localhost:5173`.
+4. Visit:
 
-## Build production
+- Frontend: `http://localhost:5173`
+- MinIO Console: `http://localhost:9001`
+- Backend API: `http://localhost:4000`
 
-```bash
-npm run build
+## Backend service
+
+The backend lives in `backend/` and exposes:
+
+- `GET /api/health`
+- `GET /api/materials`
+- `POST /api/upload`
+
+The backend stores files in MinIO and metadata in PostgreSQL.
+
+## Environment variables
+
+The project uses `.env` in the root with:
+
+- `VITE_API_URL` for the frontend
+- PostgreSQL credentials
+- MinIO credentials
+
+## Database connection for DBeaver
+
+Use these values in DBeaver:
+
+- Host: `localhost`
+- Port: `5432`
+- Database: `taxacore`
+- User: `taxacore`
+- Password: `secret`
+
+## MinIO login
+
+- URL: `http://localhost:9001`
+- Access key: `minioadmin`
+- Secret key: `minioadmin`
+
+## API usage
+
+### Upload file
+
+Send a `multipart/form-data` POST request to `/api/upload` with fields:
+
+- `file`  file upload
+- `title`
+- `classId`
+- `type` (pdf / video / soal)
+- `description` (optional)
+
+### Fetch materials
+
+Call `GET /api/materials`.
+
+## Frontend integration
+
+A minimal service has been added in `src/api/materialService.ts`.
+
+Example:
+
+```ts
+import { fetchMaterials, uploadMaterial } from "./api/materialService";
 ```
 
-Jika build berhasil, file output akan ada di folder `dist/`.
+The frontend reads `VITE_API_URL` from `.env`.
 
-## Preview hasil build
+## Running the backend only
 
-```bash
-npm run preview
-```
-
-## Struktur proyek utama
-
-- `src/main.tsx` - Entrypoint React
-- `src/app/App.tsx` - Root aplikasi dan provider
-- `src/app/routes.tsx` - Router aplikasi
-- `src/app/context/AuthContext.tsx` - Autentikasi demo
-- `src/app/pages/` - Halaman aplikasi
-- `src/app/components/` - Komponen UI, termasuk komponen dashboard
-- `src/app/components/ui/` - Komponen UI generik
-- `src/styles/` - File CSS dan konfigurasi Tailwind
-
-## Keterangan tambahan
-
-- Menggunakan `react-router-dom` untuk routing
-- Menggunakan Tailwind CSS v4 melalui plugin `@tailwindcss/vite`
-- Menggunakan `lucide-react` untuk ikon
-- Menggunakan `radix-ui` untuk komponen UI interaktif
-
-## Troubleshooting
-
-Jika muncul error saat `npm install` atau `npm run dev`:
-
-1. Pastikan Node.js versi terbaru
-2. Hapus `node_modules` dan `package-lock.json`
-3. Jalankan ulang:
+If you want to run just the backend:
 
 ```bash
-rm -rf node_modules package-lock.json
+cd backend
 npm install
+npm run dev
 ```
 
-Jika kamu menggunakan Windows PowerShell, gunakan:
+## Notes
 
-```powershell
-Remove-Item -Recurse -Force node_modules,package-lock.json
-npm install
-```
+- The backend auto-creates the `materials` table if it does not exist.
+- The MinIO bucket is created automatically on startup.
+- Use Docker Compose for the full local stack.

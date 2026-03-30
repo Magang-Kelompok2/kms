@@ -29,7 +29,7 @@ export function ClassDetailPage() {
   const classQuizzes = quizzes.filter((q) => q.classId === classId);
 
   if (!currentClass) {
-    return <div>Class not found</div>;
+    return <div>Kelas tidak ditemukan.</div>;
   }
 
   const canAccess = (itemId: string, type: "material" | "quiz" | "assignment") => {
@@ -73,7 +73,7 @@ export function ClassDetailPage() {
           className="mb-6"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
+          Kembali ke Dashboard
         </Button>
 
         {/* Class Header */}
@@ -100,7 +100,7 @@ export function ClassDetailPage() {
                 {user?.role === "superadmin" && (
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Material
+                    Tambah Materi
                   </Button>
                 )}
               </div>
@@ -113,15 +113,15 @@ export function ClassDetailPage() {
           <TabsList className="mb-6">
             <TabsTrigger value="materials">
               <FileText className="h-4 w-4 mr-2" />
-              Materials
+              Materi
             </TabsTrigger>
             <TabsTrigger value="assignments">
               <ClipboardCheck className="h-4 w-4 mr-2" />
-              Assignments
+              Penugasan
             </TabsTrigger>
             <TabsTrigger value="quizzes">
               <Calendar className="h-4 w-4 mr-2" />
-              Quizzes
+              Kuis
             </TabsTrigger>
           </TabsList>
 
@@ -161,7 +161,7 @@ export function ClassDetailPage() {
                                 {!hasAccess && user?.role !== "superadmin" && (
                                   <Badge variant="destructive" className="text-xs">
                                     <Lock className="h-3 w-3 mr-1" />
-                                    Locked
+                                    Terkunci
                                   </Badge>
                                 )}
                               </div>
@@ -175,7 +175,7 @@ export function ClassDetailPage() {
                                 {material.description}
                               </p>
                               <p className="text-xs text-gray-500">
-                                Created: {material.createdAt}
+                                Dibuat pada: {material.createdAt}
                               </p>
                             </div>
                             <div className="flex gap-2 ml-4">
@@ -185,14 +185,14 @@ export function ClassDetailPage() {
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                   <Button size="sm" variant="outline">
-                                    Manage Access
+                                    Kelola Akses
                                   </Button>
                                 </>
                               )}
                               {hasAccess && isPublished && (
                                 <Button size="sm">
                                   <Eye className="h-4 w-4 mr-2" />
-                                  View
+                                  Detail
                                 </Button>
                               )}
                             </div>
@@ -208,7 +208,7 @@ export function ClassDetailPage() {
                 <Card className="p-12 text-center">
                   <FileText className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
                   <p className="text-gray-600 dark:text-gray-400">
-                    No materials available yet
+                    Tidak ada materi yang tersedia untuk kelas ini.
                   </p>
                 </Card>
               )}
@@ -245,12 +245,12 @@ export function ClassDetailPage() {
                             }
                             className="text-xs"
                           >
-                            Due: {assignment.dueDate}
+                            Tenggat: {assignment.dueDate}
                           </Badge>
                           {!hasAccess && user?.role !== "superadmin" && (
                             <Badge variant="destructive" className="text-xs">
                               <Lock className="h-3 w-3 mr-1" />
-                              Locked
+                              Terkunci
                             </Badge>
                           )}
                         </div>
@@ -262,7 +262,7 @@ export function ClassDetailPage() {
                       {hasAccess && isPublished && (
                         <Button size="sm">
                           <Eye className="h-4 w-4 mr-2" />
-                          View
+                          Detail
                         </Button>
                       )}
                     </div>
@@ -274,7 +274,7 @@ export function ClassDetailPage() {
                 <Card className="p-12 text-center">
                   <ClipboardCheck className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
                   <p className="text-gray-600 dark:text-gray-400">
-                    No assignments available
+                    Tidak ada penugasan yang tersedia untuk kelas ini.
                   </p>
                 </Card>
               )}
@@ -304,15 +304,15 @@ export function ClassDetailPage() {
                             Pertemuan {quiz.meetingNumber}
                           </Badge>
                           <Badge variant="outline" className="text-xs">
-                            {quiz.duration} minutes
+                            {quiz.duration} menit
                           </Badge>
                           <Badge variant="outline" className="text-xs">
-                            {quiz.questions.length} questions
+                            {quiz.questions.length} pertanyaan
                           </Badge>
                           {!hasAccess && user?.role !== "superadmin" && (
                             <Badge variant="destructive" className="text-xs">
                               <Lock className="h-3 w-3 mr-1" />
-                              Locked
+                              Terkunci
                             </Badge>
                           )}
                         </div>
@@ -321,7 +321,7 @@ export function ClassDetailPage() {
                       {hasAccess && isPublished && (
                         <Button size="sm">
                           <Calendar className="h-4 w-4 mr-2" />
-                          Start Quiz
+                          Mulai Kuis
                         </Button>
                       )}
                     </div>
@@ -333,7 +333,7 @@ export function ClassDetailPage() {
                 <Card className="p-12 text-center">
                   <Calendar className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
                   <p className="text-gray-600 dark:text-gray-400">
-                    No quizzes available
+                    Tidak ada kuis tersedia untuk kelas ini.
                   </p>
                 </Card>
               )}
