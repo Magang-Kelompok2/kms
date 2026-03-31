@@ -1,11 +1,12 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { DashboardHeader } from "../components/DashboardHeader";
-import { classes, materials, assignments, quizzes, userAccess } from "../data/mockData";
+import { classes, materials, assignments, quizzes, userProgress, submissions } from "../data/mockData";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import type { Material, Assignment, Quiz } from "../types";
 import {
   ArrowLeft,
   FileText,
@@ -15,54 +16,211 @@ import {
   Plus,
   Eye,
   Edit,
+  Layers,
 } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { LevelCard } from "../components/LevelCard";
+import { UserLevelCard } from "../components/UserLevelCard";
+import { AdminLevelCard } from "../components/AdminLevelCard";
+import { useState } from "react";
 
 export function ClassDetailPage() {
   const { classId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // State for managing content
+  const [localMaterials, setLocalMaterials] = useState<Material[]>([]);
+  const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
+  const [localQuizzes, setLocalQuizzes] = useState<Quiz[]>([]);
 
   const currentClass = classes.find((c) => c.id === classId);
-  const classMaterials = materials.filter((m) => m.classId === classId);
-  const classAssignments = assignments.filter((a) => a.classId === classId);
-  const classQuizzes = quizzes.filter((q) => q.classId === classId);
+  
+  // Initialize local state from mockData
+  const classMaterials = [...materials.filter((m) => m.classId === classId), ...localMaterials];
+  const classAssignments = [...assignments.filter((a) => a.classId === classId), ...localAssignments];
+  const classQuizzes = [...quizzes.filter((q) => q.classId === classId), ...localQuizzes];
+
+  // Get user progress for this class
+  const progress = userProgress.find(
+    (p) => p.userId === user?.id && p.classId === classId
+  );
+  const userLevel = progress?.currentLevel || 1;
 
   if (!currentClass) {
-    return <div>Kelas tidak ditemukan.</div>;
+    return <div>Class not found</div>;
   }
 
-  const canAccess = (itemId: string, type: "material" | "quiz" | "assignment") => {
+  const canAccessLevel = (level: number) => {
     if (user?.role === "superadmin") return true;
-    
-    switch (type) {
-      case "material":
-        return userAccess.materialIds.includes(itemId);
-      case "quiz":
-        return userAccess.quizIds.includes(itemId);
-      case "assignment":
-        return userAccess.assignmentIds.includes(itemId);
-      default:
-        return false;
-    }
+    return level <= userLevel;
   };
 
-  // Group materials by meeting number
-  const materialsByMeeting = classMaterials.reduce((acc, material) => {
-    const meeting = material.meetingNumber;
-    if (!acc[meeting]) {
-      acc[meeting] = [];
+  // Group by level for superadmin view
+  const assignmentsByLevel = classAssignments.reduce((acc, assignment) => {
+    const level = assignment.level;
+    if (!acc[level]) {
+      acc[level] = [];
     }
-    acc[meeting].push(material);
+    acc[level].push(assignment);
     return acc;
-  }, {} as Record<number, typeof classMaterials>);
+  }, {} as Record<number, Assignment[]>);
 
-  const meetingNumbers = Object.keys(materialsByMeeting)
+  const quizzesByLevel = classQuizzes.reduce((acc, quiz) => {
+    const level = quiz.level;
+    if (!acc[level]) {
+      acc[level] = [];
+    }
+    acc[level].push(quiz);
+    return acc;
+  }, {} as Record<number, Quiz[]>);
+
+  const allLevels = Array.from(
+    new Set([
+      ...Object.keys(assignmentsByLevel).map(Number),
+      ...Object.keys(quizzesByLevel).map(Number),
+    ])
+  ).sort((a, b) => a - b);
+
+  // Group materials by level and meeting number for user view
+  const materialsByLevel = classMaterials.reduce((acc, material) => {
+    const level = material.level;
+    if (!acc[level]) {
+      acc[level] = [];
+    }
+    acc[level].push(material);
+    return acc;
+  }, {} as Record<number, Material[]>);
+
+  const materialLevels = Object.keys(materialsByLevel)
     .map(Number)
     .sort((a, b) => a - b);
 
+  // Get all levels for user view (1-3)
+  const allUserLevels = Array.from(
+    new Set([
+      ...materialLevels,
+      ...Object.keys(assignmentsByLevel).map(Number),
+      ...Object.keys(quizzesByLevel).map(Number),
+    ])
+  ).sort((a, b) => a - b);
+
+  // Superadmin View
+  if (user?.role === "superadmin") {
+    return (
+      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
+        <DashboardHeader />
+
+        <div className="container mx-auto px-4 md:px-6 py-8">
+          {/* Back Button */}
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/dashboard")}
+            className="mb-6"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+
+          {/* Class Header */}
+          <Card className="overflow-hidden mb-8">
+            <div className="relative h-48">
+              <ImageWithFallback
+                src={currentClass.icon}
+                alt={currentClass.name}
+                className="w-full h-full object-cover"
+              />
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${currentClass.color} opacity-90`}
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <h1
+                  className="text-4xl font-normal text-white"
+                  style={{ fontFamily: "Coolvetica, sans-serif" }}
+                >
+                  {currentClass.name}
+                </h1>
+              </div>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 dark:text-gray-400">
+                {currentClass.description}
+              </p>
+            </div>
+          </Card>
+
+          {/* Stats */}
+          <div className="grid md:grid-cols-3 gap-4 mb-8">
+            <Card className="p-6">
+              <div className="flex items-center gap-3">
+                <Layers className="h-8 w-8 text-[#0C4E8C]" />
+                <div>
+                  <p className="text-2xl font-bold">{currentClass.totalLevels}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Jumlah Tingkatan
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center gap-3">
+                <FileText className="h-8 w-8 text-[#0C81E4]" />
+                <div>
+                  <p className="text-2xl font-bold">{classAssignments.length}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Jumlah Pengumpulan
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center gap-3">
+                <ClipboardCheck className="h-8 w-8 text-[#11C4D4]" />
+                <div>
+                  <p className="text-2xl font-bold">{classQuizzes.length}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Jumlah Kuis
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Levels */}
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-normal mb-2">Kelola Konten per Tingkatan</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Tambah dan kelola materi, tugas, dan kuis untuk setiap tingkatan
+              </p>
+            </div>
+            
+            {Array.from({ length: currentClass.totalLevels }, (_, i) => i + 1).map(
+              (level) => (
+                <AdminLevelCard
+                  key={level}
+                  level={level}
+                  materials={materialsByLevel[level] || []}
+                  assignments={assignmentsByLevel[level] || []}
+                  quizzes={quizzesByLevel[level] || []}
+                  classId={classId!}
+                  onAddMaterial={(material) => setLocalMaterials([...localMaterials, material])}
+                  onAddAssignment={(assignment) =>
+                    setLocalAssignments([...localAssignments, assignment])
+                  }
+                  onAddQuiz={(quiz) => setLocalQuizzes([...localQuizzes, quiz])}
+                />
+              )
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // User View (existing code for students)
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
       <DashboardHeader />
 
       <div className="container mx-auto px-4 md:px-6 py-8">
@@ -77,269 +235,96 @@ export function ClassDetailPage() {
         </Button>
 
         {/* Class Header */}
-        <div className="mb-8">
-          <Card className="overflow-hidden">
-            <div className="relative h-48">
-              <ImageWithFallback
-                src={currentClass.icon}
-                alt={currentClass.name}
-                className="w-full h-full object-cover"
-              />
-              <div className={`absolute inset-0 bg-gradient-to-br ${currentClass.color} opacity-90`} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <h1 className="text-4xl font-bold text-white" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
-                  {currentClass.name}
-                </h1>
+        <Card className="overflow-hidden mb-8">
+          <div className="relative h-48">
+            <ImageWithFallback
+              src={currentClass.icon}
+              alt={currentClass.name}
+              className="w-full h-full object-cover"
+            />
+            <div
+              className={`absolute inset-0 bg-gradient-to-br ${currentClass.color} opacity-90`}
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <h1
+                className="text-4xl font-normal text-white"
+                style={{ fontFamily: "Coolvetica, sans-serif" }}
+              >
+                {currentClass.name}
+              </h1>
+            </div>
+          </div>
+          <div className="p-6">
+            <p className="text-gray-600 dark:text-gray-400">
+              {currentClass.description}
+            </p>
+          </div>
+        </Card>
+
+        {/* Stats */}
+        <div className="grid md:grid-cols-3 gap-4 mb-8">
+          <Card className="p-6">
+            <div className="flex items-center gap-3">
+              <Layers className="h-8 w-8 text-[#0C4E8C]" />
+              <div>
+                <p className="text-2xl font-bold">{currentClass.totalLevels}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Total Tingkatan
+                </p>
               </div>
             </div>
-            <div className="p-6">
-              <div className="flex items-start justify-between">
-                <p className="text-gray-600 dark:text-gray-400">
-                  {currentClass.description}
+          </Card>
+          <Card className="p-6">
+            <div className="flex items-center gap-3">
+              <FileText className="h-8 w-8 text-[#0C81E4]" />
+              <div>
+                <p className="text-2xl font-bold">{classMaterials.length}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Materi
                 </p>
-                {user?.role === "superadmin" && (
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Tambah Materi
-                  </Button>
-                )}
+              </div>
+            </div>
+          </Card>
+          <Card className="p-6">
+            <div className="flex items-center gap-3">
+              <ClipboardCheck className="h-8 w-8 text-[#11C4D4]" />
+              <div>
+                <p className="text-2xl font-bold">
+                  {classAssignments.length + classQuizzes.length}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Penugasan & Kuis
+                </p>
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Content Tabs */}
-        <Tabs defaultValue="materials" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="materials">
-              <FileText className="h-4 w-4 mr-2" />
-              Materi
-            </TabsTrigger>
-            <TabsTrigger value="assignments">
-              <ClipboardCheck className="h-4 w-4 mr-2" />
-              Penugasan
-            </TabsTrigger>
-            <TabsTrigger value="quizzes">
-              <Calendar className="h-4 w-4 mr-2" />
-              Kuis
-            </TabsTrigger>
-          </TabsList>
+        {/* Progress Badge */}
+        <div className="mb-6">
+          <Badge variant="default" className="text-sm py-2 px-4">
+            Tingkatan Saat Ini: {userLevel} / {currentClass.totalLevels}
+          </Badge>
+        </div>
 
-          {/* Materials Tab */}
-          <TabsContent value="materials">
-            <div className="space-y-6">
-              {meetingNumbers.map((meetingNum) => (
-                <div key={meetingNum}>
-                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    📅 Pertemuan {meetingNum}
-                  </h3>
-                  <div className="grid gap-4">
-                    {materialsByMeeting[meetingNum].map((material) => {
-                      const hasAccess = canAccess(material.id, "material");
-                      const isPublished = material.isPublished;
-
-                      return (
-                        <Card
-                          key={material.id}
-                          className={`p-6 ${
-                            hasAccess && isPublished
-                              ? "hover:shadow-md cursor-pointer"
-                              : "opacity-60"
-                          } transition-shadow`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Badge variant="secondary" className="text-xs">
-                                  Pertemuan {material.meetingNumber}
-                                </Badge>
-                                {!isPublished && (
-                                  <Badge variant="outline" className="text-xs">
-                                    Draft
-                                  </Badge>
-                                )}
-                                {!hasAccess && user?.role !== "superadmin" && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    <Lock className="h-3 w-3 mr-1" />
-                                    Terkunci
-                                  </Badge>
-                                )}
-                              </div>
-                              <h4 className="font-semibold mb-1 flex items-center gap-2">
-                                {material.title}
-                                {!hasAccess && user?.role !== "superadmin" && (
-                                  <Lock className="h-4 w-4 text-gray-400" />
-                                )}
-                              </h4>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                                {material.description}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Dibuat pada: {material.createdAt}
-                              </p>
-                            </div>
-                            <div className="flex gap-2 ml-4">
-                              {user?.role === "superadmin" && (
-                                <>
-                                  <Button size="sm" variant="outline">
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    Kelola Akses
-                                  </Button>
-                                </>
-                              )}
-                              {hasAccess && isPublished && (
-                                <Button size="sm">
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  Detail
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              {classMaterials.length === 0 && (
-                <Card className="p-12 text-center">
-                  <FileText className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Tidak ada materi yang tersedia untuk kelas ini.
-                  </p>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Assignments Tab */}
-          <TabsContent value="assignments">
-            <div className="grid gap-4">
-              {classAssignments.map((assignment) => {
-                const hasAccess = canAccess(assignment.id, "assignment");
-                const isPublished = assignment.isPublished;
-
-                return (
-                  <Card
-                    key={assignment.id}
-                    className={`p-6 ${
-                      hasAccess && isPublished
-                        ? "hover:shadow-md cursor-pointer"
-                        : "opacity-60"
-                    } transition-shadow`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="secondary" className="text-xs">
-                            Pertemuan {assignment.meetingNumber}
-                          </Badge>
-                          <Badge
-                            variant={
-                              new Date(assignment.dueDate) > new Date()
-                                ? "default"
-                                : "destructive"
-                            }
-                            className="text-xs"
-                          >
-                            Tenggat: {assignment.dueDate}
-                          </Badge>
-                          {!hasAccess && user?.role !== "superadmin" && (
-                            <Badge variant="destructive" className="text-xs">
-                              <Lock className="h-3 w-3 mr-1" />
-                              Terkunci
-                            </Badge>
-                          )}
-                        </div>
-                        <h4 className="font-semibold mb-1">{assignment.title}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {assignment.description}
-                        </p>
-                      </div>
-                      {hasAccess && isPublished && (
-                        <Button size="sm">
-                          <Eye className="h-4 w-4 mr-2" />
-                          Detail
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-
-              {classAssignments.length === 0 && (
-                <Card className="p-12 text-center">
-                  <ClipboardCheck className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Tidak ada penugasan yang tersedia untuk kelas ini.
-                  </p>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Quizzes Tab */}
-          <TabsContent value="quizzes">
-            <div className="grid gap-4">
-              {classQuizzes.map((quiz) => {
-                const hasAccess = canAccess(quiz.id, "quiz");
-                const isPublished = quiz.isPublished;
-
-                return (
-                  <Card
-                    key={quiz.id}
-                    className={`p-6 ${
-                      hasAccess && isPublished
-                        ? "hover:shadow-md cursor-pointer"
-                        : "opacity-60"
-                    } transition-shadow`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="secondary" className="text-xs">
-                            Pertemuan {quiz.meetingNumber}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {quiz.duration} menit
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {quiz.questions.length} pertanyaan
-                          </Badge>
-                          {!hasAccess && user?.role !== "superadmin" && (
-                            <Badge variant="destructive" className="text-xs">
-                              <Lock className="h-3 w-3 mr-1" />
-                              Terkunci
-                            </Badge>
-                          )}
-                        </div>
-                        <h4 className="font-semibold mb-1">{quiz.title}</h4>
-                      </div>
-                      {hasAccess && isPublished && (
-                        <Button size="sm">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Mulai Kuis
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-
-              {classQuizzes.length === 0 && (
-                <Card className="p-12 text-center">
-                  <Calendar className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Tidak ada kuis tersedia untuk kelas ini.
-                  </p>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+        {/* Levels */}
+        <div className="space-y-4">
+          <h2 className="text-2xl font-normal">Progres Pembelajaran</h2>
+          {Array.from({ length: currentClass.totalLevels }, (_, i) => i + 1).map(
+            (level) => (
+              <UserLevelCard
+                key={level}
+                level={level}
+                materials={materialsByLevel[level] || []}
+                assignments={assignmentsByLevel[level] || []}
+                quizzes={quizzesByLevel[level] || []}
+                classId={classId!}
+                isLocked={!canAccessLevel(level)}
+                userLevel={userLevel}
+              />
+            )
+          )}
+        </div>
       </div>
     </div>
   );

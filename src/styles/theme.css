@@ -1,5 +1,4 @@
 @custom-variant dark (&:is(.dark *));
-@import "tailwindcss";
 
 :root {
   --font-size: 16px;
@@ -25,8 +24,8 @@
   --input: transparent;
   --input-background: #f3f3f5;
   --switch-background: #cbced4;
-  --font-weight-medium: 400;
-  --font-weight-normal: 300;
+  --font-weight-medium: 300;
+  --font-weight-normal: 200;
   --ring: oklch(0.708 0 0);
   --chart-1: #0C4E8C;
   --chart-2: #0C81E4;
@@ -151,37 +150,37 @@
 
   h1 {
     font-size: var(--text-2xl);
-    font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-medium);
     line-height: 1.5;
   }
 
   h2 {
     font-size: var(--text-xl);
-    font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-medium);
     line-height: 1.5;
   }
 
   h3 {
     font-size: var(--text-lg);
-    font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-medium);
     line-height: 1.5;
   }
 
   h4 {
     font-size: var(--text-base);
-    font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-medium);
     line-height: 1.5;
   }
 
   label {
     font-size: var(--text-base);
-    font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-medium);
     line-height: 1.5;
   }
 
   button {
     font-size: var(--text-base);
-    font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-medium);
     line-height: 1.5;
   }
 

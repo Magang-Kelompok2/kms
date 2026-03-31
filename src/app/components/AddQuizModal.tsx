@@ -1,0 +1,322 @@
+import { useState } from "react";
+import { Button } from "./ui/button";
+import { X, Plus, Trash2, Clock } from "lucide-react";
+
+interface AddQuizModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  classId: string;
+  level: number;
+  onAdd: (quiz: any) => void;
+}
+
+interface Question {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+}
+
+export function AddQuizModal({
+  isOpen,
+  onClose,
+  classId,
+  level,
+  onAdd,
+}: AddQuizModalProps) {
+  const [title, setTitle] = useState("");
+  const [meetingNumber, setMeetingNumber] = useState("");
+  const [duration, setDuration] = useState("");
+  const [numberOfQuestions, setNumberOfQuestions] = useState("");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [showQuestionForm, setShowQuestionForm] = useState(false);
+
+  if (!isOpen) return null;
+
+  const initializeQuestions = () => {
+    const num = parseInt(numberOfQuestions);
+    if (num > 0 && num <= 50) {
+      const newQuestions: Question[] = Array.from({ length: num }, (_, i) => ({
+        id: `q${i + 1}`,
+        question: "",
+        options: ["", "", "", ""],
+        correctAnswer: 0,
+      }));
+      setQuestions(newQuestions);
+      setShowQuestionForm(true);
+    } else {
+      alert("Jumlah soal harus antara 1-50");
+    }
+  };
+
+  const updateQuestion = (index: number, field: keyof Question, value: any) => {
+    const newQuestions = [...questions];
+    newQuestions[index] = { ...newQuestions[index], [field]: value };
+    setQuestions(newQuestions);
+  };
+
+  const updateOption = (questionIndex: number, optionIndex: number, value: string) => {
+    const newQuestions = [...questions];
+    newQuestions[questionIndex].options[optionIndex] = value;
+    setQuestions(newQuestions);
+  };
+
+  const removeQuestion = (index: number) => {
+    setQuestions(questions.filter((_, i) => i !== index));
+    setNumberOfQuestions((questions.length - 1).toString());
+  };
+
+  const addQuestion = () => {
+    setQuestions([
+      ...questions,
+      {
+        id: `q${questions.length + 1}`,
+        question: "",
+        options: ["", "", "", ""],
+        correctAnswer: 0,
+      },
+    ]);
+    setNumberOfQuestions((questions.length + 1).toString());
+  };
+
+  const handleSubmit = () => {
+    if (!title || !meetingNumber || !duration) {
+      alert("Mohon lengkapi semua field yang wajib diisi");
+      return;
+    }
+
+    if (questions.length === 0) {
+      alert("Mohon buat minimal 1 soal");
+      return;
+    }
+
+    // Validate all questions
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.question.trim()) {
+        alert(`Soal nomor ${i + 1} belum diisi`);
+        return;
+      }
+      for (let j = 0; j < q.options.length; j++) {
+        if (!q.options[j].trim()) {
+          alert(`Pilihan ${String.fromCharCode(65 + j)} pada soal ${i + 1} belum diisi`);
+          return;
+        }
+      }
+    }
+
+    const newQuiz = {
+      id: `quiz-${Date.now()}`,
+      title,
+      classId,
+      meetingNumber: parseInt(meetingNumber),
+      level,
+      duration: parseInt(duration),
+      isPublished: true,
+      questions: questions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+      })),
+    };
+
+    onAdd(newQuiz);
+    
+    // Reset form
+    setTitle("");
+    setMeetingNumber("");
+    setDuration("");
+    setNumberOfQuestions("");
+    setQuestions([]);
+    setShowQuestionForm(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between z-10">
+          <h2 className="text-2xl font-bold">Tambah Kuis - Level {level}</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Quiz Info */}
+          <div className="space-y-6">
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Judul Kuis <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Contoh: Kuis: Dasar-dasar Perpajakan"
+                className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              {/* Meeting Number */}
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Pertemuan Ke- <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={meetingNumber}
+                  onChange={(e) => setMeetingNumber(e.target.value)}
+                  placeholder="1"
+                  min="1"
+                  className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+                />
+              </div>
+
+              {/* Duration */}
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Durasi (menit) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    placeholder="30"
+                    min="5"
+                    className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+                  />
+                  <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Number of Questions */}
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Jumlah Soal <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={numberOfQuestions}
+                  onChange={(e) => setNumberOfQuestions(e.target.value)}
+                  placeholder="10"
+                  min="1"
+                  max="50"
+                  disabled={showQuestionForm}
+                  className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            {!showQuestionForm && numberOfQuestions && (
+              <Button onClick={initializeQuestions} className="w-full text-base py-6">
+                Buat {numberOfQuestions} Soal
+              </Button>
+            )}
+          </div>
+
+          {/* Questions Form */}
+          {showQuestionForm && questions.length > 0 && (
+            <div className="space-y-6 border-t pt-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold">Soal-Soal Kuis</h3>
+                <Button onClick={addQuestion} variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Soal
+                </Button>
+              </div>
+
+              {questions.map((question, qIndex) => (
+                <div
+                  key={question.id}
+                  className="border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-4"
+                >
+                  <div className="flex items-start justify-between">
+                    <h4 className="font-bold text-lg">Soal {qIndex + 1}</h4>
+                    {questions.length > 1 && (
+                      <button
+                        onClick={() => removeQuestion(qIndex)}
+                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Question Text */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">
+                      Pertanyaan <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={question.question}
+                      onChange={(e) => updateQuestion(qIndex, "question", e.target.value)}
+                      placeholder="Tulis pertanyaan di sini..."
+                      className="w-full h-24 px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 resize-none"
+                    />
+                  </div>
+
+                  {/* Options */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-3">
+                      Pilihan Jawaban <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-3">
+                      {question.options.map((option, oIndex) => (
+                        <div key={oIndex} className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name={`correct-${qIndex}`}
+                            checked={question.correctAnswer === oIndex}
+                            onChange={() => updateQuestion(qIndex, "correctAnswer", oIndex)}
+                            className="w-5 h-5 text-blue-600"
+                          />
+                          <div className="flex-1 flex items-center gap-2">
+                            <span className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded font-semibold text-sm">
+                              {String.fromCharCode(65 + oIndex)}
+                            </span>
+                            <input
+                              type="text"
+                              value={option}
+                              onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
+                              placeholder={`Pilihan ${String.fromCharCode(65 + oIndex)}`}
+                              className="flex-1 px-4 py-2 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Pilih radio button untuk menandai jawaban yang benar
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-6 flex gap-3 z-10">
+          <Button
+            onClick={handleSubmit}
+            disabled={!showQuestionForm || questions.length === 0}
+            className="flex-1 text-base py-6"
+          >
+            Simpan Kuis ({questions.length} soal)
+          </Button>
+          <Button variant="outline" onClick={onClose} className="text-base py-6">
+            Batal
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

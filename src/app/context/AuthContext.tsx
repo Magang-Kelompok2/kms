@@ -1,5 +1,4 @@
-import { createContext, useContext, useState } from "react";
-import type { ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import type { User } from "../types";
 
 interface AuthContextType {
@@ -21,6 +20,7 @@ const mockUsers: { email: string; password: string; user: User }[] = [
       name: "Super Admin",
       email: "admin@example.com",
       role: "superadmin",
+      createdAt: "2026-01-01",
     },
   },
   {
@@ -31,6 +31,7 @@ const mockUsers: { email: string; password: string; user: User }[] = [
       name: "John Doe",
       email: "user@example.com",
       role: "user",
+      createdAt: "2026-02-15",
     },
   },
 ];

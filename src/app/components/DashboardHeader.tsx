@@ -1,7 +1,7 @@
-import { BookOpen, Bell, User, Moon, Sun, LogOut } from "lucide-react";
+import { BookOpen, Bell, User, Moon, Sun, LogOut, Users } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -33,11 +33,11 @@ export function DashboardHeader() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-lg flex items-center justify-center">
-            <BookOpen className="h-5 w-5 text-white" />
+          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center cursor-pointer" onClick={() => navigate("/dashboard")}>
+            <img src="/LogoAlpha.svg" alt="Alpha" />
           </div>
-          <div>
-            <span className="text-xl font-semibold" style={{ fontFamily: 'Coolvetica, sans-serif' }}>TaxaCore</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xl font-normal cursor-pointer" style={{ fontFamily: 'Coolvetica, sans-serif' }} onClick={() => navigate("/dashboard")}>TaxaCore</span>
             {user && (
               <Badge
                 variant="outline"
@@ -85,15 +85,14 @@ export function DashboardHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/profile")}>Profil</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleLogout}
                 className="text-red-600 dark:text-red-400"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                Log out
+                Keluar
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

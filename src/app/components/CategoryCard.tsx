@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 import { Card } from "./ui/card";
 
 interface CategoryCardProps {

@@ -25,7 +25,7 @@ export function Header() {
         {/* Logo */}
         <div className="flex items-center gap-2">
           <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          <span className="text-xl font-normal">KnowledgeHub</span>
+          <span className="text-xl font-semibold">KnowledgeHub</span>
         </div>
 
         {/* Search Bar - Hidden on mobile */}

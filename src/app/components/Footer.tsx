@@ -1,4 +1,4 @@
-import { BookOpen, ExternalLink, Link, Mail, Share2 } from "lucide-react";
+import { BookOpen, Github, Twitter, Linkedin, Mail } from "lucide-react";
 
 export function Footer() {
   return (
@@ -19,19 +19,19 @@ export function Footer() {
                 href="#"
                 className="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
               >
-                <Share2 className="h-5 w-5" />
+                <Twitter className="h-5 w-5" />
               </a>
               <a
                 href="#"
                 className="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
               >
-                <ExternalLink className="h-5 w-5" />
+                <Github className="h-5 w-5" />
               </a>
               <a
                 href="#"
                 className="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
               >
-                <Link className="h-5 w-5" />
+                <Linkedin className="h-5 w-5" />
               </a>
               <a
                 href="#"
