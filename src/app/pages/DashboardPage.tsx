@@ -1,6 +1,5 @@
 import { useAuth } from "../context/AuthContext";
 import { DashboardHeader } from "../components/DashboardHeader";
-import { mockUsers, submissions } from "../data/mockData"; // sementara untuk user management
 import { Card } from "../components/ui/card";
 import {
   BookOpen,
@@ -20,45 +19,40 @@ import { useState } from "react";
 import { useClasses } from "../hooks/useClasses";
 import { useMateri } from "../hooks/useMateri";
 import { useTugas } from "../hooks/useTugas";
+import { useUsers } from "../hooks/useUsers";
 
 export function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Supabase / API hooks
   const { classes, loading: classesLoading } = useClasses();
   const { materi, loading: materiLoading } = useMateri();
   const { tugas, loading: tugasLoading } = useTugas();
+  const { users, loading: usersLoading, deleteUser } = useUsers();
 
-  // Derived: pisahkan tugas berdasarkan type (sesuai seed: "Tugas" vs "Kuis")
   const penugasan = tugas.filter((t) => t.type !== "Kuis");
   const kuis = tugas.filter((t) => t.type === "Kuis");
 
-  // User management (masih mockData sementara)
-  const [localUsers, setLocalUsers] = useState(mockUsers);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const handleDeleteUser = (userId: string) => {
-    if (userId === "1") {
+  const handleDeleteUser = async (userId: number, role: string) => {
+    if (role === "superadmin") {
       alert("Cannot delete superadmin account!");
       return;
     }
     if (confirm("Are you sure you want to delete this user?")) {
-      setLocalUsers((prev) => prev.filter((u) => u.id !== userId));
-      alert("User deleted successfully!");
+      const success = await deleteUser(userId);
+      if (success) alert("User deleted successfully!");
+      else alert("Gagal menghapus pengguna.");
     }
   };
 
-  const getPendingSubmissionsCount = (userId: string) => {
-    return submissions.filter(
-      (s) => s.userId === userId && s.status === "pending",
-    ).length;
-  };
-
-  const filteredUsers = localUsers.filter((u) =>
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filteredUsers = users.filter(
+    (u) =>
+      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()),
   );
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const currentUsers = filteredUsers.slice(
@@ -235,81 +229,81 @@ export function DashboardPage() {
                       <th className="px-6 py-4 text-left text-sm font-semibold">
                         Dibuat Pada
                       </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Tertunda
-                      </th>
                       <th className="px-6 py-4 text-center text-sm font-semibold">
                         Aksi
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {currentUsers.map((u) => (
-                      <tr
-                        key={u.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-normal">
-                              {u.name.charAt(0)}
-                            </div>
-                            <span className="font-medium">{u.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                          {u.email}
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge
-                            variant={
-                              u.role === "superadmin" ? "default" : "secondary"
-                            }
-                          >
-                            {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                          {new Date(u.createdAt).toLocaleDateString("id-ID")}
-                        </td>
-                        <td className="px-6 py-4">
-                          {u.role === "user" && (
-                            <Badge
-                              variant="outline"
-                              className="bg-yellow-50 dark:bg-yellow-900/20"
-                            >
-                              {getPendingSubmissionsCount(u.id)} Tertunda
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                navigate(`/users/${u.id}/progress`)
-                              }
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Lihat
-                            </Button>
-                            {u.role !== "superadmin" && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteUser(u.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
+                    {usersLoading ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-8 text-center text-gray-500"
+                        >
+                          Memuat pengguna...
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      currentUsers.map((u) => (
+                        <tr
+                          key={u.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-normal">
+                                {u.username.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium">{u.username}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                            {u.email}
+                          </td>
+                          <td className="px-6 py-4">
+                            <Badge
+                              variant={
+                                u.role === "superadmin"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                            {new Date(u.created_at).toLocaleDateString("id-ID")}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  navigate(`/users/${u.id}/progress`)
+                                }
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Lihat
+                              </Button>
+                              {u.role !== "superadmin" && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteUser(u.id, u.role);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -325,7 +319,7 @@ export function DashboardPage() {
                   Sebelumnya
                 </Button>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Halaman {currentPage} dari {totalPages}
+                  Halaman {currentPage} dari {Math.max(totalPages, 1)}
                 </div>
                 <Button
                   size="sm"
@@ -333,7 +327,7 @@ export function DashboardPage() {
                   onClick={() =>
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || totalPages === 0}
                 >
                   Selanjutnya
                 </Button>

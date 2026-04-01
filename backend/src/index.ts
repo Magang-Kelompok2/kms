@@ -61,7 +61,59 @@ app.get("/api/kelas", async (_req, res) => {
     res.status(500).json({ success: false, error: "Failed to fetch kelas" });
   }
 });
+// ─── SUPERADMIN ─────────────────────────────────────────────────────────
+// ─── GET ALL USERS ────────────────────────────────────────────────────────────
+// Tambahkan ini di backend/src/index.ts
 
+app.get("/api/users", async (_req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("user")
+      .select("id_user, username, email, role, id_kelas, created_at")
+      .order("id_user", { ascending: true });
+
+    if (error) throw error;
+
+    const mapped = (data ?? []).map((u) => ({
+      id: u.id_user,
+      username: u.username,
+      email: u.email,
+      role: u.role ?? "user",
+      id_kelas: u.id_kelas,
+      created_at: u.created_at,
+    }));
+
+    res.json({ success: true, data: mapped });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch users" });
+  }
+});
+
+// ─── DELETE USER ──────────────────────────────────────────────────────────────
+
+app.delete("/api/users/:userId", async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (isNaN(userId)) {
+    return res
+      .status(400)
+      .json({ success: false, error: "userId harus berupa angka" });
+  }
+
+  try {
+    const { error } = await supabase
+      .from("user")
+      .delete()
+      .eq("id_user", userId);
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ success: false, error: "Failed to delete user" });
+  }
+});
 // ─── GET SINGLE KELAS ─────────────────────────────────────────────────────────
 
 app.get("/api/kelas/:classId", async (req, res) => {
