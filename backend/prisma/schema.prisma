@@ -1,0 +1,152 @@
+// backend/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Kelas {
+  id_kelas   Int       @id @default(autoincrement())
+  nama_kelas String    @db.VarChar(256)
+  created_at DateTime  @default(now())
+  
+  // Relations
+  users      User[]
+  tingkatan  Tingkatan[]
+  materi     Materi[]
+  tugas      Tugas[]
+
+  @@map("kelas")
+}
+
+model User {
+  id_user    Int       @id @default(autoincrement())
+  username   String    @db.VarChar(256)
+  email      String    @unique @db.VarChar(256)
+  password   String    @db.VarChar(256)
+  role       String?   @db.VarChar(50)
+  id_kelas   Int?
+  created_at DateTime  @default(now())
+  
+  // Relations
+  kelas      Kelas?    @relation(fields: [id_kelas], references: [id_kelas], onDelete: SetNull)
+  pengumpulan UserPengumpulan[]
+
+  @@map("user")
+}
+
+model Tingkatan {
+  id_tingkatan   Int      @id @default(autoincrement())
+  nama_tingkatan String   @db.VarChar(256)
+  id_kelas       Int
+  
+  // Relations
+  kelas          Kelas    @relation(fields: [id_kelas], references: [id_kelas], onDelete: Cascade)
+  materi         Materi[]
+
+  @@map("tingkatan")
+}
+
+model Materi {
+  id_materi    Int       @id @default(autoincrement())
+  title_materi String    @db.VarChar(256)
+  materi_path  String?   @db.VarChar(256)
+  id_kelas     Int
+  id_tingkatan Int
+  
+  // Relations
+  kelas      Kelas     @relation(fields: [id_kelas], references: [id_kelas], onDelete: Cascade)
+  tingkatan  Tingkatan @relation(fields: [id_tingkatan], references: [id_tingkatan], onDelete: Cascade)
+  videos     Video[]
+  pdfs       Pdf[]
+  tugas      Tugas[]
+
+  @@map("materi")
+}
+
+model Video {
+  id_video    Int     @id @default(autoincrement())
+  id_materi   Int
+  title_video String? @db.VarChar(256)
+  video_path  String? @db.VarChar(256)
+  
+  // Relations
+  materi      Materi  @relation(fields: [id_materi], references: [id_materi], onDelete: Cascade)
+
+  @@map("video")
+}
+
+model Pdf {
+  id_pdf     Int     @id @default(autoincrement())
+  title_pdf  String? @db.VarChar(256)
+  pdf_path   String? @db.VarChar(256)
+  id_materi  Int
+  
+  // Relations
+  materi     Materi  @relation(fields: [id_materi], references: [id_materi], onDelete: Cascade)
+
+  @@map("pdf")
+}
+
+model Tugas {
+  id_tugas    Int       @id @default(autoincrement())
+  nama_tugas  String?   @db.VarChar(256)
+  deskripsi   String?   @db.Text
+  type        String?   @db.VarChar(256)
+  id_materi   Int
+  id_kelas    Int
+  created_at  DateTime  @default(now())
+  
+  // Relations
+  materi      Materi    @relation(fields: [id_materi], references: [id_materi], onDelete: Cascade)
+  kelas       Kelas     @relation(fields: [id_kelas], references: [id_kelas], onDelete: Cascade)
+  pengumpulan Pengumpulan[]
+
+  @@map("tugas")
+}
+
+model FilePengumpulan {
+  id_file           Int       @id @default(autoincrement())
+  bucket_name       String?   @db.VarChar(256)
+  object_key        String?   @db.VarChar(256)
+  ukuran_file       Int?
+  original_filename String?   @db.VarChar(256)
+  created_at        DateTime  @default(now())
+  
+  // Relations
+  pengumpulan       Pengumpulan[]
+
+  @@map("file_pengumpulan")
+}
+
+model Pengumpulan {
+  id_pengumpulan Int       @id @default(autoincrement())
+  answer         String?   @db.Text
+  id_file        Int?
+  id_tugas       Int
+  created_at     DateTime  @default(now())
+  
+  // Relations
+  file           FilePengumpulan? @relation(fields: [id_file], references: [id_file], onDelete: SetNull)
+  tugas          Tugas     @relation(fields: [id_tugas], references: [id_tugas], onDelete: Cascade)
+  users          UserPengumpulan[]
+
+  @@map("pengumpulan")
+}
+
+model UserPengumpulan {
+  id_user         Int
+  id_pengumpulan  Int
+  created_at      DateTime    @default(now())
+  
+  // Relations
+  user            User        @relation(fields: [id_user], references: [id_user], onDelete: Cascade)
+  pengumpulan     Pengumpulan @relation(fields: [id_pengumpulan], references: [id_pengumpulan], onDelete: Cascade)
+
+  @@id([id_user, id_pengumpulan])
+  @@map("user_pengumpulan")
+}
