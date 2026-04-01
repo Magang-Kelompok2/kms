@@ -85,7 +85,7 @@ export function MaterialViewPage() {
         {/* Sidebar Layout */}
         <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-180px)]">
           {/* Left Sidebar - File List */}
-          <div className="w-full lg:w-96 flex-shrink-0">
+          <div className="w-full lg:w-96 shrink-0">
             <Card className="h-full overflow-y-auto">
               <div className="p-5 border-b sticky top-0 bg-white dark:bg-gray-900 z-10">
                 <h2 className="text-xl font-normal mb-1">Daftar Materi</h2>
@@ -115,7 +115,7 @@ export function MaterialViewPage() {
                         >
                           <div className="flex items-start gap-3">
                             <div
-                              className={`w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
                                 selectedFile === file.id
                                   ? "bg-red-200 dark:bg-red-800/40"
                                   : "bg-red-100 dark:bg-red-900/20"
@@ -129,7 +129,7 @@ export function MaterialViewPage() {
                                   {file.name}
                                 </h4>
                                 {completedFiles.includes(file.id) && (
-                                  <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                                 )}
                               </div>
                               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -163,7 +163,7 @@ export function MaterialViewPage() {
                         >
                           <div className="flex items-start gap-3">
                             <div
-                              className={`w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
                                 selectedFile === file.id
                                   ? "bg-blue-200 dark:bg-blue-800/40"
                                   : "bg-blue-100 dark:bg-blue-900/20"
@@ -177,7 +177,7 @@ export function MaterialViewPage() {
                                   {file.name}
                                 </h4>
                                 {completedFiles.includes(file.id) && (
-                                  <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                                 )}
                               </div>
                               <p className="text-sm text-gray-600 dark:text-gray-400">

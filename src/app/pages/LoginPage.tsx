@@ -110,7 +110,7 @@ export function LoginPage() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         {/* Overlay with branding */}
-        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-blue-900/40 via-transparent to-transparent" />
         
         {/* Logo and Text at Bottom */}
         <div className="absolute bottom-12 left-12 right-12">
@@ -119,7 +119,7 @@ export function LoginPage() {
               <img src="/LogoAlpha.svg" alt="TaxaCore Logo" width={64} height={64} />
             </div>
             <div>
-              <h2 className="text-3xl font-bold" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
+              <h2 className="text-3xl font-normal" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
                 TaxaCore
               </h2>
               <p className="text-lg text-white/90">
