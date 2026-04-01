@@ -5,9 +5,10 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { PDFViewer } from "../components/PDFViewer";
-import { materials, userProgress } from "../data/mockData";
+import { userProgress } from "../data/mockData";
 import { ArrowLeft, FileText, PlayCircle, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
+import type { Material as MaterialType } from "../types";
 
 export function MaterialViewPage() {
   const { materialId } = useParams();
@@ -15,11 +16,38 @@ export function MaterialViewPage() {
   const navigate = useNavigate();
   const [completedFiles, setCompletedFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [material, setMaterial] = useState<MaterialType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const material = materials.find((m) => m.id === materialId);
   const progress = userProgress.find(
-    (p) => p.userId === user?.id && p.classId === material?.classId
+    (p) => p.userId === user?.id && p.classId === material?.classId,
   );
+
+  // Fetch material from back-end table materi
+  useEffect(() => {
+    const fetchMaterial = async () => {
+      if (!materialId) return;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/materials/${materialId}`,
+        );
+        if (!res.ok) throw new Error("Gagal mengambil data materi");
+        const json = await res.json();
+        if (!json.success || !json.data) throw new Error("Material not found");
+        setMaterial(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMaterial();
+  }, [materialId]);
 
   // Auto-select first file on load
   useEffect(() => {
@@ -28,8 +56,41 @@ export function MaterialViewPage() {
     }
   }, [material, selectedFile]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 md:px-6 py-8">
+          <p className="text-gray-500">Memuat materi...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 md:px-6 py-8">
+          <Card className="p-8 text-center">
+            <p className="text-red-500">{error}</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (!material) {
-    return <div>Material not found</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 md:px-6 py-8">
+          <Card className="p-8 text-center">
+            <p className="text-red-500">Material tidak ditemukan</p>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   // Check if user has access
@@ -44,7 +105,8 @@ export function MaterialViewPage() {
           <Card className="p-12 text-center">
             <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses materi ini.
+              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
+              materi ini.
             </p>
             <Button onClick={() => navigate("/dashboard")} className="mt-4">
               Kembali ke Dashboard
@@ -215,7 +277,9 @@ export function MaterialViewPage() {
                         </Badge>
                       )}
                     </div>
-                    <h1 className="text-3xl font-normal mb-2">{material.title}</h1>
+                    <h1 className="text-3xl font-normal mb-2">
+                      {material.title}
+                    </h1>
                     <p className="text-base text-gray-600 dark:text-gray-400">
                       {material.description}
                     </p>
@@ -242,15 +306,20 @@ export function MaterialViewPage() {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-lg font-normal">{selectedFileData.name}</h3>
+                        <h3 className="text-lg font-normal">
+                          {selectedFileData.name}
+                        </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                          {selectedFileData.type} • {selectedFileData.duration || "View Only"}
+                          {selectedFileData.type} •{" "}
+                          {selectedFileData.duration || "View Only"}
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-2">
                       {!completedFiles.includes(selectedFile) && (
-                        <Button onClick={() => handleMarkComplete(selectedFile)}>
+                        <Button
+                          onClick={() => handleMarkComplete(selectedFile)}
+                        >
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Tandai Selesai
                         </Button>
@@ -279,26 +348,30 @@ export function MaterialViewPage() {
               )}
 
               {/* Completion Status */}
-              {allFilesCompleted && !progress?.completedMaterials.includes(material.id) && (
-                <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
-                      <div>
-                        <h3 className="text-base font-bold text-green-900 dark:text-green-100">
-                          Semua materi selesai!
-                        </h3>
-                        <p className="text-sm text-green-700 dark:text-green-300">
-                          Kerja bagus! Sekarang Anda dapat melanjutkan ke kuis.
-                        </p>
+              {allFilesCompleted &&
+                !progress?.completedMaterials.includes(material.id) && (
+                  <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                        <div>
+                          <h3 className="text-base font-bold text-green-900 dark:text-green-100">
+                            Semua materi selesai!
+                          </h3>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            Kerja bagus! Sekarang Anda dapat melanjutkan ke
+                            kuis.
+                          </p>
+                        </div>
                       </div>
+                      <Button
+                        onClick={() => navigate(`/class/${material.classId}`)}
+                      >
+                        Lanjut ke Kuis
+                      </Button>
                     </div>
-                    <Button onClick={() => navigate(`/class/${material.classId}`)}>
-                      Lanjut ke Kuis
-                    </Button>
-                  </div>
-                </Card>
-              )}
+                  </Card>
+                )}
             </div>
           </div>
         </div>

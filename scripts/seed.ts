@@ -68,14 +68,14 @@ async function seed() {
       nama_tugas: "Tugas: Analisis Jenis Pajak",
       id_materi: 2,
       id_kelas: 1,
-      type: "pdf",
+      type: "Tugas",
     },
     {
       id_tugas: 2,
       nama_tugas: "Tugas: Studi Kasus Audit",
       id_materi: 1,
       id_kelas: 2,
-      type: "pdf",
+      type: "Kuis",
     },
   ];
   await supabase.from("tugas").upsert(assignments);

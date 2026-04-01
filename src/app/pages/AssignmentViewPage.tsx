@@ -4,9 +4,18 @@ import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { assignments, userProgress } from "../data/mockData";
-import { ArrowLeft, Upload, Calendar, CheckCircle, FileText, Clock, File } from "lucide-react";
-import { useState } from "react";
+import { userProgress } from "../data/mockData";
+import {
+  ArrowLeft,
+  Upload,
+  Calendar,
+  CheckCircle,
+  FileText,
+  Clock,
+  File,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+import type { Assignment as AssignmentType } from "../types";
 
 export function AssignmentViewPage() {
   const { assignmentId } = useParams();
@@ -16,18 +25,80 @@ export function AssignmentViewPage() {
   const [submissionText, setSubmissionText] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const assignment = assignments.find((a) => a.id === assignmentId);
+  const [assignment, setAssignment] = useState<AssignmentType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const progress = userProgress.find(
-    (p) => p.userId === user?.id && p.classId === assignment?.classId
+    (p) => p.userId === user?.id && p.classId === assignment?.classId,
   );
 
+  useEffect(() => {
+    const fetchAssignment = async () => {
+      if (!assignmentId) return;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/tugas/${assignmentId}`,
+        );
+        if (!res.ok) throw new Error("Gagal mengambil data tugas");
+        const json = await res.json();
+        if (!json.success || !json.data)
+          throw new Error("Assignment not found");
+        setAssignment(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAssignment();
+  }, [assignmentId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 md:px-6 py-8">
+          <p className="text-gray-500">Memuat assignment...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 md:px-6 py-8">
+          <Card className="p-8 text-center">
+            <p className="text-red-500">{error}</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (!assignment) {
-    return <div>Assignment not found</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 md:px-6 py-8">
+          <Card className="p-8 text-center">
+            <p className="text-red-500">Assignment tidak ditemukan</p>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   // Check if user has access
   const userLevel = progress?.currentLevel || 1;
-  const hasAccess = user?.role === "superadmin" || assignment.level <= userLevel;
+  const hasAccess =
+    user?.role === "superadmin" || assignment.level <= userLevel;
 
   if (!hasAccess) {
     return (
@@ -37,7 +108,8 @@ export function AssignmentViewPage() {
           <Card className="p-12 text-center">
             <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses tugas ini.
+              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
+              tugas ini.
             </p>
             <Button onClick={() => navigate("/dashboard")} className="mt-4">
               Kembali ke Dashboard
@@ -59,14 +131,19 @@ export function AssignmentViewPage() {
       // Simulate submission
       setIsSubmitted(true);
       // In real app, send to backend
-      console.log("Submission:", { text: submissionText, file: submissionFile });
+      console.log("Submission:", {
+        text: submissionText,
+        file: submissionFile,
+      });
     }
   };
 
   const dueDate = new Date(assignment.dueDate);
   const today = new Date();
   const isOverdue = today > dueDate;
-  const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const daysUntilDue = Math.ceil(
+    (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -106,11 +183,18 @@ export function AssignmentViewPage() {
                     <FileText className="h-7 w-7 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <h1 className="text-3xl font-bold mb-1">{assignment.title}</h1>
+                    <h1 className="text-3xl font-bold mb-1">
+                      {assignment.title}
+                    </h1>
                     <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        <span>Deadline: {new Date(assignment.dueDate).toLocaleDateString("id-ID")}</span>
+                        <span>
+                          Deadline:{" "}
+                          {new Date(assignment.dueDate).toLocaleDateString(
+                            "id-ID",
+                          )}
+                        </span>
                       </div>
                       {!isOverdue && daysUntilDue > 0 && (
                         <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
@@ -140,9 +224,12 @@ export function AssignmentViewPage() {
           {/* Assignment Attachments/Files from Superadmin */}
           {assignment.attachments && assignment.attachments.length > 0 && (
             <Card className="p-6">
-              <h2 className="text-xl font-bold mb-4">📎 File Tugas dari Superadmin</h2>
+              <h2 className="text-xl font-bold mb-4">
+                📎 File Tugas dari Superadmin
+              </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Silakan baca dan download file berikut sebelum mengerjakan tugas:
+                Silakan baca dan download file berikut sebelum mengerjakan
+                tugas:
               </p>
               <div className="space-y-3">
                 {assignment.attachments.map((file) => (
@@ -198,7 +285,8 @@ export function AssignmentViewPage() {
                   Tugas Berhasil Dikumpulkan!
                 </h3>
                 <p className="text-sm text-green-700 dark:text-green-300 mb-4">
-                  Tugas Anda sedang direview oleh superadmin. Anda akan menerima notifikasi setelah direview.
+                  Tugas Anda sedang direview oleh superadmin. Anda akan menerima
+                  notifikasi setelah direview.
                 </p>
                 <div className="flex gap-3 justify-center">
                   <Button
@@ -211,7 +299,9 @@ export function AssignmentViewPage() {
                   >
                     Kirim Ulang
                   </Button>
-                  <Button onClick={() => navigate(`/class/${assignment.classId}`)}>
+                  <Button
+                    onClick={() => navigate(`/class/${assignment.classId}`)}
+                  >
                     Kembali ke Kelas
                   </Button>
                 </div>

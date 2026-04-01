@@ -1,53 +1,44 @@
 import { useAuth } from "../context/AuthContext";
 import { DashboardHeader } from "../components/DashboardHeader";
-import { classes, materials, assignments, quizzes, userAccess, mockUsers, submissions } from "../data/mockData";
+import { mockUsers, submissions } from "../data/mockData"; // sementara untuk user management
 import { Card } from "../components/ui/card";
-import { BookOpen, FileText, ClipboardCheck, Calendar, Users, Trash2, Plus, Eye, Search } from "lucide-react";
+import {
+  BookOpen,
+  FileText,
+  ClipboardCheck,
+  Calendar,
+  Trash2,
+  Plus,
+  Eye,
+  Search,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { useState } from "react";
+import { useClasses } from "../hooks/useClasses";
+import { useMateri } from "../hooks/useMateri";
+import { useTugas } from "../hooks/useTugas";
 
 export function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Supabase / API hooks
+  const { classes, loading: classesLoading } = useClasses();
+  const { materi, loading: materiLoading } = useMateri();
+  const { tugas, loading: tugasLoading } = useTugas();
+
+  // Derived: pisahkan tugas berdasarkan type (sesuai seed: "Tugas" vs "Kuis")
+  const penugasan = tugas.filter((t) => t.type !== "Kuis");
+  const kuis = tugas.filter((t) => t.type === "Kuis");
+
+  // User management (masih mockData sementara)
   const [localUsers, setLocalUsers] = useState(mockUsers);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
-
-  const getAccessibleMaterials = () => {
-    if (user?.role === "superadmin") {
-      return materials;
-    }
-    return materials.filter(
-      (m) => m.isPublished && userAccess.materialIds.includes(m.id)
-    );
-  };
-
-  const getAccessibleQuizzes = () => {
-    if (user?.role === "superadmin") {
-      return quizzes;
-    }
-    return quizzes.filter(
-      (q) => q.isPublished && userAccess.quizIds.includes(q.id)
-    );
-  };
-
-  const getAccessibleAssignments = () => {
-    if (user?.role === "superadmin") {
-      return assignments;
-    }
-    return assignments.filter(
-      (a) => a.isPublished && userAccess.assignmentIds.includes(a.id)
-    );
-  };
-
-  const accessibleMaterials = getAccessibleMaterials();
-  const accessibleQuizzes = getAccessibleQuizzes();
-  const accessibleAssignments = getAccessibleAssignments();
 
   const handleDeleteUser = (userId: string) => {
     if (userId === "1") {
@@ -61,23 +52,24 @@ export function DashboardPage() {
   };
 
   const getPendingSubmissionsCount = (userId: string) => {
-    return submissions.filter((s) => s.userId === userId && s.status === "pending").length;
+    return submissions.filter(
+      (s) => s.userId === userId && s.status === "pending",
+    ).length;
   };
 
   const filteredUsers = localUsers.filter((u) =>
-    u.name.toLowerCase().includes(searchQuery.toLowerCase())
+    u.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const currentUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   return (
     <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
       <DashboardHeader />
-      
+
       <div className="container mx-auto px-4 md:px-6 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
@@ -99,7 +91,9 @@ export function DashboardPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                   Total Kelas
                 </p>
-                <p className="text-2xl font-bold">{classes.length}</p>
+                <p className="text-2xl font-bold">
+                  {classesLoading ? "-" : classes.length}
+                </p>
               </div>
               <BookOpen className="h-10 w-10 text-blue-500 opacity-20" />
             </div>
@@ -111,7 +105,9 @@ export function DashboardPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                   Materi
                 </p>
-                <p className="text-2xl font-bold">{accessibleMaterials.length}</p>
+                <p className="text-2xl font-bold">
+                  {materiLoading ? "-" : materi.length}
+                </p>
               </div>
               <FileText className="h-10 w-10 text-purple-500 opacity-20" />
             </div>
@@ -123,7 +119,9 @@ export function DashboardPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                   Penugasan
                 </p>
-                <p className="text-2xl font-bold">{accessibleAssignments.length}</p>
+                <p className="text-2xl font-bold">
+                  {tugasLoading ? "-" : penugasan.length}
+                </p>
               </div>
               <ClipboardCheck className="h-10 w-10 text-green-500 opacity-20" />
             </div>
@@ -135,7 +133,9 @@ export function DashboardPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                   Kuis
                 </p>
-                <p className="text-2xl font-semibold">{accessibleQuizzes.length}</p>
+                <p className="text-2xl font-semibold">
+                  {tugasLoading ? "-" : kuis.length}
+                </p>
               </div>
               <Calendar className="h-10 w-10 text-orange-500 opacity-20" />
             </div>
@@ -148,47 +148,47 @@ export function DashboardPage() {
             <h2 className="text-2xl font-normal">Kelas Anda</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {classes.map((cls) => {
-              const classMaterials = materials.filter((m) => m.classId === cls.id);
-              const classQuizzes = quizzes.filter((q) => q.classId === cls.id);
-              
-              return (
-                <Card
-                  key={cls.id}
-                  className="group cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden"
-                  onClick={() => navigate(`/class/${cls.id}`)}
-                >
-                  <div className="relative h-40 overflow-hidden">
-                    <ImageWithFallback
-                      src={cls.icon}
-                      alt={cls.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className={`absolute inset-0 bg-gradient-to-br ${cls.color} opacity-75`} />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <h3 className="text-2xl font-normal text-white" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
-                        {cls.name}
-                      </h3>
+          {classesLoading ? (
+            <p className="text-gray-500">Memuat kelas...</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {classes.map((cls) => {
+                const kelasMateri = materi.filter((m) => m.id_kelas === cls.id);
+                const kelasTugas = tugas.filter(
+                  (t) => t.id_kelas === cls.id && t.type === "Kuis",
+                );
+
+                return (
+                  <Card
+                    key={cls.id}
+                    className="group cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden"
+                    onClick={() => navigate(`/class/${cls.id}`)}
+                  >
+                    <div className="relative h-40 overflow-hidden bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4]">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <h3
+                          className="text-2xl font-normal text-white"
+                          style={{ fontFamily: "Coolvetica, sans-serif" }}
+                        >
+                          {cls.name}
+                        </h3>
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-6">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      {cls.description}
-                    </p>
-                    <div className="flex gap-4 text-sm">
-                      <span className="text-gray-500">
-                        {classMaterials.length} materi
-                      </span>
-                      <span className="text-gray-500">
-                        {classQuizzes.length} kuis
-                      </span>
+                    <div className="p-6">
+                      <div className="flex gap-4 text-sm text-gray-500 mb-2">
+                        <span>{kelasMateri.length} materi</span>
+                        <span>{kelasTugas.length} kuis</span>
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        Dibuat:{" "}
+                        {new Date(cls.createdAt).toLocaleDateString("id-ID")}
+                      </p>
                     </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* User Management for Superadmin */}
@@ -202,7 +202,6 @@ export function DashboardPage() {
               </Button>
             </div>
 
-            {/* Search Bar */}
             <div className="mb-4">
               <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -224,17 +223,32 @@ export function DashboardPage() {
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Nama</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Role</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Dibuat Pada</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Tertunda</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">Aksi</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Nama
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Email
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Role
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Dibuat Pada
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Tertunda
+                      </th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold">
+                        Aksi
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                     {currentUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                      <tr
+                        key={u.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                      >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-normal">
@@ -243,18 +257,27 @@ export function DashboardPage() {
                             <span className="font-medium">{u.name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{u.email}</td>
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                          {u.email}
+                        </td>
                         <td className="px-6 py-4">
-                          <Badge variant={u.role === "superadmin" ? "default" : "secondary"}>
+                          <Badge
+                            variant={
+                              u.role === "superadmin" ? "default" : "secondary"
+                            }
+                          >
                             {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                          {new Date(u.createdAt).toLocaleDateString('id-ID')}
+                          {new Date(u.createdAt).toLocaleDateString("id-ID")}
                         </td>
                         <td className="px-6 py-4">
                           {u.role === "user" && (
-                            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/20">
+                            <Badge
+                              variant="outline"
+                              className="bg-yellow-50 dark:bg-yellow-900/20"
+                            >
                               {getPendingSubmissionsCount(u.id)} Tertunda
                             </Badge>
                           )}
@@ -264,7 +287,9 @@ export function DashboardPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => navigate(`/users/${u.id}/progress`)}
+                              onClick={() =>
+                                navigate(`/users/${u.id}/progress`)
+                              }
                             >
                               <Eye className="h-4 w-4 mr-1" />
                               Lihat
@@ -292,7 +317,9 @@ export function DashboardPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
                   disabled={currentPage === 1}
                 >
                   Sebelumnya
@@ -303,7 +330,9 @@ export function DashboardPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
                   disabled={currentPage === totalPages}
                 >
                   Selanjutnya
@@ -313,24 +342,21 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* Recent Materials for Regular Users */}
+        {/* Materi Terbaru untuk user non-superadmin */}
         {user?.role !== "superadmin" && (
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-normal">Materi Terbaru</h2>
-              {/* <button className="text-blue-600 dark:text-blue-400 hover:underline">
-                Lihat semua →
-              </button> */}
             </div>
 
             <div className="grid gap-4">
-              {accessibleMaterials.slice(0, 5).map((material) => {
-                const cls = classes.find((c) => c.id === material.classId);
+              {materi.slice(0, 5).map((m) => {
+                const cls = classes.find((c) => c.id === m.id_kelas);
                 return (
                   <Card
-                    key={material.id}
+                    key={m.id_materi}
                     className="p-6 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => navigate(`/class/${material.classId}`)}
+                    onClick={() => navigate(`/class/${m.id_kelas}`)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -339,13 +365,10 @@ export function DashboardPage() {
                             {cls?.name}
                           </Badge>
                           <Badge variant="secondary" className="text-xs">
-                            Pertemuan {material.meetingNumber}
+                            Pertemuan {m.pertemuan}
                           </Badge>
                         </div>
-                        <h3 className="font-normal mb-1">{material.title}</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {material.description}
-                        </p>
+                        <h3 className="font-normal mb-1">{m.title_materi}</h3>
                       </div>
                       <FileText className="h-10 w-10 text-gray-300 dark:text-gray-700 ml-4" />
                     </div>
