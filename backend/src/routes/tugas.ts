@@ -69,7 +69,7 @@ router.post("/", async (req, res) => {
   const {
     nama_tugas,
     deskripsi,
-    type,
+    type, // Ini yang dikirim dari frontend ("kuis")
     id_materi,
     id_kelas,
     pertemuan,
@@ -77,20 +77,22 @@ router.post("/", async (req, res) => {
   } = req.body;
 
   if (!nama_tugas || !id_materi || !id_kelas)
-    return res
-      .status(400)
-      .json({
-        success: false,
-        error: "nama_tugas, id_materi, id_kelas wajib diisi",
-      });
+    return res.status(400).json({
+      success: false,
+      error: "nama_tugas, id_materi, id_kelas wajib diisi",
+    });
 
   try {
+    // TAMBAHKAN LOGIKA PROTEKSI DI SINI
+    // Jika type yang masuk adalah "kuis", paksa jadi "Kuis"
+    const validatedType = type?.toLowerCase() === "kuis" ? "Kuis" : type;
+
     const { data, error } = await supabase
       .from("tugas")
       .insert({
         nama_tugas,
         deskripsi: deskripsi ?? null,
-        type: type ?? null,
+        type: validatedType, // Gunakan variabel yang sudah divalidasi
         id_materi: Number(id_materi),
         id_kelas: Number(id_kelas),
         pertemuan: pertemuan ? Number(pertemuan) : 1,
@@ -102,9 +104,13 @@ router.post("/", async (req, res) => {
     if (error) throw error;
 
     res.json({ success: true, data });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating tugas:", error);
-    res.status(500).json({ success: false, error: "Failed to create tugas" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to create tugas",
+      detail: error.message, // Ini biar kamu bisa lihat pesan error aslinya di response
+    });
   }
 });
 

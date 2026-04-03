@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { X, Upload, FileText, Trash2, Calendar } from "lucide-react";
+import { useAddTugas } from "../hooks/useAddTugas";
+
+interface MateriOption {
+  id_materi: number;
+  title_materi: string;
+}
 
 interface AddAssignmentModalProps {
   isOpen: boolean;
@@ -28,6 +34,39 @@ export function AddAssignmentModal({
   const [meetingNumber, setMeetingNumber] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [files, setFiles] = useState<FileUpload[]>([]);
+  const [selectedMateriId, setSelectedMateriId] = useState<number | "">("");
+  const [materiOptions, setMateriOptions] = useState<MateriOption[]>([]);
+  const [materiLoading, setMateriLoading] = useState(false);
+
+  const { addTugas, loading, error } = useAddTugas();
+
+  // Fetch daftar materi berdasarkan classId & level (id_tingkatan)
+  useEffect(() => {
+    if (!isOpen || !classId) return;
+    const fetchMateri = async () => {
+      setMateriLoading(true);
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/materials?classId=${classId}`,
+        );
+        const json = await res.json();
+        if (json.success) {
+          const filtered = (json.data as any[])
+            .filter((m) => m.id_tingkatan === level)
+            .map((m) => ({
+              id_materi: m.id_materi,
+              title_materi: m.title_materi,
+            }));
+          setMateriOptions(filtered);
+        }
+      } catch {
+        setMateriOptions([]);
+      } finally {
+        setMateriLoading(false);
+      }
+    };
+    fetchMateri();
+  }, [isOpen, classId, level]);
 
   if (!isOpen) return null;
 
@@ -46,13 +85,27 @@ export function AddAssignmentModal({
     setFiles(files.filter((f) => f.id !== id));
   };
 
-  const handleSubmit = () => {
-    if (!title || !description || !meetingNumber || !dueDate) {
+  const handleSubmit = async () => {
+    if (!title || !description || !meetingNumber) {
       alert("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
+    if (!selectedMateriId) {
+      alert("Mohon pilih materi yang terkait");
+      return;
+    }
 
-    const newAssignment = {
+    await addTugas({
+      nama_tugas: title,
+      deskripsi: description,
+      type: "Tugas",
+      id_materi: Number(selectedMateriId),
+      id_kelas: Number(classId),
+      pertemuan: parseInt(meetingNumber),
+      deadline: dueDate ? new Date(dueDate).toISOString() : undefined,
+    });
+
+    onAdd({
       id: `assign-${Date.now()}`,
       title,
       description,
@@ -61,22 +114,15 @@ export function AddAssignmentModal({
       meetingNumber: parseInt(meetingNumber),
       level,
       isPublished: true,
-      attachments: files.map((f) => ({
-        id: f.id,
-        name: f.name,
-        url: `https://example.com/${f.file?.name}`,
-        type: "pdf" as const,
-      })),
-    };
+      attachments: [],
+    });
 
-    onAdd(newAssignment);
-    
-    // Reset form
     setTitle("");
     setDescription("");
     setMeetingNumber("");
     setDueDate("");
     setFiles([]);
+    setSelectedMateriId("");
     onClose();
   };
 
@@ -94,6 +140,40 @@ export function AddAssignmentModal({
         </div>
 
         <div className="p-6 space-y-6">
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Pilih Materi */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">
+              Materi Terkait <span className="text-red-500">*</span>
+            </label>
+            {materiLoading ? (
+              <p className="text-sm text-gray-500">Memuat daftar materi...</p>
+            ) : materiOptions.length === 0 ? (
+              <p className="text-sm text-red-500">
+                Belum ada materi di tingkatan ini. Tambahkan materi terlebih
+                dahulu.
+              </p>
+            ) : (
+              <select
+                value={selectedMateriId}
+                onChange={(e) => setSelectedMateriId(Number(e.target.value))}
+                className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+              >
+                <option value="">-- Pilih Materi --</option>
+                {materiOptions.map((m) => (
+                  <option key={m.id_materi} value={m.id_materi}>
+                    {m.title_materi}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           {/* Title */}
           <div>
             <label className="block text-sm font-semibold mb-2">
@@ -139,7 +219,10 @@ export function AddAssignmentModal({
           {/* Due Date */}
           <div>
             <label className="block text-sm font-semibold mb-2">
-              Deadline <span className="text-red-500">*</span>
+              Deadline{" "}
+              <span className="text-gray-400 text-xs font-normal">
+                (opsional)
+              </span>
             </label>
             <div className="relative">
               <input
@@ -152,15 +235,11 @@ export function AddAssignmentModal({
             </div>
           </div>
 
-          {/* File Upload Section */}
+          {/* File Upload */}
           <div>
             <label className="block text-sm font-semibold mb-3">
               File Tugas (PDF) - Opsional
             </label>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-              Upload file soal, template, atau referensi untuk mahasiswa
-            </p>
-            
             <div className="mb-4">
               <input
                 type="file"
@@ -178,11 +257,8 @@ export function AddAssignmentModal({
                 <span className="text-sm font-medium">Upload File PDF</span>
               </label>
             </div>
-
-            {/* File List */}
             {files.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold">{files.length} file ditambahkan:</p>
                 {files.map((file) => (
                   <div
                     key={file.id}
@@ -205,12 +281,19 @@ export function AddAssignmentModal({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-6 flex gap-3">
-          <Button onClick={handleSubmit} className="flex-1 text-base py-6">
-            Simpan Tugas
+          <Button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 text-base py-6"
+          >
+            {loading ? "Menyimpan..." : "Simpan Tugas"}
           </Button>
-          <Button variant="outline" onClick={onClose} className="text-base py-6">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="text-base py-6"
+          >
             Batal
           </Button>
         </div>

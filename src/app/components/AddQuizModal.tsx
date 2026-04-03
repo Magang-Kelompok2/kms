@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { X, Plus, Trash2, Clock } from "lucide-react";
+import { useAddKuis } from "../hooks/useAddKuis";
+
+interface MateriOption {
+  id_materi: number;
+  title_materi: string;
+}
 
 interface AddQuizModalProps {
   isOpen: boolean;
@@ -30,6 +36,39 @@ export function AddQuizModal({
   const [numberOfQuestions, setNumberOfQuestions] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
+  const [selectedMateriId, setSelectedMateriId] = useState<number | "">("");
+  const [materiOptions, setMateriOptions] = useState<MateriOption[]>([]);
+  const [materiLoading, setMateriLoading] = useState(false);
+
+  const { addKuis, loading, error } = useAddKuis();
+
+  // Fetch daftar materi berdasarkan classId & level
+  useEffect(() => {
+    if (!isOpen || !classId) return;
+    const fetchMateri = async () => {
+      setMateriLoading(true);
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/materials?classId=${classId}`,
+        );
+        const json = await res.json();
+        if (json.success) {
+          const filtered = (json.data as any[])
+            .filter((m) => m.id_tingkatan === level)
+            .map((m) => ({
+              id_materi: m.id_materi,
+              title_materi: m.title_materi,
+            }));
+          setMateriOptions(filtered);
+        }
+      } catch {
+        setMateriOptions([]);
+      } finally {
+        setMateriLoading(false);
+      }
+    };
+    fetchMateri();
+  }, [isOpen, classId, level]);
 
   if (!isOpen) return null;
 
@@ -55,7 +94,11 @@ export function AddQuizModal({
     setQuestions(newQuestions);
   };
 
-  const updateOption = (questionIndex: number, optionIndex: number, value: string) => {
+  const updateOption = (
+    questionIndex: number,
+    optionIndex: number,
+    value: string,
+  ) => {
     const newQuestions = [...questions];
     newQuestions[questionIndex].options[optionIndex] = value;
     setQuestions(newQuestions);
@@ -79,18 +122,19 @@ export function AddQuizModal({
     setNumberOfQuestions((questions.length + 1).toString());
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title || !meetingNumber || !duration) {
       alert("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
-
+    if (!selectedMateriId) {
+      alert("Mohon pilih materi yang terkait");
+      return;
+    }
     if (questions.length === 0) {
       alert("Mohon buat minimal 1 soal");
       return;
     }
-
-    // Validate all questions
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.question.trim()) {
@@ -99,13 +143,23 @@ export function AddQuizModal({
       }
       for (let j = 0; j < q.options.length; j++) {
         if (!q.options[j].trim()) {
-          alert(`Pilihan ${String.fromCharCode(65 + j)} pada soal ${i + 1} belum diisi`);
+          alert(
+            `Pilihan ${String.fromCharCode(65 + j)} pada soal ${i + 1} belum diisi`,
+          );
           return;
         }
       }
     }
 
-    const newQuiz = {
+    await addKuis({
+      nama_tugas: title,
+      deskripsi: `Durasi: ${duration} menit | ${questions.length} soal`,
+      id_materi: Number(selectedMateriId),
+      id_kelas: Number(classId),
+      pertemuan: parseInt(meetingNumber),
+    });
+
+    onAdd({
       id: `quiz-${Date.now()}`,
       title,
       classId,
@@ -119,17 +173,15 @@ export function AddQuizModal({
         options: q.options,
         correctAnswer: q.correctAnswer,
       })),
-    };
+    });
 
-    onAdd(newQuiz);
-    
-    // Reset form
     setTitle("");
     setMeetingNumber("");
     setDuration("");
     setNumberOfQuestions("");
     setQuestions([]);
     setShowQuestionForm(false);
+    setSelectedMateriId("");
     onClose();
   };
 
@@ -147,7 +199,40 @@ export function AddQuizModal({
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Quiz Info */}
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Pilih Materi */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">
+              Materi Terkait <span className="text-red-500">*</span>
+            </label>
+            {materiLoading ? (
+              <p className="text-sm text-gray-500">Memuat daftar materi...</p>
+            ) : materiOptions.length === 0 ? (
+              <p className="text-sm text-red-500">
+                Belum ada materi di tingkatan ini. Tambahkan materi terlebih
+                dahulu.
+              </p>
+            ) : (
+              <select
+                value={selectedMateriId}
+                onChange={(e) => setSelectedMateriId(Number(e.target.value))}
+                className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+              >
+                <option value="">-- Pilih Materi --</option>
+                {materiOptions.map((m) => (
+                  <option key={m.id_materi} value={m.id_materi}>
+                    {m.title_materi}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div className="space-y-6">
             {/* Title */}
             <div>
@@ -164,7 +249,6 @@ export function AddQuizModal({
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              {/* Meeting Number */}
               <div>
                 <label className="block text-sm font-semibold mb-2">
                   Pertemuan Ke- <span className="text-red-500">*</span>
@@ -178,8 +262,6 @@ export function AddQuizModal({
                   className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
                 />
               </div>
-
-              {/* Duration */}
               <div>
                 <label className="block text-sm font-semibold mb-2">
                   Durasi (menit) <span className="text-red-500">*</span>
@@ -196,8 +278,6 @@ export function AddQuizModal({
                   <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-
-              {/* Number of Questions */}
               <div>
                 <label className="block text-sm font-semibold mb-2">
                   Jumlah Soal <span className="text-red-500">*</span>
@@ -216,7 +296,10 @@ export function AddQuizModal({
             </div>
 
             {!showQuestionForm && numberOfQuestions && (
-              <Button onClick={initializeQuestions} className="w-full text-base py-6">
+              <Button
+                onClick={initializeQuestions}
+                className="w-full text-base py-6"
+              >
                 Buat {numberOfQuestions} Soal
               </Button>
             )}
@@ -249,21 +332,19 @@ export function AddQuizModal({
                       </button>
                     )}
                   </div>
-
-                  {/* Question Text */}
                   <div>
                     <label className="block text-sm font-semibold mb-2">
                       Pertanyaan <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       value={question.question}
-                      onChange={(e) => updateQuestion(qIndex, "question", e.target.value)}
+                      onChange={(e) =>
+                        updateQuestion(qIndex, "question", e.target.value)
+                      }
                       placeholder="Tulis pertanyaan di sini..."
                       className="w-full h-24 px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 resize-none"
                     />
                   </div>
-
-                  {/* Options */}
                   <div>
                     <label className="block text-sm font-semibold mb-3">
                       Pilihan Jawaban <span className="text-red-500">*</span>
@@ -275,7 +356,9 @@ export function AddQuizModal({
                             type="radio"
                             name={`correct-${qIndex}`}
                             checked={question.correctAnswer === oIndex}
-                            onChange={() => updateQuestion(qIndex, "correctAnswer", oIndex)}
+                            onChange={() =>
+                              updateQuestion(qIndex, "correctAnswer", oIndex)
+                            }
                             className="w-5 h-5 text-blue-600"
                           />
                           <div className="flex-1 flex items-center gap-2">
@@ -285,7 +368,9 @@ export function AddQuizModal({
                             <input
                               type="text"
                               value={option}
-                              onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
+                              onChange={(e) =>
+                                updateOption(qIndex, oIndex, e.target.value)
+                              }
                               placeholder={`Pilihan ${String.fromCharCode(65 + oIndex)}`}
                               className="flex-1 px-4 py-2 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
                             />
@@ -303,16 +388,21 @@ export function AddQuizModal({
           )}
         </div>
 
-        {/* Footer */}
         <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-6 flex gap-3 z-10">
           <Button
             onClick={handleSubmit}
-            disabled={!showQuestionForm || questions.length === 0}
+            disabled={loading || !showQuestionForm || questions.length === 0}
             className="flex-1 text-base py-6"
           >
-            Simpan Kuis ({questions.length} soal)
+            {loading
+              ? "Menyimpan..."
+              : `Simpan Kuis (${questions.length} soal)`}
           </Button>
-          <Button variant="outline" onClick={onClose} className="text-base py-6">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="text-base py-6"
+          >
             Batal
           </Button>
         </div>

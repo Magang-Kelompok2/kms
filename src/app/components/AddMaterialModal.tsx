@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { X, Upload, Video, FileText, Trash2 } from "lucide-react";
+import { X, Video, FileText, Trash2 } from "lucide-react";
+import { useAddMateri } from "../hooks/UseAddMateri";
 
 interface AddMaterialModalProps {
   isOpen: boolean;
   onClose: () => void;
   classId: string;
-  level: number;
+  level: number; // ini = id_tingkatan
   onAdd: (material: any) => void;
 }
 
@@ -31,9 +32,14 @@ export function AddMaterialModal({
   const [meetingNumber, setMeetingNumber] = useState("");
   const [files, setFiles] = useState<FileUpload[]>([]);
 
+  const { addMateri, loading, error } = useAddMateri();
+
   if (!isOpen) return null;
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: "pdf" | "video") => {
+  const handleFileSelect = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "pdf" | "video",
+  ) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files).map((file) => ({
         id: `file-${Date.now()}-${Math.random()}`,
@@ -49,11 +55,12 @@ export function AddMaterialModal({
     const url = prompt("Masukkan URL video YouTube:");
     if (url) {
       const duration = prompt("Masukkan durasi video (contoh: 15:30):");
+      const name = prompt("Nama video:") || "Video";
       setFiles([
         ...files,
         {
           id: `file-${Date.now()}-${Math.random()}`,
-          name: prompt("Nama video:") || "Video",
+          name,
           type: "video",
           url,
           duration: duration || undefined,
@@ -66,34 +73,56 @@ export function AddMaterialModal({
     setFiles(files.filter((f) => f.id !== id));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title || !description || !meetingNumber) {
       alert("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
 
-    const newMaterial = {
+    const videos = files
+      .filter((f) => f.type === "video")
+      .map((f) => ({
+        title_video: f.name,
+        video_path: f.url ?? "",
+      }));
+
+    const pdfs = files
+      .filter((f) => f.type === "pdf")
+      .map((f) => ({
+        title_pdf: f.name,
+        // Kalau belum ada upload ke storage, pakai nama file sementara
+        pdf_path: f.url ?? f.file?.name ?? "",
+      }));
+
+    await addMateri({
+      title_materi: title,
+      deskripsi: description,
+      id_kelas: Number(classId),
+      id_tingkatan: level,
+      pertemuan: parseInt(meetingNumber),
+      videos,
+      pdfs,
+    });
+
+    // Kalau sukses, panggil onAdd agar UI ikut update
+    onAdd({
       id: `mat-${Date.now()}`,
       title,
       description,
-      content: description,
       classId,
       meetingNumber: parseInt(meetingNumber),
       level,
-      createdAt: new Date().toISOString().split("T")[0],
       isPublished: true,
       files: files.map((f) => ({
         id: f.id,
         name: f.name,
         type: f.type,
-        url: f.url || `https://example.com/${f.file?.name}`,
+        url: f.url ?? "",
         duration: f.duration,
       })),
-    };
+    });
 
-    onAdd(newMaterial);
-    
-    // Reset form
+    // Reset
     setTitle("");
     setDescription("");
     setMeetingNumber("");
@@ -115,6 +144,12 @@ export function AddMaterialModal({
         </div>
 
         <div className="p-6 space-y-6">
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <label className="block text-sm font-semibold mb-2">
@@ -162,9 +197,8 @@ export function AddMaterialModal({
             <label className="block text-sm font-semibold mb-3">
               File Materi (PDF & Video)
             </label>
-            
+
             <div className="space-y-3 mb-4">
-              {/* PDF Upload */}
               <div>
                 <input
                   type="file"
@@ -183,7 +217,6 @@ export function AddMaterialModal({
                 </label>
               </div>
 
-              {/* Video URL */}
               <Button
                 type="button"
                 variant="outline"
@@ -195,10 +228,11 @@ export function AddMaterialModal({
               </Button>
             </div>
 
-            {/* File List */}
             {files.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold">{files.length} file ditambahkan:</p>
+                <p className="text-sm font-semibold">
+                  {files.length} file ditambahkan:
+                </p>
                 {files.map((file) => (
                   <div
                     key={file.id}
@@ -213,7 +247,9 @@ export function AddMaterialModal({
                       <div>
                         <p className="text-sm font-medium">{file.name}</p>
                         {file.duration && (
-                          <p className="text-xs text-gray-500">{file.duration}</p>
+                          <p className="text-xs text-gray-500">
+                            {file.duration}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -230,12 +266,19 @@ export function AddMaterialModal({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-6 flex gap-3">
-          <Button onClick={handleSubmit} className="flex-1 text-base py-6">
-            Simpan Materi
+          <Button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 text-base py-6"
+          >
+            {loading ? "Menyimpan..." : "Simpan Materi"}
           </Button>
-          <Button variant="outline" onClick={onClose} className="text-base py-6">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="text-base py-6"
+          >
             Batal
           </Button>
         </div>
