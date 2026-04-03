@@ -20,19 +20,12 @@ export function useMateri() {
       setError(null);
       try {
         const apiUrl = import.meta.env.VITE_API_URL;
-        console.log("[useMateri] VITE_API_URL:", apiUrl);
-        console.log("[useMateri] Fetching:", `${apiUrl}/api/materials`);
-
         const res = await fetch(`${apiUrl}/api/materials`);
-        console.log("[useMateri] Response status:", res.status);
-
         if (!res.ok) throw new Error("Gagal mengambil data materi");
-        const data = await res.json();
-        console.log("[useMateri] Data received:", data);
 
-        setMateri(Array.isArray(data) ? data : []);
+        const json = await res.json(); // ← json.data bukan langsung data
+        setMateri(Array.isArray(json.data) ? json.data : []);
       } catch (err) {
-        console.error("[useMateri] Error:", err);
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
       } finally {
         setLoading(false);

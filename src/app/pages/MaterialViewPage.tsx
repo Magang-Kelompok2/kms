@@ -5,7 +5,6 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { PDFViewer } from "../components/PDFViewer";
-import { userProgress } from "../data/mockData";
 import { ArrowLeft, FileText, PlayCircle, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Material as MaterialType } from "../types";
@@ -14,21 +13,24 @@ export function MaterialViewPage() {
   const { materialId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [completedFiles, setCompletedFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [material, setMaterial] = useState<MaterialType | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  // Loading terpisah: satu untuk material, satu untuk progress
+  const [materialLoading, setMaterialLoading] = useState(true);
+  const [progressLoading, setProgressLoading] = useState(true);
+
   const [error, setError] = useState<string | null>(null);
+  const [userLevel, setUserLevel] = useState(1);
+  const [isCompleted, setIsCompleted] = useState(false);
 
-  const progress = userProgress.find(
-    (p) => p.userId === user?.id && p.classId === material?.classId,
-  );
-
-  // Fetch material from back-end table materi
+  // ── 1. Fetch material ──────────────────────────────────────────
   useEffect(() => {
     const fetchMaterial = async () => {
       if (!materialId) return;
-      setLoading(true);
+      setMaterialLoading(true);
       setError(null);
 
       try {
@@ -42,21 +44,69 @@ export function MaterialViewPage() {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
       } finally {
-        setLoading(false);
+        setMaterialLoading(false);
       }
     };
 
     fetchMaterial();
   }, [materialId]);
 
-  // Auto-select first file on load
+  // ── 2. Fetch progress — tunggu sampai material tersedia ────────
+  useEffect(() => {
+    // Kalau material belum ada, belum bisa fetch progress
+    if (!material?.classId) return;
+
+    // Superadmin tidak butuh progress, langsung unlock
+    if (user?.role === "superadmin") {
+      setProgressLoading(false);
+      return;
+    }
+
+    if (!user?.id) {
+      setProgressLoading(false);
+      return;
+    }
+
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${material.classId}`,
+        );
+        if (!res.ok) {
+          // Kalau endpoint belum ada / error, default level 1
+          return;
+        }
+        const json = await res.json();
+
+        // Ambil tingkatan saat ini
+        setUserLevel(json.data?.tingkatanSaatIni ?? 1);
+
+        // Cek apakah materi ini sudah pernah diselesaikan
+        const completedMaterials: string[] =
+          json.data?.completedMaterials ?? [];
+        if (materialId && completedMaterials.includes(materialId)) {
+          setIsCompleted(true);
+        }
+      } catch {
+        // Gagal fetch progress → default userLevel tetap 1
+      } finally {
+        // Apapun hasilnya, progress loading selesai
+        setProgressLoading(false);
+      }
+    };
+
+    fetchProgress();
+  }, [material?.classId, user?.id, user?.role, materialId]);
+
+  // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
     if (material && material.files.length > 0 && !selectedFile) {
       setSelectedFile(material.files[0].id);
     }
   }, [material, selectedFile]);
 
-  if (loading) {
+  // ── Loading state — tunggu KEDUA fetch selesai ─────────────────
+  if (materialLoading || progressLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />
@@ -93,8 +143,7 @@ export function MaterialViewPage() {
     );
   }
 
-  // Check if user has access
-  const userLevel = progress?.currentLevel || 1;
+  // ── Cek akses — baru dievaluasi SETELAH kedua fetch selesai ────
   const hasAccess = user?.role === "superadmin" || material.level <= userLevel;
 
   if (!hasAccess) {
@@ -123,9 +172,10 @@ export function MaterialViewPage() {
     }
   };
 
-  const allFilesCompleted = completedFiles.length === material.files.length;
+  const allFilesCompleted =
+    material.files.length > 0 &&
+    completedFiles.length === material.files.length;
 
-  // Group files by type
   const videoFiles = material.files.filter((f) => f.type === "video");
   const pdfFiles = material.files.filter((f) => f.type === "pdf");
   const selectedFileData = material.files.find((f) => f.id === selectedFile);
@@ -144,9 +194,8 @@ export function MaterialViewPage() {
           Kembali ke Kelas
         </Button>
 
-        {/* Sidebar Layout */}
         <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-180px)]">
-          {/* Left Sidebar - File List */}
+          {/* ── Left Sidebar ── */}
           <div className="w-full lg:w-96 shrink-0">
             <Card className="h-full overflow-y-auto">
               <div className="p-5 border-b sticky top-0 bg-white dark:bg-gray-900 z-10">
@@ -157,7 +206,7 @@ export function MaterialViewPage() {
               </div>
 
               <div className="p-4 space-y-5">
-                {/* Video Section */}
+                {/* Video */}
                 {videoFiles.length > 0 && (
                   <div>
                     <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-red-600 dark:text-red-400">
@@ -205,7 +254,7 @@ export function MaterialViewPage() {
                   </div>
                 )}
 
-                {/* PDF Section */}
+                {/* PDF */}
                 {pdfFiles.length > 0 && (
                   <div>
                     <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
@@ -256,10 +305,10 @@ export function MaterialViewPage() {
             </Card>
           </div>
 
-          {/* Right Content Area */}
+          {/* ── Right Content ── */}
           <div className="flex-1 min-w-0">
             <div className="h-full flex flex-col gap-6">
-              {/* Material Header */}
+              {/* Header */}
               <Card className="p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -270,7 +319,7 @@ export function MaterialViewPage() {
                       <Badge variant="outline" className="text-sm">
                         Level {material.level}
                       </Badge>
-                      {progress?.completedMaterials.includes(material.id) && (
+                      {isCompleted && (
                         <Badge variant="default" className="text-sm">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Selesai
@@ -287,7 +336,7 @@ export function MaterialViewPage() {
                 </div>
               </Card>
 
-              {/* File Viewer */}
+              {/* Viewer */}
               {selectedFile && selectedFileData && (
                 <Card className="flex-1 p-6 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-4">
@@ -315,19 +364,14 @@ export function MaterialViewPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      {!completedFiles.includes(selectedFile) && (
-                        <Button
-                          onClick={() => handleMarkComplete(selectedFile)}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Tandai Selesai
-                        </Button>
-                      )}
-                    </div>
+                    {!completedFiles.includes(selectedFile) && (
+                      <Button onClick={() => handleMarkComplete(selectedFile)}>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Tandai Selesai
+                      </Button>
+                    )}
                   </div>
 
-                  {/* File Content */}
                   <div className="flex-1 min-h-0">
                     {selectedFileData.type === "video" ? (
                       <div className="h-full bg-gray-900 rounded-lg overflow-hidden">
@@ -347,31 +391,29 @@ export function MaterialViewPage() {
                 </Card>
               )}
 
-              {/* Completion Status */}
-              {allFilesCompleted &&
-                !progress?.completedMaterials.includes(material.id) && (
-                  <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
-                        <div>
-                          <h3 className="text-base font-bold text-green-900 dark:text-green-100">
-                            Semua materi selesai!
-                          </h3>
-                          <p className="text-sm text-green-700 dark:text-green-300">
-                            Kerja bagus! Sekarang Anda dapat melanjutkan ke
-                            kuis.
-                          </p>
-                        </div>
+              {/* Completion banner */}
+              {allFilesCompleted && !isCompleted && (
+                <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                      <div>
+                        <h3 className="text-base font-bold text-green-900 dark:text-green-100">
+                          Semua materi selesai!
+                        </h3>
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                          Kerja bagus! Sekarang Anda dapat melanjutkan ke kuis.
+                        </p>
                       </div>
-                      <Button
-                        onClick={() => navigate(`/class/${material.classId}`)}
-                      >
-                        Lanjut ke Kuis
-                      </Button>
                     </div>
-                  </Card>
-                )}
+                    <Button
+                      onClick={() => navigate(`/class/${material.classId}`)}
+                    >
+                      Lanjut ke Kuis
+                    </Button>
+                  </div>
+                </Card>
+              )}
             </div>
           </div>
         </div>
