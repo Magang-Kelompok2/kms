@@ -35,7 +35,7 @@ router.get("/:tugasId", async (req, res) => {
       .select(
         `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
          pertemuan, deadline, created_at,
-         materi(id_tingkatan, pertemuan)`,
+         materi!inner(id_tingkatan, pertemuan)`,
       )
       .eq("id_tugas", tugasId)
       .single();
@@ -50,6 +50,7 @@ router.get("/:tugasId", async (req, res) => {
         description: data.deskripsi ?? "",
         dueDate: data.deadline ?? data.created_at,
         classId: String(data.id_kelas),
+        level: (data.materi as any)?.id_tingkatan ?? 1,
         meetingNumber: data.pertemuan,
         type: data.type ?? "",
         materialId: String(data.id_materi),

@@ -68,6 +68,7 @@ router.get("/:materialId", async (req, res) => {
         title: data.title_materi,
         description: data.deskripsi ?? "",
         classId: String(data.id_kelas),
+        level: data.id_tingkatan,
         meetingNumber: data.pertemuan,
         isPublished: true,
         files: [

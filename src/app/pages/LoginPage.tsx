@@ -33,7 +33,7 @@ export function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-950">
         <div className="w-full max-w-md">
           <div className="mb-10">
-            <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
+            <h1 className="text-5xl font-normal mb-3" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
               Login
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
@@ -81,7 +81,7 @@ export function LoginPage() {
 
             <Button 
               type="submit" 
-              className="w-full h-12 bg-[#0C81E4] hover:bg-[#0C4E8C] text-white font-semibold text-base"
+              className="w-full h-12 bg-secondary hover:bg-primary text-white font-semibold text-base cursor-pointer"
             >
               Login
             </Button>

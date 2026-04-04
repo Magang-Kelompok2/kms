@@ -222,7 +222,7 @@ export function AssignmentViewPage() {
           </Card>
 
           {/* Assignment Attachments/Files from Superadmin */}
-          {assignment.attachments && assignment.attachments.length > 0 && (
+          {assignment.attachments && assignment.attachments.length > 0 ? (
             <Card className="p-6">
               <h2 className="text-xl font-bold mb-4">
                 📎 File Tugas dari Superadmin
@@ -270,6 +270,18 @@ export function AssignmentViewPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-6">
+              <div className="text-center">
+                <File className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                  Belum ada file yang diunggah
+                </h3>
+                <p className="text-gray-500 dark:text-gray-500">
+                  File tugas akan segera diunggah oleh admin.
+                </p>
               </div>
             </Card>
           )}

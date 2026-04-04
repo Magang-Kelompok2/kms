@@ -337,7 +337,21 @@ export function MaterialViewPage() {
               </Card>
 
               {/* Viewer */}
-              {selectedFile && selectedFileData && (
+              {material.files.length === 0 ? (
+                <Card className="flex-1 p-6 flex flex-col min-h-0">
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                        Belum ada file yang diunggah
+                      </h3>
+                      <p className="text-gray-500 dark:text-gray-500">
+                        File materi akan segera diunggah oleh admin.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              ) : selectedFile && selectedFileData ? (
                 <Card className="flex-1 p-6 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -389,7 +403,7 @@ export function MaterialViewPage() {
                     )}
                   </div>
                 </Card>
-              )}
+              ) : null}
 
               {/* Completion banner */}
               {allFilesCompleted && !isCompleted && (

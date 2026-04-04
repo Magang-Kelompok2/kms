@@ -144,26 +144,42 @@ export function QuizViewPage() {
                 </div>
               </div>
 
-              <Card className="p-5 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 mb-6">
-                <div className="flex gap-3">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="text-base font-bold text-yellow-900 dark:text-yellow-100 mb-2">
-                      Perhatian!
+              {quiz.questions.length === 0 ? (
+                <Card className="p-6 mb-6 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                  <div className="text-center">
+                    <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                      Belum ada soal yang dibuat
                     </h3>
-                    <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 list-disc list-inside">
-                      <li>Kuis hanya dapat dikerjakan satu kali</li>
-                      <li>Timer akan mulai berjalan setelah Anda klik "Mulai Kuis"</li>
-                      <li>Jawaban akan otomatis tersubmit saat waktu habis</li>
-                      <li>Pastikan koneksi internet stabil</li>
-                    </ul>
+                    <p className="text-gray-500 dark:text-gray-500">
+                      Soal kuis akan segera dibuat oleh admin.
+                    </p>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              ) : (
+                <Card className="p-5 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 mb-6">
+                  <div className="flex gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-base font-bold text-yellow-900 dark:text-yellow-100 mb-2">
+                        Perhatian!
+                      </h3>
+                      <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 list-disc list-inside">
+                        <li>Kuis hanya dapat dikerjakan satu kali</li>
+                        <li>Timer akan mulai berjalan setelah Anda klik "Mulai Kuis"</li>
+                        <li>Jawaban akan otomatis tersubmit saat waktu habis</li>
+                        <li>Pastikan koneksi internet stabil</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+              )}
 
-              <Button onClick={handleStart} className="w-full text-base py-6">
-                Mulai Kuis
-              </Button>
+              {quiz.questions.length > 0 && (
+                <Button onClick={handleStart} className="w-full text-base py-6">
+                  Mulai Kuis
+                </Button>
+              )}
             </Card>
           </div>
         </div>
