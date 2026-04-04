@@ -1,13 +1,15 @@
+// src/app/components/AddMaterialModal.tsx
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { X, Video, FileText, Trash2 } from "lucide-react";
-import { useAddMateri } from "../hooks/UseAddMateri";
+import { X, Video, FileText, Trash2, Loader2 } from "lucide-react";
+import { useAddMateri } from "../hooks/useAddMateri";
+import { useUpload } from "../hooks/useUpload";
 
 interface AddMaterialModalProps {
   isOpen: boolean;
   onClose: () => void;
   classId: string;
-  level: number; // ini = id_tingkatan
+  level: number;
   onAdd: (material: any) => void;
 }
 
@@ -15,8 +17,8 @@ interface FileUpload {
   id: string;
   name: string;
   type: "pdf" | "video";
-  file?: File;
-  url?: string;
+  file?: File; // file lokal — untuk diupload
+  url?: string; // URL YouTube — langsung pakai, tidak diupload
   duration?: string;
 }
 
@@ -31,8 +33,21 @@ export function AddMaterialModal({
   const [description, setDescription] = useState("");
   const [meetingNumber, setMeetingNumber] = useState("");
   const [files, setFiles] = useState<FileUpload[]>([]);
+  const [uploadProgress, setUploadProgress] = useState("");
 
-  const { addMateri, loading, error } = useAddMateri();
+  const {
+    addMateri,
+    loading: materiLoading,
+    error: materiError,
+  } = useAddMateri();
+  const {
+    uploadMateriFile,
+    loading: uploadLoading,
+    error: uploadError,
+  } = useUpload();
+
+  const loading = materiLoading || uploadLoading;
+  const error = materiError ?? uploadError;
 
   if (!isOpen) return null;
 
@@ -47,31 +62,30 @@ export function AddMaterialModal({
         type,
         file,
       }));
-      setFiles([...files, ...newFiles]);
+      setFiles((prev) => [...prev, ...newFiles]);
     }
   };
 
   const handleVideoUrl = () => {
     const url = prompt("Masukkan URL video YouTube:");
-    if (url) {
-      const duration = prompt("Masukkan durasi video (contoh: 15:30):");
-      const name = prompt("Nama video:") || "Video";
-      setFiles([
-        ...files,
-        {
-          id: `file-${Date.now()}-${Math.random()}`,
-          name,
-          type: "video",
-          url,
-          duration: duration || undefined,
-        },
-      ]);
-    }
+    if (!url) return;
+    const duration =
+      prompt("Masukkan durasi video (contoh: 15:30):") ?? undefined;
+    const name = prompt("Nama video:") || "Video";
+    setFiles((prev) => [
+      ...prev,
+      {
+        id: `file-${Date.now()}-${Math.random()}`,
+        name,
+        type: "video",
+        url,
+        duration,
+      },
+    ]);
   };
 
-  const removeFile = (id: string) => {
-    setFiles(files.filter((f) => f.id !== id));
-  };
+  const removeFile = (id: string) =>
+    setFiles((prev) => prev.filter((f) => f.id !== id));
 
   const handleSubmit = async () => {
     if (!title || !description || !meetingNumber) {
@@ -79,34 +93,54 @@ export function AddMaterialModal({
       return;
     }
 
-    const videos = files
-      .filter((f) => f.type === "video")
-      .map((f) => ({
-        title_video: f.name,
-        video_path: f.url ?? "",
-      }));
+    // ── 1. Pisahkan video YouTube (tidak diupload) dan file lokal ──
+    const youtubeVideos = files
+      .filter((f) => f.type === "video" && f.url)
+      .map((f) => ({ title_video: f.name, video_path: f.url! }));
 
-    const pdfs = files
-      .filter((f) => f.type === "pdf")
-      .map((f) => ({
-        title_pdf: f.name,
-        // Kalau belum ada upload ke storage, pakai nama file sementara
-        pdf_path: f.url ?? f.file?.name ?? "",
-      }));
+    // ── 2. Simpan materi dulu (tanpa file lokal) ──────────────────
+    setUploadProgress("Menyimpan materi...");
+    let idMateri: number | null = null;
 
-    await addMateri({
-      title_materi: title,
-      deskripsi: description,
-      id_kelas: Number(classId),
-      id_tingkatan: level,
-      pertemuan: parseInt(meetingNumber),
-      videos,
-      pdfs,
-    });
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/materials`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title_materi: title,
+          deskripsi: description,
+          id_kelas: Number(classId),
+          id_tingkatan: level,
+          pertemuan: parseInt(meetingNumber),
+          videos: youtubeVideos,
+          pdfs: [],
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success)
+        throw new Error(json.error ?? "Gagal menyimpan materi");
+      idMateri = json.data.id_materi;
+    } catch (err: any) {
+      setUploadProgress("");
+      alert(err?.message ?? "Gagal menyimpan materi");
+      return;
+    }
 
-    // Kalau sukses, panggil onAdd agar UI ikut update
+    // ── 3. Upload file lokal (PDF & video file) ke MinIO ──────────
+    const localFiles = files.filter((f) => f.file);
+    for (let i = 0; i < localFiles.length; i++) {
+      const f = localFiles[i];
+      setUploadProgress(
+        `Mengupload file ${i + 1} dari ${localFiles.length}: ${f.name}`,
+      );
+      await uploadMateriFile(f.file!, f.type, idMateri!, f.name);
+    }
+
+    setUploadProgress("");
+
+    // ── 4. Update UI lokal ────────────────────────────────────────
     onAdd({
-      id: `mat-${Date.now()}`,
+      id: String(idMateri),
       title,
       description,
       classId,
@@ -122,7 +156,6 @@ export function AddMaterialModal({
       })),
     });
 
-    // Reset
     setTitle("");
     setDescription("");
     setMeetingNumber("");
@@ -147,6 +180,12 @@ export function AddMaterialModal({
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
               {error}
+            </div>
+          )}
+          {uploadProgress && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-600 dark:text-blue-400 text-sm flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {uploadProgress}
             </div>
           )}
 
@@ -192,12 +231,11 @@ export function AddMaterialModal({
             />
           </div>
 
-          {/* File Upload Section */}
+          {/* File Upload */}
           <div>
             <label className="block text-sm font-semibold mb-3">
               File Materi (PDF & Video)
             </label>
-
             <div className="space-y-3 mb-4">
               <div>
                 <input
@@ -210,13 +248,12 @@ export function AddMaterialModal({
                 />
                 <label
                   htmlFor="pdf-upload"
-                  className="flex items-center justify-center gap-2 w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-blue-400 dark:hover:border-blue-600 transition-colors cursor-pointer"
+                  className="flex items-center justify-center gap-2 w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-blue-400 transition-colors cursor-pointer"
                 >
                   <FileText className="h-5 w-5 text-gray-400" />
                   <span className="text-sm font-medium">Upload File PDF</span>
                 </label>
               </div>
-
               <Button
                 type="button"
                 variant="outline"
@@ -246,11 +283,11 @@ export function AddMaterialModal({
                       )}
                       <div>
                         <p className="text-sm font-medium">{file.name}</p>
-                        {file.duration && (
-                          <p className="text-xs text-gray-500">
-                            {file.duration}
-                          </p>
-                        )}
+                        <p className="text-xs text-gray-500">
+                          {file.file
+                            ? "File lokal → akan diupload ke MinIO"
+                            : "YouTube URL"}
+                        </p>
                       </div>
                     </div>
                     <button
@@ -272,7 +309,13 @@ export function AddMaterialModal({
             disabled={loading}
             className="flex-1 text-base py-6"
           >
-            {loading ? "Menyimpan..." : "Simpan Materi"}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Menyimpan...
+              </>
+            ) : (
+              "Simpan Materi"
+            )}
           </Button>
           <Button
             variant="outline"

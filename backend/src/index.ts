@@ -41,9 +41,10 @@ async function start() {
       const exists = await minioClient.bucketExists(BUCKET);
       if (!exists) await minioClient.makeBucket(BUCKET);
       console.log("✅ MinIO bucket ready!");
-    } catch {
+    } catch (err) {
       console.warn(
         "⚠️  MinIO tidak tersedia, upload file tidak akan berfungsi",
+        err,
       );
     }
 
