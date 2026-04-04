@@ -1,43 +1,48 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { Lock, User, AlertCircle } from "lucide-react";
+import { Lock, User, Mail, AlertCircle } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import React from "react";
 
-const loginImage = "https://images.unsplash.com/photo-1724985284026-dd2451e4857a?q=80&w=2072&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+const registerImage = "https://images.unsplash.com/photo-1724985284026-dd2451e4857a?q=80&w=2072&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
-export function LoginPage() {
+export function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    const result = await login(email, password);
+    const result = await register(email, password, username);
+    setLoading(false);
+
     if (result.success) {
       navigate("/dashboard");
     } else {
-      setError(result.error || "Email atau password salah");
+      setError(result.error || "Terjadi kesalahan saat registrasi");
     }
   };
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Login Form */}
+      {/* Left Side - Register Form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-950">
         <div className="w-full max-w-md">
           <div className="mb-10">
             <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
-              Login
+              Register
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Silahkan lakukan Login terlebih dahulu
+              Buat akun baru untuk memulai
             </p>
           </div>
 
@@ -45,6 +50,21 @@ export function LoginPage() {
             <div className="space-y-2">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="pl-10 h-12 border-gray-300 dark:border-gray-700"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
                   id="email"
                   type="email"
@@ -68,6 +88,7 @@ export function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 h-12 border-gray-300 dark:border-gray-700"
                   required
+                  minLength={6}
                 />
               </div>
             </div>
@@ -82,22 +103,19 @@ export function LoginPage() {
             <Button 
               type="submit" 
               className="w-full h-12 bg-[#0C81E4] hover:bg-[#0C4E8C] text-white font-semibold text-base"
+              disabled={loading}
             >
-              Login
+              {loading ? "Mendaftar..." : "Register"}
             </Button>
           </form>
 
-          {/* Demo Accounts - Hidden in production */}
-          <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-            <p className="text-xs font-semibold mb-2 text-gray-700 dark:text-gray-300">Demo Accounts:</p>
-            <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-              <p>
-                <strong>Admin:</strong> admin@example.com / admin123
-              </p>
-              <p>
-                <strong>User:</strong> user@example.com / user123
-              </p>
-            </div>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Sudah punya akun?{" "}
+              <a href="/login" className="text-[#0C81E4] hover:text-[#0C4E8C] font-semibold">
+                Login disini
+              </a>
+            </p>
           </div>
         </div>
       </div>
@@ -105,7 +123,7 @@ export function LoginPage() {
       {/* Right Side - Image and Branding */}
       <div className="hidden lg:flex flex-1 relative overflow-hidden">
         <img
-          src={loginImage}
+          src={registerImage}
           alt="TaxaCore Building"
           className="absolute inset-0 w-full h-full object-cover"
         />

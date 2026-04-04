@@ -1,10 +1,16 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
+import { verifySupabaseToken } from "../middleware/auth";
 
 const router = Router();
 
 // GET /api/users
-router.get("/", async (_req, res) => {
+router.get("/", verifySupabaseToken, async (req: any, res) => {
+  // Only superadmin can access this
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ success: false, error: 'Akses ditolak' });
+  }
+
   try {
     const { data, error } = await supabase
       .from("user")
@@ -26,12 +32,12 @@ router.get("/", async (_req, res) => {
     });
   } catch (error) {
     console.error("Error fetching users:", error);
-    res.status(500).json({ success: false, error: "Failed to fetch users" });
+    res.status(500).json({ success: false, error: "Gagal mengambil data users" });
   }
 });
 
 // DELETE /api/users/:userId
-router.delete("/:userId", async (req, res) => {
+router.delete("/:userId", verifySupabaseToken, async (req: any, res) => {
   const userId = Number(req.params.userId);
   if (isNaN(userId))
     return res
@@ -54,7 +60,7 @@ router.delete("/:userId", async (req, res) => {
 
 // GET /api/users/:userId/progress/:classId
 // Ambil tingkatan saat ini untuk user di kelas tertentu
-router.get("/:userId/progress/:classId", async (req, res) => {
+router.get("/:userId/progress/:classId", verifySupabaseToken, async (req: any, res) => {
   const userId = Number(req.params.userId);
   const classId = Number(req.params.classId);
 
@@ -86,7 +92,7 @@ router.get("/:userId/progress/:classId", async (req, res) => {
 
 // PUT /api/users/:userId/progress/:classId
 // Update atau buat progress user
-router.put("/:userId/progress/:classId", async (req, res) => {
+router.put("/:userId/progress/:classId", verifySupabaseToken, async (req: any, res) => {
   const userId = Number(req.params.userId);
   const classId = Number(req.params.classId);
   const { tingkatanSaatIni } = req.body;
