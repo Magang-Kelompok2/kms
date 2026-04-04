@@ -110,7 +110,11 @@ router.get("/:classId/levels", async (req, res) => {
         id: String(m.id_materi),
         title: m.title_materi,
         description: m.deskripsi ?? "",
+        content: m.deskripsi ?? "",
+        classId: String(classId),
         meetingNumber: m.pertemuan,
+        level: tingkatan.id_tingkatan,
+        createdAt: new Date().toISOString(),
         isPublished: true,
         files: [
           ...(m.video ?? []).map((v: any) => ({
@@ -136,14 +140,18 @@ router.get("/:classId/levels", async (req, res) => {
           id: String(t.id_tugas),
           title: t.nama_tugas ?? "",
           description: t.deskripsi ?? "",
-          meetingNumber: t.pertemuan,
           dueDate: t.deadline ?? t.created_at,
+          classId: String(classId),
+          meetingNumber: t.pertemuan,
+          level: tingkatan.id_tingkatan,
+          materialId: String(t.id_materi),
+          isPublished: true,
           type: t.type ?? "",
         }));
 
       return {
         id: String(tingkatan.id_tingkatan),
-        level: index + 1,
+        level: tingkatan.id_tingkatan,
         namaLevel: tingkatan.nama_tingkatan,
         materials,
         assignments,

@@ -36,7 +36,7 @@ export function UserProgressPage() {
   const userSubmissions = submissions.filter((s) => s.userId === userId);
 
   if (!targetUser) {
-    return <div>User not found</div>;
+    return <div>Pengguna tidak ditemukan.</div>;
   }
 
   const handleApprove = (submissionId: string) => {
@@ -55,33 +55,33 @@ export function UserProgressPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <DashboardHeader />
 
-      <div className="container mx-auto px-4 md:px-6 py-8">
+      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
         <Button
           variant="ghost"
           onClick={() => navigate("/users")}
           className="mb-6"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Users
+          Kembali ke Laman Pengguna
         </Button>
 
         {/* User Header */}
         <Card className="p-6 mb-8">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-bold text-xl">
+            <div className="w-16 h-16 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-bold text-xl">
               {targetUser.name.charAt(0)}
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold mb-1">{targetUser.name}</h1>
+              <h1 className="text-2xl font-normal mb-1">{targetUser.name}</h1>
               <p className="text-gray-600 dark:text-gray-400 mb-3">
                 {targetUser.email}
               </p>
               <div className="flex gap-4 text-sm">
                 <span className="text-gray-500">
-                  Joined: {targetUser.createdAt}
+                  Bergabung: {targetUser.createdAt}
                 </span>
                 <span className="text-gray-500">
-                  Total Submissions: {userSubmissions.length}
+                  Total Pengumpulan: {userSubmissions.length}
                 </span>
               </div>
             </div>
@@ -90,7 +90,7 @@ export function UserProgressPage() {
 
         {/* Class Progress */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Class Progress</h2>
+          <h2 className="text-2xl font-normal mb-4">Progres Kelas</h2>
           <div className="grid gap-6">
             {progress.map((p) => {
               const cls = classes.find((c) => c.id === p.classId);
@@ -100,16 +100,16 @@ export function UserProgressPage() {
                 <Card key={p.classId} className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="text-xl font-bold mb-1">{cls.name}</h3>
+                      <h3 className="text-xl font-normal mb-1">{cls.name}</h3>
                       <div className="flex items-center gap-2">
                         <Badge variant="default">
-                          Level {p.currentLevel} / {cls.totalLevels}
+                          Tingkatan {p.currentLevel} / {cls.totalLevels}
                         </Badge>
                         <Badge variant="outline">
-                          {p.completedMaterials.length} Materials Completed
+                          {p.completedMaterials.length} Materi Selesai
                         </Badge>
                         <Badge variant="outline">
-                          {p.completedQuizzes.length} Quizzes Completed
+                          {p.completedQuizzes.length} Kuis Selesai
                         </Badge>
                       </div>
                     </div>
@@ -117,8 +117,8 @@ export function UserProgressPage() {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-semibold mb-2 text-sm">
-                        Completed Materials:
+                      <h4 className="font-normal mb-2 text-base">
+                        Materi diselesaikan:
                       </h4>
                       {p.completedMaterials.length > 0 ? (
                         <ul className="space-y-1">
@@ -137,14 +137,14 @@ export function UserProgressPage() {
                         </ul>
                       ) : (
                         <p className="text-sm text-gray-500">
-                          No materials completed yet
+                          Belum ada materi yang diselesaikan.
                         </p>
                       )}
                     </div>
 
                     <div>
-                      <h4 className="font-semibold mb-2 text-sm">
-                        Completed Quizzes:
+                      <h4 className="font-normal mb-2 text-base">
+                        Kuis diselesaikan:
                       </h4>
                       {p.completedQuizzes.length > 0 ? (
                         <ul className="space-y-1">
@@ -163,7 +163,7 @@ export function UserProgressPage() {
                         </ul>
                       ) : (
                         <p className="text-sm text-gray-500">
-                          No quizzes completed yet
+                          Belum ada kuis yang diselesaikan.
                         </p>
                       )}
                     </div>
@@ -176,7 +176,7 @@ export function UserProgressPage() {
 
         {/* Submissions */}
         <div>
-          <h2 className="text-2xl font-bold mb-4">Submissions</h2>
+          <h2 className="text-2xl font-normal mb-4">Pengumpulan</h2>
           <div className="grid gap-4">
             {userSubmissions.map((submission) => {
               const cls = classes.find((c) => c.id === submission.classId);
@@ -189,16 +189,16 @@ export function UserProgressPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-bold">
-                          {quiz?.title || "Assignment Submission"}
+                        <h3 className="font-normal">
+                          {quiz?.title || "Pengumpulan Tugas"}
                         </h3>
                         <Badge
-                          variant={
+                          className={
                             submission.status === "approved"
-                              ? "default"
+                              ? "bg:green-500 dark:bg-green-900/20"
                               : submission.status === "rejected"
-                              ? "destructive"
-                              : "secondary"
+                              ? "bg:red-500 dark:bg-red-900/20"
+                              : "bg:gray-500 dark:bg-gray-900/20"
                           }
                         >
                           {submission.status === "pending" && (
@@ -216,7 +216,7 @@ export function UserProgressPage() {
 
                       <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
                         <span>{cls?.name}</span>
-                        <span>Level {submission.level}</span>
+                        <span>Tingkatan {submission.level}</span>
                         <span>
                           {new Date(submission.submittedAt).toLocaleString()}
                         </span>
@@ -226,7 +226,7 @@ export function UserProgressPage() {
                         <div className="flex items-center gap-2 mb-2">
                           <Award className="h-4 w-4 text-yellow-500" />
                           <span className="font-semibold">
-                            Score: {submission.score}%
+                            Skor: {submission.score}
                           </span>
                         </div>
                       )}
@@ -242,6 +242,7 @@ export function UserProgressPage() {
                       <div className="flex gap-2 ml-4">
                         <Button
                           size="sm"
+                          className="bg-green-500 hover:bg-green-700 cursor-pointer"
                           onClick={() => handleApprove(submission.id)}
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
@@ -249,7 +250,7 @@ export function UserProgressPage() {
                         </Button>
                         <Button
                           size="sm"
-                          variant="destructive"
+                          className="bg-red-500 hover:bg-red-700 cursor-pointer"
                           onClick={() => handleReject(submission.id)}
                         >
                           <XCircle className="h-4 w-4 mr-2" />
@@ -266,7 +267,7 @@ export function UserProgressPage() {
               <Card className="p-12 text-center">
                 <TrendingUp className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
                 <p className="text-gray-600 dark:text-gray-400">
-                  No submissions yet
+                  Belum ada pengumpulan.
                 </p>
               </Card>
             )}

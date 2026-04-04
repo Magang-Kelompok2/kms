@@ -16,11 +16,15 @@ export function useClasses() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kelas`);
+        console.log("Fetching classes from:", `${import.meta.env.VITE_API_URL}/api/kelas`);
+        const res = await fetch(`http://localhost:4000/api/kelas`);
+        console.log("Response status:", res.status);
         if (!res.ok) throw new Error("Gagal mengambil data kelas");
         const json = await res.json();
+        console.log("Fetched classes:", json.data);
         setClasses(json.data);
       } catch (err) {
+        console.error("Error fetching classes:", err);
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
       } finally {
         setLoading(false);
