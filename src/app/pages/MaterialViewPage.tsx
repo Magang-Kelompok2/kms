@@ -110,7 +110,7 @@ export function MaterialViewPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto px-4 md:px-6 py-8">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <p className="text-gray-500">Memuat materi...</p>
         </div>
       </div>
@@ -121,7 +121,7 @@ export function MaterialViewPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto px-4 md:px-6 py-8">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
             <p className="text-red-500">{error}</p>
           </Card>
@@ -134,7 +134,7 @@ export function MaterialViewPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto px-4 md:px-6 py-8">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
             <p className="text-red-500">Material tidak ditemukan</p>
           </Card>
@@ -150,7 +150,7 @@ export function MaterialViewPage() {
     return (
       <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto px-4 md:px-6 py-8">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-12 text-center">
             <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
             <p className="text-gray-600 dark:text-gray-400">

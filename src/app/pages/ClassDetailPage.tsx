@@ -105,7 +105,7 @@ export function ClassDetailPage() {
     return (
       <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto px-4 md:px-6 py-8">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
             <p className="text-red-500">Kelas tidak ditemukan</p>
           </Card>
@@ -118,7 +118,7 @@ export function ClassDetailPage() {
     return (
       <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto px-4 md:px-6 py-8">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
             <p className="text-red-500 mb-2">Gagal memuat data tingkatan</p>
             <p className="text-sm text-gray-500">{levelsError}</p>
@@ -147,11 +147,11 @@ export function ClassDetailPage() {
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         {user?.role === "superadmin"
-          ? "Back to Dashboard"
+          ? "Kembali ke Dashboard"
           : "Kembali ke Dashboard"}
       </Button>
       <Card className="overflow-hidden mb-8">
-        <div className="relative h-48 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4]">
+        <div className="relative h-48 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4]">
           <div className="absolute inset-0 flex items-center justify-center">
             <h1
               className="text-4xl font-normal text-white"
@@ -170,40 +170,67 @@ export function ClassDetailPage() {
     return (
       <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto px-4 md:px-6 py-8">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <ClassHeader />
           <div className="grid md:grid-cols-3 gap-4 mb-8">
-            <Card className="p-6">
-              <div className="flex items-center gap-3">
-                <Layers className="h-8 w-8 text-[#0C4E8C]" />
+            <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
+              <div className="relative flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-2xl font-bold">{levels.length}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                     Jumlah Tingkatan
                   </p>
+                  <p className="text-4xl font-semibold">{levels.length}</p>
+                </div>
+                <div className="rounded-3xl bg-white/15 p-3">
+                  <Layers className="h-10 w-10 text-white opacity-90" />
                 </div>
               </div>
+              <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+                <span>Semua tingkatan</span>
+                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                  Overview
+                </span>
+              </div>
             </Card>
-            <Card className="p-6">
-              <div className="flex items-center gap-3">
-                <FileText className="h-8 w-8 text-[#0C81E4]" />
+            <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-purple-600 to-pink-500">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
+              <div className="relative flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-2xl font-bold">{totalAssignments}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                     Jumlah Pengumpulan
                   </p>
+                  <p className="text-4xl font-semibold">{totalAssignments}</p>
+                </div>
+                <div className="rounded-3xl bg-white/15 p-3">
+                  <FileText className="h-10 w-10 text-white opacity-90" />
                 </div>
               </div>
+              <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+                <span>Tugas & pengumpulan</span>
+                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                  Assignments
+                </span>
+              </div>
             </Card>
-            <Card className="p-6">
-              <div className="flex items-center gap-3">
-                <ClipboardCheck className="h-8 w-8 text-[#11C4D4]" />
+            <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-emerald-600 to-teal-500">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
+              <div className="relative flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-2xl font-bold">{totalQuizzes}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                     Jumlah Kuis
                   </p>
+                  <p className="text-4xl font-semibold">{totalQuizzes}</p>
                 </div>
+                <div className="rounded-3xl bg-white/15 p-3">
+                  <ClipboardCheck className="h-10 w-10 text-white opacity-90" />
+                </div>
+              </div>
+              <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+                <span>Kuis & evaluasi</span>
+                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                  Quizzes
+                </span>
               </div>
             </Card>
           </div>
@@ -220,6 +247,7 @@ export function ClassDetailPage() {
               <AdminLevelCard
                 key={lvl.id}
                 level={lvl.level}
+                namaLevel={lvl.namaLevel}
                 materials={[
                   ...lvl.materials,
                   ...localMaterials.filter(
@@ -256,42 +284,69 @@ export function ClassDetailPage() {
   return (
     <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
       <DashboardHeader />
-      <div className="container mx-auto px-4 md:px-6 py-8">
+      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
         <ClassHeader />
         <div className="grid md:grid-cols-3 gap-4 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center gap-3">
-              <Layers className="h-8 w-8 text-[#0C4E8C]" />
+          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
+            <div className="relative flex items-start justify-between gap-4">
               <div>
-                <p className="text-2xl font-bold">{levels.length}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                   Total Tingkatan
                 </p>
+                <p className="text-4xl font-semibold">{levels.length}</p>
+              </div>
+              <div className="rounded-3xl bg-white/15 p-3">
+                <Layers className="h-10 w-10 text-white opacity-90" />
               </div>
             </div>
+            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+              <span>Semua tingkatan</span>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                Overview
+              </span>
+            </div>
           </Card>
-          <Card className="p-6">
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-[#0C81E4]" />
+          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-purple-600 to-pink-500">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
+            <div className="relative flex items-start justify-between gap-4">
               <div>
-                <p className="text-2xl font-bold">{totalMaterials}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                   Materi
                 </p>
+                <p className="text-4xl font-semibold">{totalMaterials}</p>
+              </div>
+              <div className="rounded-3xl bg-white/15 p-3">
+                <FileText className="h-10 w-10 text-white opacity-90" />
               </div>
             </div>
+            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+              <span>Materi pembelajaran</span>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                Materials
+              </span>
+            </div>
           </Card>
-          <Card className="p-6">
-            <div className="flex items-center gap-3">
-              <ClipboardCheck className="h-8 w-8 text-[#11C4D4]" />
+          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-emerald-600 to-teal-500">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
+            <div className="relative flex items-start justify-between gap-4">
               <div>
-                <p className="text-2xl font-bold">
-                  {totalAssignments + totalQuizzes}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                   Penugasan & Kuis
                 </p>
+                <p className="text-4xl font-semibold">
+                  {totalAssignments + totalQuizzes}
+                </p>
               </div>
+              <div className="rounded-3xl bg-white/15 p-3">
+                <ClipboardCheck className="h-10 w-10 text-white opacity-90" />
+              </div>
+            </div>
+            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+              <span>Tugas & evaluasi</span>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                Tasks
+              </span>
             </div>
           </Card>
         </div>
@@ -306,6 +361,7 @@ export function ClassDetailPage() {
             <UserLevelCard
               key={lvl.id}
               level={lvl.level}
+              namaLevel={lvl.namaLevel}
               materials={lvl.materials}
               assignments={lvl.assignments}
               quizzes={lvl.quizzes}

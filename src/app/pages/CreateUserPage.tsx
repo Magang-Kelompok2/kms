@@ -41,29 +41,29 @@ export function CreateUserPage() {
           className="mb-6"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Users
+          Kembali ke Laman Pengguna
         </Button>
 
         <Card className="p-8">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-lg flex items-center justify-center">
               <UserPlus className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Create New User</h1>
+              <h1 className="text-2xl font-normal">Buat Akun Baru</h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Add a new student account
+                Buat Akun untuk Pengguna Baru
               </p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">Nama Lengkap</Label>
               <Input
                 id="name"
                 type="text"
-                placeholder="Enter full name"
+                placeholder="Masukkan nama lengkap"
                 value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
@@ -73,11 +73,11 @@ export function CreateUserPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">Alamat Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="student@example.com"
+                placeholder="example@gmail.com"
                 value={formData.email}
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
@@ -91,15 +91,15 @@ export function CreateUserPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Create a password"
+                placeholder="Buat kata sandi"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
                 required
               />
-              <p className="text-xs text-gray-500">
-                User can change this password after first login
+              <p className="text-xs text-red-500">
+                Pastikan untuk memberikan password yang mudah diingat kepada pengguna.
               </p>
             </div>
 
