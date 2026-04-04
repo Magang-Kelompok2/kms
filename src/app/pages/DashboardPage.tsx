@@ -61,7 +61,7 @@ export function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-red-50 dark:bg-gray-950">
       <DashboardHeader />
 
       <div className="container mx-auto px-4 md:px-6 py-8">
