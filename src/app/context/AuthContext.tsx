@@ -6,6 +6,7 @@ import type { User } from "../types";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  token: string | null; // ← tambah ini biar bisa dipakai di hooks
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, username: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -19,23 +20,59 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
+// Helper: ambil data user dari tabel public.user berdasarkan email
+async function fetchUserProfile(email: string): Promise<Partial<User> | null> {
+  const { data, error } = await supabase
+    .from("user")
+    .select("id_user, username, role, id_kelas")
+    .eq("email", email)
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    id: String(data.id_user),
+    name: data.username,
+    role: data.role ?? "user",
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Gabungkan Supabase auth user + profile dari tabel public.user
+  async function syncUser(supabaseUser: any, accessToken: string) {
+    const profile = await fetchUserProfile(supabaseUser.email);
+    setUser({
+      id: profile?.id ?? supabaseUser.id,
+      name: profile?.name ?? supabaseUser.email.split("@")[0],
+      email: supabaseUser.email,
+      role: profile?.role ?? "user",
+      createdAt: supabaseUser.created_at ?? new Date().toISOString(),
+    });
+    setToken(accessToken);
+  }
+
   useEffect(() => {
-    // Check session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-      setUser(session.user as unknown as User);
+    // Cek session saat mount
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        await syncUser(session.user, session.access_token);
       }
       setLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen perubahan auth (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user as unknown as User ?? null);
+      async (_event, session) => {
+        if (session?.user) {
+          await syncUser(session.user, session.access_token);
+        } else {
+          setUser(null);
+          setToken(null);
+        }
       }
     );
 
@@ -44,15 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email, password
-      });
-      
-      if (error) {
-        return { success: false, error: error.message };
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { success: false, error: error.message };
+      if (data.user && data.session) {
+        await syncUser(data.user, data.session.access_token);
       }
-      
-      setUser(data.user as unknown as User);
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message || "Terjadi kesalahan saat login" };
@@ -62,21 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, username: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const { data, error } = await supabase.auth.signUp({
-        email, password,
-        options: {
-          data: { username }
-        }
+        email,
+        password,
+        options: { data: { username } }
       });
-      
-      if (error) {
-        return { success: false, error: error.message };
+      if (error) return { success: false, error: error.message };
+      if (data.user && data.session) {
+        await syncUser(data.user, data.session.access_token);
       }
-      
-      // Auto-login after registration
-      if (data.user) {
-        setUser(data.user as unknown as User);
-      }
-      
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message || "Terjadi kesalahan saat registrasi" };
@@ -86,19 +112,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async (): Promise<void> => {
     await supabase.auth.signOut();
     setUser(null);
+    setToken(null);
   };
 
   return (
-    <AuthContext.Provider
-      value={{ 
-        user, 
-        loading,
-        login, 
-        register, 
-        logout, 
-        isAuthenticated: !!user 
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      token,
+      login,
+      register,
+      logout,
+      isAuthenticated: !!user
+    }}>
       {children}
     </AuthContext.Provider>
   );

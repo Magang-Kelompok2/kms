@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import type { Material, Assignment } from "../types";
 
 interface Level {
@@ -11,6 +12,7 @@ interface Level {
 }
 
 export function useLevels(classId: string | number | undefined) {
+  const { token } = useAuth();
   const [levels, setLevels] = useState<Level[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +24,14 @@ export function useLevels(classId: string | number | undefined) {
       setLoading(true);
       setError(null);
       try {
+        // Endpoint /api/kelas/:id/levels tidak butuh auth, tapi tetap kirim kalau ada
+        const headers: HeadersInit = token
+          ? { Authorization: `Bearer ${token}` }
+          : {};
+
         const res = await fetch(
-          `http://localhost:4000/api/kelas/${classId}/levels`,
+          `${import.meta.env.VITE_API_URL}/api/kelas/${classId}/levels`,
+          { headers }
         );
         if (!res.ok) throw new Error("Gagal mengambil data tingkatan");
         const json = await res.json();
@@ -36,7 +44,7 @@ export function useLevels(classId: string | number | undefined) {
     };
 
     fetchLevels();
-  }, [classId]);
+  }, [classId, token]);
 
   return { levels, loading, error };
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 
 export interface UserData {
   id: number;
@@ -10,15 +11,21 @@ export interface UserData {
 }
 
 export function useUsers() {
+  const { token } = useAuth(); // ← ambil token dari AuthContext
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchUsers = async () => {
+    if (!token) return; // jangan fetch kalau belum ada token
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users`, {
+        headers: {
+          Authorization: `Bearer ${token}`, // ← kirim token
+        },
+      });
       if (!res.ok) throw new Error("Gagal mengambil data pengguna");
       const json = await res.json();
       setUsers(json.data ?? []);
@@ -31,18 +38,23 @@ export function useUsers() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [token]); // re-fetch kalau token berubah
 
   const deleteUser = async (userId: number): Promise<boolean> => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/users/${userId}`,
-        { method: "DELETE" },
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
       if (!res.ok) throw new Error("Gagal menghapus pengguna");
-      await fetchUsers(); // refresh list
+      await fetchUsers();
       return true;
-    } catch (err) {
+    } catch {
       return false;
     }
   };
