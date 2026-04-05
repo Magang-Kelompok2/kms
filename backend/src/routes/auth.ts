@@ -5,10 +5,11 @@ import { supabase } from "../lib/supabase";
 
 const router = Router();
 
+// Gunakan fallback agar tidak crash saat dev, tapi log warning
+const JWT_SECRET = process.env.JWT_SECRET ?? "taxacore_secret_key_dev_only";
 if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET belum diset di .env");
+  console.warn("⚠️  JWT_SECRET tidak diset di .env, menggunakan fallback dev key");
 }
-const JWT_SECRET = process.env.JWT_SECRET;
 
 const SALT_ROUNDS = 10;
 
@@ -38,7 +39,7 @@ router.post("/login", async (req, res) => {
     if (isHashed) {
       isValid = await bcrypt.compare(password, user.password);
     } else {
-      // Password lama plain text - langsung bandingkan lalu auto-upgrade ke hash
+      // Password lama plain text
       isValid = user.password === password;
       if (isValid) {
         // Auto-upgrade: hash dan simpan password lama
@@ -87,6 +88,10 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ success: false, error: "Semua field wajib diisi" });
   }
 
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, error: "Password minimal 6 karakter" });
+  }
+
   try {
     // Cek email sudah ada
     const { data: existing } = await supabase
@@ -102,7 +107,7 @@ router.post("/register", async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // Simpan user baru
+    // Simpan user baru dengan role default "user"
     const { data: newUser, error } = await supabase
       .from("user")
       .insert({ username, email, password: hashedPassword, role: "user" })
@@ -110,6 +115,7 @@ router.post("/register", async (req, res) => {
       .single();
 
     if (error || !newUser) {
+      console.error("Register DB error:", error);
       return res.status(500).json({ success: false, error: "Gagal membuat akun" });
     }
 
@@ -135,6 +141,11 @@ router.post("/register", async (req, res) => {
     console.error("Register error:", err);
     return res.status(500).json({ success: false, error: "Terjadi kesalahan server" });
   }
+});
+
+// POST /api/auth/logout (opsional - client cukup hapus token)
+router.post("/logout", (_req, res) => {
+  return res.json({ success: true, message: "Logout berhasil" });
 });
 
 export default router;

@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { supabase } from "../lib/supabase";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "taxacore_secret_key_ganti_ini";
+// HARUS sama persis dengan yang di routes/auth.ts
+const JWT_SECRET = process.env.JWT_SECRET ?? "taxacore_secret_key_dev_only";
 
 export interface AuthenticatedRequest extends Request {
   user: any;

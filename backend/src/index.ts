@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { supabase } from "./lib/supabase";
 import { minioClient, BUCKET } from "./lib/minio";
 
+import authRoutes from "./routes/auth";       // ← TAMBAH INI
 import kelasRoutes from "./routes/kelas";
 import usersRoutes from "./routes/users";
 import materialsRoutes from "./routes/materials";
@@ -23,6 +24,7 @@ app.use(express.json());
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
+app.use("/api/auth", authRoutes);            // ← TAMBAH INI
 app.use("/api/kelas", kelasRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/materials", materialsRoutes);
