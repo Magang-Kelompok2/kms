@@ -17,7 +17,7 @@ export function useClasses() {
       setError(null);
       try {
         console.log("Fetching classes from:", `${import.meta.env.VITE_API_URL}/api/kelas`);
-        const res = await fetch(`http://localhost:4000/api/kelas`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kelas`);
         console.log("Response status:", res.status);
         if (!res.ok) throw new Error("Gagal mengambil data kelas");
         const json = await res.json();

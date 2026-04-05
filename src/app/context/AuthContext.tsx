@@ -15,10 +15,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+console.log("URL:", supabaseUrl)
+console.log("KEY:", supabaseKey)
+
+export const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Helper: ambil data user dari tabel public.user berdasarkan email
 async function fetchUserProfile(email: string): Promise<Partial<User> | null> {
@@ -92,22 +95,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, username: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { username } }
-      });
-      if (error) return { success: false, error: error.message };
-      if (data.user && data.session) {
-        await syncUser(data.user, data.session.access_token);
-      }
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message || "Terjadi kesalahan saat registrasi" };
+const register = async (
+  email: string,
+  password: string,
+  username: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { username } },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data.user) return { success: false, error: "Gagal membuat akun" };
+
+    // ← INSERT ke tabel public.user setelah signup
+    const { error: dbError } = await supabase.from("user").insert({
+      username,
+      email,
+      password: "supabase_managed",
+      role: "user",
+    });
+
+    if (dbError) {
+      console.error("Gagal insert ke public.user:", dbError);
+      // Tidak return error agar tidak block login, tapi log-nya perlu
     }
-  };
+
+    if (data.session) {
+      await syncUser(data.user, data.session.access_token);
+    }
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Terjadi kesalahan" };
+  }
+};
 
   const logout = async (): Promise<void> => {
     await supabase.auth.signOut();

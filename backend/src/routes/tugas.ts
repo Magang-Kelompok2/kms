@@ -43,20 +43,21 @@ router.get("/:tugasId", async (req, res) => {
     if (error) throw error;
 
     res.json({
-      success: true,
-      data: {
-        id: String(data.id_tugas),
-        title: data.nama_tugas ?? "",
-        description: data.deskripsi ?? "",
-        dueDate: data.deadline ?? data.created_at,
-        classId: String(data.id_kelas),
-        meetingNumber: data.pertemuan,
-        type: data.type ?? "",
-        materialId: String(data.id_materi),
-        isPublished: true,
-        attachments: [],
-      },
-    });
+  success: true,
+  data: {
+    id: String(data.id_tugas),
+    title: data.nama_tugas ?? "",
+    description: data.deskripsi ?? "",
+    dueDate: data.deadline ?? data.created_at,
+    classId: String(data.id_kelas),
+    meetingNumber: data.pertemuan,
+    level: (data.materi as any)?.id_tingkatan ?? 1,  // ← TAMBAH INI
+    type: data.type ?? "",
+    materialId: String(data.id_materi),
+    isPublished: true,
+    attachments: [],
+  },
+});
   } catch (error) {
     console.error("Error fetching tugas:", error);
     res.status(500).json({ success: false, error: "Failed to fetch tugas" });

@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import bodyParser from "body-parser";
+import express from "express";
 import dotenv from "dotenv";
 
 import { supabase } from "./lib/supabase";
@@ -18,7 +18,7 @@ const PORT = Number(process.env.PORT ?? 4000);
 const app = express();
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));

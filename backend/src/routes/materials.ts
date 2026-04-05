@@ -62,30 +62,32 @@ router.get("/:materialId", async (req, res) => {
     if (error) throw error;
 
     res.json({
-      success: true,
-      data: {
-        id: String(data.id_materi),
-        title: data.title_materi,
-        description: data.deskripsi ?? "",
-        classId: String(data.id_kelas),
-        meetingNumber: data.pertemuan,
-        isPublished: true,
-        files: [
-          ...(data.video ?? []).map((v: any) => ({
-            id: String(v.id_video),
-            title: v.title_video ?? "Video",
-            url: v.video_path,
-            type: "video",
-          })),
-          ...(data.pdf ?? []).map((p: any) => ({
-            id: String(p.id_pdf),
-            title: p.title_pdf ?? "PDF",
-            url: p.pdf_path,
-            type: "pdf",
-          })),
-        ],
-      },
-    });
+  success: true,
+  data: {
+    id: String(data.id_materi),
+    title: data.title_materi,
+    description: data.deskripsi ?? "",
+    content: data.deskripsi ?? "",
+    classId: String(data.id_kelas),
+    meetingNumber: data.pertemuan,
+    level: data.id_tingkatan,   // ← TAMBAH INI
+    isPublished: true,
+    files: [
+      ...(data.video ?? []).map((v: any) => ({
+        id: String(v.id_video),
+        name: v.title_video ?? "Video",  // ← 'name' bukan 'title'
+        url: v.video_path,
+        type: "video",
+      })),
+      ...(data.pdf ?? []).map((p: any) => ({
+        id: String(p.id_pdf),
+        name: p.title_pdf ?? "PDF",      // ← 'name' bukan 'title'
+        url: p.pdf_path,
+        type: "pdf",
+      })),
+    ],
+  },
+});
   } catch (error) {
     console.error("Error fetching material:", error);
     res.status(500).json({ success: false, error: "Failed to fetch material" });
