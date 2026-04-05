@@ -5,46 +5,176 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { PDFViewer } from "../components/PDFViewer";
-import { materials, userProgress } from "../data/mockData";
 import { ArrowLeft, FileText, PlayCircle, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
+import type { Material as MaterialType } from "../types";
 
 export function MaterialViewPage() {
   const { materialId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [completedFiles, setCompletedFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [material, setMaterial] = useState<MaterialType | null>(null);
 
-  const material = materials.find((m) => m.id === materialId);
-  const progress = userProgress.find(
-    (p) => p.userId === user?.id && p.classId === material?.classId
-  );
+  const [materialLoading, setMaterialLoading] = useState(true);
+  const [progressLoading, setProgressLoading] = useState(true);
 
-  // Auto-select first file on load
+  const [error, setError] = useState<string | null>(null);
+  const [userLevel, setUserLevel] = useState(1);
+  const [isCompleted, setIsCompleted] = useState(false);
+
+  // ── 1. Fetch material ──────────────────────────────────────────
+  useEffect(() => {
+    const fetchMaterial = async () => {
+      if (!materialId) return;
+      setMaterialLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/materials/${materialId}`,
+        );
+        if (!res.ok) throw new Error("Gagal mengambil data materi");
+        const json = await res.json();
+        if (!json.success || !json.data) throw new Error("Material not found");
+        setMaterial(json.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+        // FIX: Jika material gagal di-fetch, progress tidak perlu di-fetch juga
+        setProgressLoading(false);
+      } finally {
+        setMaterialLoading(false);
+      }
+    };
+
+    fetchMaterial();
+  }, [materialId]);
+
+  // ── 2. Fetch progress ──────────────────────────────────────────
+  useEffect(() => {
+    // FIX: Jika material belum ada (termasuk jika classId tidak ada),
+    // langsung set progressLoading false agar tidak stuck loading selamanya.
+    if (!material) return;
+
+    if (!material.classId) {
+      // classId tidak ada — tidak bisa fetch progress, anggap level 1
+      setProgressLoading(false);
+      return;
+    }
+
+    // Superadmin tidak butuh progress
+    if (user?.role === "superadmin") {
+      setProgressLoading(false);
+      return;
+    }
+
+    if (!user?.id) {
+      setProgressLoading(false);
+      return;
+    }
+
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${material.classId}`,
+        );
+
+        // FIX: Jika 404 atau error lain (user belum punya progress),
+        // default userLevel = 1 sehingga materi level 1 tetap bisa diakses.
+        if (!res.ok) {
+          setUserLevel(1);
+          return;
+        }
+
+        const json = await res.json();
+
+        // FIX: Fallback eksplisit ke 1 jika data tidak ada
+        const level = json.data?.tingkatanSaatIni;
+        setUserLevel(typeof level === "number" && level >= 1 ? level : 1);
+
+        const completedMaterials: string[] =
+          json.data?.completedMaterials ?? [];
+        if (materialId && completedMaterials.includes(materialId)) {
+          setIsCompleted(true);
+        }
+      } catch {
+        // Gagal fetch progress → default level 1 agar tidak langsung ditolak
+        setUserLevel(1);
+      } finally {
+        setProgressLoading(false);
+      }
+    };
+
+    fetchProgress();
+  }, [material, user?.id, user?.role, materialId]);
+
+  // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
     if (material && material.files.length > 0 && !selectedFile) {
       setSelectedFile(material.files[0].id);
     }
   }, [material, selectedFile]);
 
-  if (!material) {
-    return <div>Material not found</div>;
+  // ── Loading state ──────────────────────────────────────────────
+  if (materialLoading || progressLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
+          <p className="text-gray-500">Memuat materi...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Check if user has access
-  const userLevel = progress?.currentLevel || 1;
-  const hasAccess = user?.role === "superadmin" || material.level <= userLevel;
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
+          <Card className="p-8 text-center">
+            <p className="text-red-500">{error}</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (!material) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <DashboardHeader />
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
+          <Card className="p-8 text-center">
+            <p className="text-red-500">Material tidak ditemukan</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Cek akses ──────────────────────────────────────────────────
+  // FIX: Jika material.level tidak terdefinisi/null, anggap level 1
+  const materialLevel =
+    typeof material.level === "number" && material.level >= 1
+      ? material.level
+      : 1;
+
+  const hasAccess = user?.role === "superadmin" || materialLevel <= userLevel;
 
   if (!hasAccess) {
     return (
       <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto px-4 md:px-6 py-8">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-12 text-center">
             <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses materi ini.
+              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
+              materi ini. (Level materi: {materialLevel}, Level kamu:{" "}
+              {userLevel})
             </p>
             <Button onClick={() => navigate("/dashboard")} className="mt-4">
               Kembali ke Dashboard
@@ -61,9 +191,10 @@ export function MaterialViewPage() {
     }
   };
 
-  const allFilesCompleted = completedFiles.length === material.files.length;
+  const allFilesCompleted =
+    material.files.length > 0 &&
+    completedFiles.length === material.files.length;
 
-  // Group files by type
   const videoFiles = material.files.filter((f) => f.type === "video");
   const pdfFiles = material.files.filter((f) => f.type === "pdf");
   const selectedFileData = material.files.find((f) => f.id === selectedFile);
@@ -82,9 +213,8 @@ export function MaterialViewPage() {
           Kembali ke Kelas
         </Button>
 
-        {/* Sidebar Layout */}
         <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-180px)]">
-          {/* Left Sidebar - File List */}
+          {/* ── Left Sidebar ── */}
           <div className="w-full lg:w-96 shrink-0">
             <Card className="h-full overflow-y-auto">
               <div className="p-5 border-b sticky top-0 bg-white dark:bg-gray-900 z-10">
@@ -95,7 +225,7 @@ export function MaterialViewPage() {
               </div>
 
               <div className="p-4 space-y-5">
-                {/* Video Section */}
+                {/* Video */}
                 {videoFiles.length > 0 && (
                   <div>
                     <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-red-600 dark:text-red-400">
@@ -143,7 +273,7 @@ export function MaterialViewPage() {
                   </div>
                 )}
 
-                {/* PDF Section */}
+                {/* PDF */}
                 {pdfFiles.length > 0 && (
                   <div>
                     <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
@@ -194,10 +324,10 @@ export function MaterialViewPage() {
             </Card>
           </div>
 
-          {/* Right Content Area */}
+          {/* ── Right Content ── */}
           <div className="flex-1 min-w-0">
             <div className="h-full flex flex-col gap-6">
-              {/* Material Header */}
+              {/* Header */}
               <Card className="p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -206,16 +336,18 @@ export function MaterialViewPage() {
                         Pertemuan {material.meetingNumber}
                       </Badge>
                       <Badge variant="outline" className="text-sm">
-                        Level {material.level}
+                        Level {materialLevel}
                       </Badge>
-                      {progress?.completedMaterials.includes(material.id) && (
+                      {isCompleted && (
                         <Badge variant="default" className="text-sm">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Selesai
                         </Badge>
                       )}
                     </div>
-                    <h1 className="text-3xl font-normal mb-2">{material.title}</h1>
+                    <h1 className="text-3xl font-normal mb-2">
+                      {material.title}
+                    </h1>
                     <p className="text-base text-gray-600 dark:text-gray-400">
                       {material.description}
                     </p>
@@ -223,7 +355,7 @@ export function MaterialViewPage() {
                 </div>
               </Card>
 
-              {/* File Viewer */}
+              {/* Viewer */}
               {selectedFile && selectedFileData && (
                 <Card className="flex-1 p-6 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-4">
@@ -242,23 +374,23 @@ export function MaterialViewPage() {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-lg font-normal">{selectedFileData.name}</h3>
+                        <h3 className="text-lg font-normal">
+                          {selectedFileData.name}
+                        </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                          {selectedFileData.type} • {selectedFileData.duration || "View Only"}
+                          {selectedFileData.type} •{" "}
+                          {selectedFileData.duration || "View Only"}
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      {!completedFiles.includes(selectedFile) && (
-                        <Button onClick={() => handleMarkComplete(selectedFile)}>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Tandai Selesai
-                        </Button>
-                      )}
-                    </div>
+                    {!completedFiles.includes(selectedFile) && (
+                      <Button onClick={() => handleMarkComplete(selectedFile)}>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Tandai Selesai
+                      </Button>
+                    )}
                   </div>
 
-                  {/* File Content */}
                   <div className="flex-1 min-h-0">
                     {selectedFileData.type === "video" ? (
                       <div className="h-full bg-gray-900 rounded-lg overflow-hidden">
@@ -278,8 +410,8 @@ export function MaterialViewPage() {
                 </Card>
               )}
 
-              {/* Completion Status */}
-              {allFilesCompleted && !progress?.completedMaterials.includes(material.id) && (
+              {/* Completion banner */}
+              {allFilesCompleted && !isCompleted && (
                 <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -293,7 +425,9 @@ export function MaterialViewPage() {
                         </p>
                       </div>
                     </div>
-                    <Button onClick={() => navigate(`/class/${material.classId}`)}>
+                    <Button
+                      onClick={() => navigate(`/class/${material.classId}`)}
+                    >
                       Lanjut ke Kuis
                     </Button>
                   </div>

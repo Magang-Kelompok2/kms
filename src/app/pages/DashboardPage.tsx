@@ -1,88 +1,74 @@
 import { useAuth } from "../context/AuthContext";
 import { DashboardHeader } from "../components/DashboardHeader";
-import { classes, materials, assignments, quizzes, userAccess, mockUsers, submissions } from "../data/mockData";
 import { Card } from "../components/ui/card";
-import { BookOpen, FileText, ClipboardCheck, Calendar, Users, Trash2, Plus, Eye, Search } from "lucide-react";
+import {
+  BookOpen,
+  FileText,
+  ClipboardCheck,
+  Calendar,
+  Trash2,
+  Plus,
+  Eye,
+  Search,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { useState } from "react";
+import { useClasses } from "../hooks/useClasses";
+import { useMateri } from "../hooks/useMateri";
+import { useTugas } from "../hooks/useTugas";
+import { useUsers } from "../hooks/useUsers";
 
 export function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [localUsers, setLocalUsers] = useState(mockUsers);
+
+  const { classes, loading: classesLoading } = useClasses();
+  const { materi, loading: materiLoading } = useMateri();
+  const { tugas, loading: tugasLoading } = useTugas();
+  const { users, loading: usersLoading, deleteUser } = useUsers();
+
+  const penugasan = tugas.filter((t) => t.type !== "Kuis");
+  const kuis = tugas.filter((t) => t.type === "Kuis");
+
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const getAccessibleMaterials = () => {
-    if (user?.role === "superadmin") {
-      return materials;
-    }
-    return materials.filter(
-      (m) => m.isPublished && userAccess.materialIds.includes(m.id)
-    );
-  };
-
-  const getAccessibleQuizzes = () => {
-    if (user?.role === "superadmin") {
-      return quizzes;
-    }
-    return quizzes.filter(
-      (q) => q.isPublished && userAccess.quizIds.includes(q.id)
-    );
-  };
-
-  const getAccessibleAssignments = () => {
-    if (user?.role === "superadmin") {
-      return assignments;
-    }
-    return assignments.filter(
-      (a) => a.isPublished && userAccess.assignmentIds.includes(a.id)
-    );
-  };
-
-  const accessibleMaterials = getAccessibleMaterials();
-  const accessibleQuizzes = getAccessibleQuizzes();
-  const accessibleAssignments = getAccessibleAssignments();
-
-  const handleDeleteUser = (userId: string) => {
-    if (userId === "1") {
+  const handleDeleteUser = async (userId: number, role: string) => {
+    if (role === "superadmin") {
       alert("Cannot delete superadmin account!");
       return;
     }
     if (confirm("Are you sure you want to delete this user?")) {
-      setLocalUsers((prev) => prev.filter((u) => u.id !== userId));
-      alert("User deleted successfully!");
+      const success = await deleteUser(userId);
+      if (success) alert("User deleted successfully!");
+      else alert("Gagal menghapus pengguna.");
     }
   };
 
-  const getPendingSubmissionsCount = (userId: string) => {
-    return submissions.filter((s) => s.userId === userId && s.status === "pending").length;
-  };
-
-  const filteredUsers = localUsers.filter((u) =>
-    u.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredUsers = users.filter(
+    (u) =>
+      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const currentUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   return (
     <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
       <DashboardHeader />
-      
-      <div className="container mx-auto px-4 md:px-6 py-8">
+
+      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-normal mb-2">
-            Selamat datang kembali, {user?.name}! 👋
+            Selamat datang kembali, {user?.name}!
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             {user?.role === "superadmin"
@@ -92,52 +78,96 @@ export function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 max-w-6xl mx-auto">
+          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
+            <div className="relative flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                   Total Kelas
                 </p>
-                <p className="text-2xl font-bold">{classes.length}</p>
+                <p className="text-4xl font-semibold">
+                  {classesLoading ? "-" : classes.length}
+                </p>
               </div>
-              <BookOpen className="h-10 w-10 text-blue-500 opacity-20" />
+              <div className="rounded-3xl bg-white/15 p-3">
+                <BookOpen className="h-10 w-10 text-white opacity-90" />
+              </div>
+            </div>
+            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+              <span>Semua kelas aktif</span>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                Overview
+              </span>
             </div>
           </Card>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
+          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-violet-600 via-fuchsia-500 to-sky-500">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
+            <div className="relative flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                   Materi
                 </p>
-                <p className="text-2xl font-bold">{accessibleMaterials.length}</p>
+                <p className="text-4xl font-semibold">
+                  {materiLoading ? "-" : materi.length}
+                </p>
               </div>
-              <FileText className="h-10 w-10 text-purple-500 opacity-20" />
+              <div className="rounded-3xl bg-white/15 p-3">
+                <FileText className="h-10 w-10 text-white opacity-90" />
+              </div>
+            </div>
+            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+              <span>Total materi</span>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                Pelajari sekarang
+              </span>
             </div>
           </Card>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
+          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-emerald-500 via-teal-500 to-cyan-500">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
+            <div className="relative flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                   Penugasan
                 </p>
-                <p className="text-2xl font-bold">{accessibleAssignments.length}</p>
+                <p className="text-4xl font-semibold">
+                  {tugasLoading ? "-" : penugasan.length}
+                </p>
               </div>
-              <ClipboardCheck className="h-10 w-10 text-green-500 opacity-20" />
+              <div className="rounded-3xl bg-white/15 p-3">
+                <ClipboardCheck className="h-10 w-10 text-white opacity-90" />
+              </div>
+            </div>
+            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+              <span>Task progress</span>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                Fokus kerja
+              </span>
             </div>
           </Card>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
+          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-orange-500 via-rose-500 to-pink-500">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
+            <div className="relative flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
                   Kuis
                 </p>
-                <p className="text-2xl font-semibold">{accessibleQuizzes.length}</p>
+                <p className="text-4xl font-semibold">
+                  {tugasLoading ? "-" : kuis.length}
+                </p>
               </div>
-              <Calendar className="h-10 w-10 text-orange-500 opacity-20" />
+              <div className="rounded-3xl bg-white/15 p-3">
+                <Calendar className="h-10 w-10 text-white opacity-90" />
+              </div>
+            </div>
+            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
+              <span>Persiapan ujian</span>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
+                Review
+              </span>
             </div>
           </Card>
         </div>
@@ -148,47 +178,50 @@ export function DashboardPage() {
             <h2 className="text-2xl font-normal">Kelas Anda</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {classes.map((cls) => {
-              const classMaterials = materials.filter((m) => m.classId === cls.id);
-              const classQuizzes = quizzes.filter((q) => q.classId === cls.id);
-              
-              return (
-                <Card
-                  key={cls.id}
-                  className="group cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden"
-                  onClick={() => navigate(`/class/${cls.id}`)}
-                >
-                  <div className="relative h-40 overflow-hidden">
-                    <ImageWithFallback
-                      src={cls.icon}
-                      alt={cls.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className={`absolute inset-0 bg-gradient-to-br ${cls.color} opacity-75`} />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <h3 className="text-2xl font-normal text-white" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
-                        {cls.name}
-                      </h3>
+          {classesLoading ? (
+            <p className="text-gray-500">Memuat kelas...</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {classes.map((cls) => {
+                const kelasMateri = materi.filter((m) => m.id_kelas === cls.id);
+                const kelasTugas = tugas.filter(
+                  (t) => t.id_kelas === cls.id && t.type === "Kuis",
+                );
+
+                return (
+                  <Card
+                    key={cls.id}
+                    className="group cursor-pointer hover:shadow-2xl transition-all duration-300 overflow-hidden rounded-4xl"
+                    onClick={() => navigate(`/class/${cls.id}`)}
+                  >
+                    <div className="relative h-50 overflow-hidden bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.25),transparent_40%)]" />
+                      <div className="absolute left-6 top-6 rounded-full bg-white/20 w-14 h-14 blur-2xl" />
+                      <div className="absolute right-4 top-8 rounded-full bg-white/10 w-24 h-24" />
+                      <div className="absolute inset-0 flex items-center justify-center px-4">
+                        <h3
+                          className="text-4xl font-normal text-white text-center"
+                          style={{ fontFamily: "Coolvetica, sans-serif" }}
+                        >
+                          {cls.name}
+                        </h3>
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-6">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      {cls.description}
-                    </p>
-                    <div className="flex gap-4 text-sm">
-                      <span className="text-gray-500">
-                        {classMaterials.length} materi
-                      </span>
-                      <span className="text-gray-500">
-                        {classQuizzes.length} kuis
-                      </span>
+                    <div className="p-6">
+                      <div className="flex gap-4 text-sm text-gray-500 mb-2">
+                        <span className="font-bold text-base">{kelasMateri.length} Materi</span>
+                        <span className="font-bold text-base">{kelasTugas.length} Kuis</span>
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        Dibuat:{" "}
+                        {new Date(cls.createdAt).toLocaleDateString("id-ID")}
+                      </p>
                     </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* User Management for Superadmin */}
@@ -196,13 +229,12 @@ export function DashboardPage() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-normal">Manajemen Pengguna</h2>
-              <Button onClick={() => navigate("/users/create")}>
+              <Button className="bg-secondary cursor-pointer" onClick={() => navigate("/users/create")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Buat Pengguna Baru
               </Button>
             </div>
 
-            {/* Search Bar */}
             <div className="mb-4">
               <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -224,67 +256,93 @@ export function DashboardPage() {
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Nama</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Role</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Dibuat Pada</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Tertunda</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">Aksi</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Nama
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Email
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Role
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Dibuat Pada
+                      </th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold">
+                        Aksi
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {currentUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-normal">
-                              {u.name.charAt(0)}
-                            </div>
-                            <span className="font-medium">{u.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{u.email}</td>
-                        <td className="px-6 py-4">
-                          <Badge variant={u.role === "superadmin" ? "default" : "secondary"}>
-                            {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                          {new Date(u.createdAt).toLocaleDateString('id-ID')}
-                        </td>
-                        <td className="px-6 py-4">
-                          {u.role === "user" && (
-                            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/20">
-                              {getPendingSubmissionsCount(u.id)} Tertunda
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => navigate(`/users/${u.id}/progress`)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Lihat
-                            </Button>
-                            {u.role !== "superadmin" && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteUser(u.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
+                    {usersLoading ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-8 text-center text-gray-500"
+                        >
+                          Memuat pengguna...
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      currentUsers.map((u) => (
+                        <tr
+                          key={u.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-normal">
+                                {u.username.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium">{u.username}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                            {u.email}
+                          </td>
+                          <td className="px-6 py-4">
+                            <Badge
+                              variant={
+                                u.role === "superadmin"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                            {new Date(u.created_at).toLocaleDateString("id-ID")}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  navigate(`/users/${u.id}/progress`)
+                                }
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Lihat
+                              </Button>
+                              {u.role !== "superadmin" && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteUser(u.id, u.role);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -292,19 +350,23 @@ export function DashboardPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
                   disabled={currentPage === 1}
                 >
                   Sebelumnya
                 </Button>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Halaman {currentPage} dari {totalPages}
+                  Halaman {currentPage} dari {Math.max(totalPages, 1)}
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages || totalPages === 0}
                 >
                   Selanjutnya
                 </Button>
@@ -313,24 +375,21 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* Recent Materials for Regular Users */}
+        {/* Materi Terbaru untuk user non-superadmin */}
         {user?.role !== "superadmin" && (
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-normal">Materi Terbaru</h2>
-              {/* <button className="text-blue-600 dark:text-blue-400 hover:underline">
-                Lihat semua →
-              </button> */}
             </div>
 
             <div className="grid gap-4">
-              {accessibleMaterials.slice(0, 5).map((material) => {
-                const cls = classes.find((c) => c.id === material.classId);
+              {materi.slice(0, 5).map((m) => {
+                const cls = classes.find((c) => c.id === m.id_kelas);
                 return (
                   <Card
-                    key={material.id}
+                    key={m.id_materi}
                     className="p-6 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => navigate(`/class/${material.classId}`)}
+                    onClick={() => navigate(`/class/${m.id_kelas}`)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -339,13 +398,10 @@ export function DashboardPage() {
                             {cls?.name}
                           </Badge>
                           <Badge variant="secondary" className="text-xs">
-                            Pertemuan {material.meetingNumber}
+                            Pertemuan {m.pertemuan}
                           </Badge>
                         </div>
-                        <h3 className="font-normal mb-1">{material.title}</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {material.description}
-                        </p>
+                        <h3 className="font-normal mb-1">{m.title_materi}</h3>
                       </div>
                       <FileText className="h-10 w-10 text-gray-300 dark:text-gray-700 ml-4" />
                     </div>
