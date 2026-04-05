@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ClassDetailPage } from "./pages/ClassDetailPage";
 import { MaterialViewPage } from "./pages/MaterialViewPage";
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
     path: "/",
     element: <Navigate to="/login" replace />,
   },
+  { path: "/register", element: <RegisterPage /> },
   {
     path: "/login",
     element: <LoginPage />,

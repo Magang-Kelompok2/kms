@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { X, Video, FileText, Trash2 } from "lucide-react";
-import { useAddMateri } from "../hooks/UseAddMateri";
+import { useAddMateri } from "../hooks/useAddMateri";
 
 interface AddMaterialModalProps {
   isOpen: boolean;

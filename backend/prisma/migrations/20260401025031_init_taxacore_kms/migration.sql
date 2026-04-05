@@ -1,145 +1,106 @@
--- CreateTable
-CREATE TABLE "kelas" (
-    "id_kelas" SERIAL NOT NULL,
-    "nama_kelas" VARCHAR(256) NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
-    CONSTRAINT "kelas_pkey" PRIMARY KEY ("id_kelas")
+CREATE TABLE public.file_pengumpulan (
+  id_file integer NOT NULL DEFAULT nextval('file_pengumpulan_id_file_seq'::regclass),
+  bucket_name character varying,
+  object_key character varying,
+  ukuran_file integer,
+  original_filename character varying,
+  created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT file_pengumpulan_pkey PRIMARY KEY (id_file)
 );
-
--- CreateTable
-CREATE TABLE "user" (
-    "id_user" SERIAL NOT NULL,
-    "username" VARCHAR(256) NOT NULL,
-    "email" VARCHAR(256) NOT NULL,
-    "password" VARCHAR(256) NOT NULL,
-    "role" VARCHAR(50),
-    "id_kelas" INTEGER,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "user_pkey" PRIMARY KEY ("id_user")
+CREATE TABLE public.kelas (
+  id_kelas integer NOT NULL DEFAULT nextval('kelas_id_kelas_seq'::regclass),
+  nama_kelas character varying NOT NULL,
+  created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT kelas_pkey PRIMARY KEY (id_kelas)
 );
-
--- CreateTable
-CREATE TABLE "tingkatan" (
-    "id_tingkatan" SERIAL NOT NULL,
-    "nama_tingkatan" VARCHAR(256) NOT NULL,
-    "id_kelas" INTEGER NOT NULL,
-
-    CONSTRAINT "tingkatan_pkey" PRIMARY KEY ("id_tingkatan")
+CREATE TABLE public.materi (
+  id_materi integer NOT NULL DEFAULT nextval('materi_id_materi_seq'::regclass),
+  title_materi character varying NOT NULL,
+  materi_path character varying,
+  id_kelas integer NOT NULL,
+  id_tingkatan integer NOT NULL,
+  pertemuan integer NOT NULL DEFAULT 1,
+  deskripsi text,
+  CONSTRAINT materi_pkey PRIMARY KEY (id_materi),
+  CONSTRAINT materi_id_kelas_fkey FOREIGN KEY (id_kelas) REFERENCES public.kelas(id_kelas),
+  CONSTRAINT materi_id_tingkatan_fkey FOREIGN KEY (id_tingkatan) REFERENCES public.tingkatan(id_tingkatan)
 );
-
--- CreateTable
-CREATE TABLE "materi" (
-    "id_materi" SERIAL NOT NULL,
-    "title_materi" VARCHAR(256) NOT NULL,
-    "materi_path" VARCHAR(256),
-    "id_kelas" INTEGER NOT NULL,
-    "id_tingkatan" INTEGER NOT NULL,
-
-    CONSTRAINT "materi_pkey" PRIMARY KEY ("id_materi")
+CREATE TABLE public.pdf (
+  id_pdf integer NOT NULL DEFAULT nextval('pdf_id_pdf_seq'::regclass),
+  title_pdf character varying,
+  pdf_path character varying,
+  id_materi integer NOT NULL,
+  CONSTRAINT pdf_pkey PRIMARY KEY (id_pdf),
+  CONSTRAINT pdf_id_materi_fkey FOREIGN KEY (id_materi) REFERENCES public.materi(id_materi)
 );
-
--- CreateTable
-CREATE TABLE "video" (
-    "id_video" SERIAL NOT NULL,
-    "id_materi" INTEGER NOT NULL,
-    "title_video" VARCHAR(256),
-    "video_path" VARCHAR(256),
-
-    CONSTRAINT "video_pkey" PRIMARY KEY ("id_video")
+CREATE TABLE public.pengumpulan (
+  id_pengumpulan integer NOT NULL DEFAULT nextval('pengumpulan_id_pengumpulan_seq'::regclass),
+  answer text,
+  id_file integer,
+  id_tugas integer NOT NULL,
+  created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT pengumpulan_pkey PRIMARY KEY (id_pengumpulan),
+  CONSTRAINT pengumpulan_id_file_fkey FOREIGN KEY (id_file) REFERENCES public.file_pengumpulan(id_file),
+  CONSTRAINT pengumpulan_id_tugas_fkey FOREIGN KEY (id_tugas) REFERENCES public.tugas(id_tugas)
 );
-
--- CreateTable
-CREATE TABLE "pdf" (
-    "id_pdf" SERIAL NOT NULL,
-    "title_pdf" VARCHAR(256),
-    "pdf_path" VARCHAR(256),
-    "id_materi" INTEGER NOT NULL,
-
-    CONSTRAINT "pdf_pkey" PRIMARY KEY ("id_pdf")
+CREATE TABLE public.tingkatan (
+  id_tingkatan integer NOT NULL DEFAULT nextval('tingkatan_id_tingkatan_seq'::regclass),
+  nama_tingkatan character varying NOT NULL,
+  id_kelas integer NOT NULL,
+  CONSTRAINT tingkatan_pkey PRIMARY KEY (id_tingkatan),
+  CONSTRAINT tingkatan_id_kelas_fkey FOREIGN KEY (id_kelas) REFERENCES public.kelas(id_kelas)
 );
-
--- CreateTable
-CREATE TABLE "tugas" (
-    "id_tugas" SERIAL NOT NULL,
-    "nama_tugas" VARCHAR(256),
-    "deskripsi" TEXT,
-    "type" VARCHAR(256),
-    "id_materi" INTEGER NOT NULL,
-    "id_kelas" INTEGER NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "tugas_pkey" PRIMARY KEY ("id_tugas")
+CREATE TABLE public.tugas (
+  id_tugas integer NOT NULL DEFAULT nextval('tugas_id_tugas_seq'::regclass),
+  nama_tugas character varying,
+  deskripsi text,
+  type USER-DEFINED NOT NULL DEFAULT 'Tugas'::"Penugasan",
+  id_materi integer NOT NULL,
+  id_kelas integer NOT NULL,
+  created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  pertemuan integer NOT NULL DEFAULT 1,
+  deadline timestamp without time zone,
+  CONSTRAINT tugas_pkey PRIMARY KEY (id_tugas),
+  CONSTRAINT tugas_id_materi_fkey FOREIGN KEY (id_materi) REFERENCES public.materi(id_materi),
+  CONSTRAINT tugas_id_kelas_fkey FOREIGN KEY (id_kelas) REFERENCES public.kelas(id_kelas)
 );
-
--- CreateTable
-CREATE TABLE "file_pengumpulan" (
-    "id_file" SERIAL NOT NULL,
-    "bucket_name" VARCHAR(256),
-    "object_key" VARCHAR(256),
-    "ukuran_file" INTEGER,
-    "original_filename" VARCHAR(256),
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "file_pengumpulan_pkey" PRIMARY KEY ("id_file")
+CREATE TABLE public.user (
+  id_user integer NOT NULL DEFAULT nextval('user_id_user_seq'::regclass),
+  username character varying NOT NULL,
+  email character varying NOT NULL,
+  password character varying NOT NULL,
+  role character varying,
+  id_kelas integer,
+  created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT user_pkey PRIMARY KEY (id_user),
+  CONSTRAINT user_id_kelas_fkey FOREIGN KEY (id_kelas) REFERENCES public.kelas(id_kelas)
 );
-
--- CreateTable
-CREATE TABLE "pengumpulan" (
-    "id_pengumpulan" SERIAL NOT NULL,
-    "answer" TEXT,
-    "id_file" INTEGER,
-    "id_tugas" INTEGER NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "pengumpulan_pkey" PRIMARY KEY ("id_pengumpulan")
+CREATE TABLE public.user_pengumpulan (
+  id_user integer NOT NULL,
+  id_pengumpulan integer NOT NULL,
+  created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT user_pengumpulan_pkey PRIMARY KEY (id_user, id_pengumpulan),
+  CONSTRAINT user_pengumpulan_id_user_fkey FOREIGN KEY (id_user) REFERENCES public.user(id_user),
+  CONSTRAINT user_pengumpulan_id_pengumpulan_fkey FOREIGN KEY (id_pengumpulan) REFERENCES public.pengumpulan(id_pengumpulan)
 );
-
--- CreateTable
-CREATE TABLE "user_pengumpulan" (
-    "id_user" INTEGER NOT NULL,
-    "id_pengumpulan" INTEGER NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "user_pengumpulan_pkey" PRIMARY KEY ("id_user","id_pengumpulan")
+CREATE TABLE public.user_progress (
+  id_progress integer NOT NULL DEFAULT nextval('user_progress_id_progress_seq'::regclass),
+  id_user integer NOT NULL,
+  id_kelas integer NOT NULL,
+  tingkatan_saat_ini integer NOT NULL DEFAULT 1,
+  updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT user_progress_pkey PRIMARY KEY (id_progress),
+  CONSTRAINT user_progress_id_user_fkey FOREIGN KEY (id_user) REFERENCES public.user(id_user),
+  CONSTRAINT user_progress_id_kelas_fkey FOREIGN KEY (id_kelas) REFERENCES public.kelas(id_kelas)
 );
-
--- CreateIndex
-CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
-
--- AddForeignKey
-ALTER TABLE "user" ADD CONSTRAINT "user_id_kelas_fkey" FOREIGN KEY ("id_kelas") REFERENCES "kelas"("id_kelas") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "tingkatan" ADD CONSTRAINT "tingkatan_id_kelas_fkey" FOREIGN KEY ("id_kelas") REFERENCES "kelas"("id_kelas") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "materi" ADD CONSTRAINT "materi_id_kelas_fkey" FOREIGN KEY ("id_kelas") REFERENCES "kelas"("id_kelas") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "materi" ADD CONSTRAINT "materi_id_tingkatan_fkey" FOREIGN KEY ("id_tingkatan") REFERENCES "tingkatan"("id_tingkatan") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "video" ADD CONSTRAINT "video_id_materi_fkey" FOREIGN KEY ("id_materi") REFERENCES "materi"("id_materi") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "pdf" ADD CONSTRAINT "pdf_id_materi_fkey" FOREIGN KEY ("id_materi") REFERENCES "materi"("id_materi") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "tugas" ADD CONSTRAINT "tugas_id_materi_fkey" FOREIGN KEY ("id_materi") REFERENCES "materi"("id_materi") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "tugas" ADD CONSTRAINT "tugas_id_kelas_fkey" FOREIGN KEY ("id_kelas") REFERENCES "kelas"("id_kelas") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "pengumpulan" ADD CONSTRAINT "pengumpulan_id_file_fkey" FOREIGN KEY ("id_file") REFERENCES "file_pengumpulan"("id_file") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "pengumpulan" ADD CONSTRAINT "pengumpulan_id_tugas_fkey" FOREIGN KEY ("id_tugas") REFERENCES "tugas"("id_tugas") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_pengumpulan" ADD CONSTRAINT "user_pengumpulan_id_user_fkey" FOREIGN KEY ("id_user") REFERENCES "user"("id_user") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_pengumpulan" ADD CONSTRAINT "user_pengumpulan_id_pengumpulan_fkey" FOREIGN KEY ("id_pengumpulan") REFERENCES "pengumpulan"("id_pengumpulan") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE TABLE public.video (
+  id_video integer NOT NULL DEFAULT nextval('video_id_video_seq'::regclass),
+  id_materi integer NOT NULL,
+  title_video character varying,
+  video_path character varying,
+  CONSTRAINT video_pkey PRIMARY KEY (id_video),
+  CONSTRAINT video_id_materi_fkey FOREIGN KEY (id_materi) REFERENCES public.materi(id_materi)
+);
