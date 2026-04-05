@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Material, Assignment } from "../types";
+import type { Material, Assignment, Quiz } from "../types";
 
 interface Level {
   id: string;
@@ -7,7 +7,7 @@ interface Level {
   namaLevel: string;
   materials: Material[];
   assignments: Assignment[];
-  quizzes: never[];
+  quizzes: Quiz[];
 }
 
 export function useLevels(classId: string | number | undefined) {
@@ -23,7 +23,7 @@ export function useLevels(classId: string | number | undefined) {
       setError(null);
       try {
         const res = await fetch(
-          `http://localhost:4000/api/kelas/${classId}/levels`,
+          `${import.meta.env.VITE_API_URL}/api/kelas/${classId}/levels`,
         );
         if (!res.ok) throw new Error("Gagal mengambil data tingkatan");
         const json = await res.json();

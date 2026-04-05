@@ -4,7 +4,6 @@ import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { userProgress } from "../data/mockData";
 import {
   ArrowLeft,
   Upload,
@@ -24,19 +23,19 @@ export function AssignmentViewPage() {
   const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   const [submissionText, setSubmissionText] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [assignment, setAssignment] = useState<AssignmentType | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [assignmentLoading, setAssignmentLoading] = useState(true);
+  const [progressLoading, setProgressLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userLevel, setUserLevel] = useState(1);
 
-  const progress = userProgress.find(
-    (p) => p.userId === user?.id && p.classId === assignment?.classId,
-  );
-
+  // ── 1. Fetch assignment ────────────────────────────────────────
   useEffect(() => {
     const fetchAssignment = async () => {
       if (!assignmentId) return;
-      setLoading(true);
+      setAssignmentLoading(true);
       setError(null);
 
       try {
@@ -46,24 +45,67 @@ export function AssignmentViewPage() {
         if (!res.ok) throw new Error("Gagal mengambil data tugas");
         const json = await res.json();
         if (!json.success || !json.data)
-          throw new Error("Assignment not found");
+          throw new Error("Tugas tidak ditemukan");
         setAssignment(json.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+        setProgressLoading(false);
       } finally {
-        setLoading(false);
+        setAssignmentLoading(false);
       }
     };
 
     fetchAssignment();
   }, [assignmentId]);
 
-  if (loading) {
+  // ── 2. Fetch progress ──────────────────────────────────────────
+  useEffect(() => {
+    if (!assignment) return;
+
+    if (!assignment.classId) {
+      setProgressLoading(false);
+      return;
+    }
+
+    if (user?.role === "superadmin") {
+      setProgressLoading(false);
+      return;
+    }
+
+    if (!user?.id) {
+      setProgressLoading(false);
+      return;
+    }
+
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${assignment.classId}`,
+        );
+        if (!res.ok) {
+          setUserLevel(1);
+          return;
+        }
+        const json = await res.json();
+        const level = json.data?.tingkatanSaatIni;
+        setUserLevel(typeof level === "number" && level >= 1 ? level : 1);
+      } catch {
+        setUserLevel(1);
+      } finally {
+        setProgressLoading(false);
+      }
+    };
+
+    fetchProgress();
+  }, [assignment, user?.id, user?.role]);
+
+  // ── Loading ────────────────────────────────────────────────────
+  if (assignmentLoading || progressLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <p className="text-gray-500">Memuat assignment...</p>
+          <p className="text-gray-500">Memuat tugas...</p>
         </div>
       </div>
     );
@@ -88,17 +130,20 @@ export function AssignmentViewPage() {
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
-            <p className="text-red-500">Assignment tidak ditemukan</p>
+            <p className="text-red-500">Tugas tidak ditemukan</p>
           </Card>
         </div>
       </div>
     );
   }
 
-  // Check if user has access
-  const userLevel = progress?.currentLevel || 1;
-  const hasAccess =
-    user?.role === "superadmin" || assignment.level <= userLevel;
+  // ── Cek akses ──────────────────────────────────────────────────
+  const assignmentLevel =
+    typeof assignment.level === "number" && assignment.level >= 1
+      ? assignment.level
+      : 1;
+
+  const hasAccess = user?.role === "superadmin" || assignmentLevel <= userLevel;
 
   if (!hasAccess) {
     return (
@@ -109,7 +154,8 @@ export function AssignmentViewPage() {
             <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
             <p className="text-gray-600 dark:text-gray-400">
               Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
-              tugas ini.
+              tugas ini. (Level tugas: {assignmentLevel}, Level kamu:{" "}
+              {userLevel})
             </p>
             <Button onClick={() => navigate("/dashboard")} className="mt-4">
               Kembali ke Dashboard
@@ -120,21 +166,60 @@ export function AssignmentViewPage() {
     );
   }
 
+  // ── Submit handler ─────────────────────────────────────────────
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSubmissionFile(e.target.files[0]);
     }
   };
 
-  const handleSubmit = () => {
-    if (submissionText.trim() || submissionFile) {
-      // Simulate submission
+  const handleSubmit = async () => {
+    if (!submissionText.trim() && !submissionFile) return;
+    setIsSubmitting(true);
+
+    try {
+      let id_file: number | null = null;
+
+      // Upload file jika ada
+      if (submissionFile) {
+        const formData = new FormData();
+        formData.append("file", submissionFile);
+
+        const uploadRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/upload/tugas-file`,
+          { method: "POST", body: formData },
+        );
+        const uploadJson = await uploadRes.json();
+        if (!uploadJson.success) throw new Error("Gagal upload file");
+        id_file = uploadJson.data.id_file;
+      }
+
+      // Submit pengumpulan
+      const submitRes = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/pengumpulan`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id_tugas: Number(assignmentId),
+            id_user: Number(user?.id),
+            answer: submissionText.trim() || null,
+            id_file,
+          }),
+        },
+      );
+      const submitJson = await submitRes.json();
+      if (!submitJson.success) throw new Error("Gagal mengumpulkan tugas");
+
       setIsSubmitted(true);
-      // In real app, send to backend
-      console.log("Submission:", {
-        text: submissionText,
-        file: submissionFile,
-      });
+    } catch (err) {
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat mengumpulkan",
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -160,7 +245,7 @@ export function AssignmentViewPage() {
         </Button>
 
         <div className="max-w-4xl mx-auto space-y-6">
-          {/* Assignment Header */}
+          {/* Header */}
           <Card className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
@@ -169,7 +254,7 @@ export function AssignmentViewPage() {
                     Pertemuan {assignment.meetingNumber}
                   </Badge>
                   <Badge variant="outline" className="text-sm">
-                    Level {assignment.level}
+                    Level {assignmentLevel}
                   </Badge>
                   {isSubmitted && (
                     <Badge variant="default" className="text-sm bg-green-600">
@@ -190,10 +275,7 @@ export function AssignmentViewPage() {
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
                         <span>
-                          Deadline:{" "}
-                          {new Date(assignment.dueDate).toLocaleDateString(
-                            "id-ID",
-                          )}
+                          Deadline: {dueDate.toLocaleDateString("id-ID")}
                         </span>
                       </div>
                       {!isOverdue && daysUntilDue > 0 && (
@@ -221,7 +303,7 @@ export function AssignmentViewPage() {
             </div>
           </Card>
 
-          {/* Assignment Attachments/Files from Superadmin */}
+          {/* Attachments dari superadmin */}
           {assignment.attachments && assignment.attachments.length > 0 && (
             <Card className="p-6">
               <h2 className="text-xl font-bold mb-4">
@@ -274,7 +356,7 @@ export function AssignmentViewPage() {
             </Card>
           )}
 
-          {/* Submission Form */}
+          {/* Form Pengumpulan */}
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-4">Pengumpulan Tugas</h2>
 
@@ -285,8 +367,7 @@ export function AssignmentViewPage() {
                   Tugas Berhasil Dikumpulkan!
                 </h3>
                 <p className="text-sm text-green-700 dark:text-green-300 mb-4">
-                  Tugas Anda sedang direview oleh superadmin. Anda akan menerima
-                  notifikasi setelah direview.
+                  Tugas Anda sedang direview oleh superadmin.
                 </p>
                 <div className="flex gap-3 justify-center">
                   <Button
@@ -308,7 +389,6 @@ export function AssignmentViewPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Text Submission */}
                 <div>
                   <label className="block text-sm font-semibold mb-2">
                     Jawaban (Teks)
@@ -324,7 +404,6 @@ export function AssignmentViewPage() {
                   </p>
                 </div>
 
-                {/* File Upload */}
                 <div>
                   <label className="block text-sm font-semibold mb-2">
                     Upload File (Opsional)
@@ -362,20 +441,50 @@ export function AssignmentViewPage() {
                   </div>
                 </div>
 
-                {/* Submit Button */}
                 <div className="flex gap-3 pt-4">
                   <Button
                     onClick={handleSubmit}
-                    disabled={!submissionText.trim() && !submissionFile}
+                    disabled={
+                      (!submissionText.trim() && !submissionFile) ||
+                      isSubmitting
+                    }
                     className="flex-1 text-base py-6"
                   >
-                    <Upload className="h-5 w-5 mr-2" />
-                    Kumpulkan Tugas
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <svg
+                          className="animate-spin h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8v8H4z"
+                          />
+                        </svg>
+                        Mengumpulkan...
+                      </span>
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5 mr-2" />
+                        Kumpulkan Tugas
+                      </>
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => navigate(`/class/${assignment.classId}`)}
                     className="text-base py-6"
+                    disabled={isSubmitting}
                   >
                     Batal
                   </Button>
@@ -384,7 +493,6 @@ export function AssignmentViewPage() {
             )}
           </Card>
 
-          {/* Instructions Card */}
           <Card className="p-5 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
             <h3 className="text-base font-bold text-blue-900 dark:text-blue-100 mb-2">
               📋 Petunjuk Pengumpulan

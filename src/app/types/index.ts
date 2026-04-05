@@ -26,7 +26,7 @@ export interface MaterialFile {
   name: string;
   type: "pdf" | "video";
   url: string;
-  duration?: string; // for videos
+  duration?: string;
 }
 
 export interface Assignment {
@@ -39,7 +39,7 @@ export interface Assignment {
   level: number;
   materialId?: string;
   isPublished: boolean;
-  attachments?: AssignmentFile[]; // PDF files from superadmin
+  attachments?: AssignmentFile[];
 }
 
 export interface AssignmentFile {
@@ -52,12 +52,16 @@ export interface AssignmentFile {
 export interface Quiz {
   id: string;
   title: string;
-  questions: QuizQuestion[];
+  description?: string; // ← tambah optional
   classId: string;
   meetingNumber: number;
   level: number;
-  duration: number; // in minutes
+  materialId?: string; // ← tambah optional
   isPublished: boolean;
+  type?: string; // ← tambah optional
+  dueDate?: string; // ← tambah optional
+  duration?: number; // ← jadikan optional
+  questions?: QuizQuestion[]; // ← jadikan optional
 }
 
 export interface QuizQuestion {

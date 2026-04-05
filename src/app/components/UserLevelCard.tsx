@@ -3,15 +3,7 @@ import { useNavigate } from "react-router";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import {
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  HelpCircle,
-  Lock,
-  ClipboardCheck,
-  PlayCircle,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import type { Assignment, Quiz, Material } from "../types";
 
 interface UserLevelCardProps {
@@ -36,20 +28,24 @@ export function UserLevelCard({
   userLevel,
 }: UserLevelCardProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'materi' | 'tugas' | 'kuis'>('materi');
+  const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">(
+    "materi",
+  );
   const navigate = useNavigate();
 
   const totalItems = materials.length + assignments.length + quizzes.length;
 
-  // Group materials by meeting
-  const materialsByMeeting = materials.reduce((acc, material) => {
-    const meeting = material.meetingNumber;
-    if (!acc[meeting]) {
-      acc[meeting] = [];
-    }
-    acc[meeting].push(material);
-    return acc;
-  }, {} as Record<number, Material[]>);
+  const materialsByMeeting = materials.reduce(
+    (acc, material) => {
+      const meeting = material.meetingNumber;
+      if (!acc[meeting]) {
+        acc[meeting] = [];
+      }
+      acc[meeting].push(material);
+      return acc;
+    },
+    {} as Record<number, Material[]>,
+  );
 
   const meetings = Object.keys(materialsByMeeting)
     .map(Number)
@@ -57,7 +53,7 @@ export function UserLevelCard({
 
   return (
     <Card className={`overflow-hidden ${isLocked ? "opacity-60" : ""}`}>
-      {/* Header - Clickable to expand/collapse */}
+      {/* Header */}
       <button
         onClick={() => !isLocked && setIsOpen(!isOpen)}
         className={`cursor-pointer w-full p-6 flex items-center justify-between transition-colors ${
@@ -97,38 +93,38 @@ export function UserLevelCard({
         )}
       </button>
 
-      {/* Content - Expanded */}
+      {/* Content */}
       {isOpen && !isLocked && (
         <div className="border-t border-gray-200 dark:border-gray-800">
-          {/* Tab Buttons */}
+          {/* Tabs */}
           <div className="flex justify-center p-6">
             <div className="inline-flex rounded-full border cursor-pointer border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-950 shadow-sm">
               <button
-                onClick={() => setActiveTab('materi')}
+                onClick={() => setActiveTab("materi")}
                 className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === 'materi'
-                    ? 'bg-primary text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  activeTab === "materi"
+                    ? "bg-primary text-white"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 Materi ({materials.length})
               </button>
               <button
-                onClick={() => setActiveTab('tugas')}
+                onClick={() => setActiveTab("tugas")}
                 className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === 'tugas'
-                    ? 'bg-primary text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  activeTab === "tugas"
+                    ? "bg-primary text-white"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 Tugas ({assignments.length})
               </button>
               <button
-                onClick={() => setActiveTab('kuis')}
+                onClick={() => setActiveTab("kuis")}
                 className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === 'kuis'
-                    ? 'bg-primary text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  activeTab === "kuis"
+                    ? "bg-primary text-white"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 Kuis ({quizzes.length})
@@ -138,7 +134,8 @@ export function UserLevelCard({
 
           {/* Tab Content */}
           <div className="p-6">
-            {activeTab === 'materi' && (
+            {/* Materi */}
+            {activeTab === "materi" && (
               <div>
                 {meetings.length > 0 ? (
                   <div className="space-y-2">
@@ -188,7 +185,8 @@ export function UserLevelCard({
               </div>
             )}
 
-            {activeTab === 'tugas' && (
+            {/* Tugas */}
+            {activeTab === "tugas" && (
               <div>
                 {assignments.length > 0 ? (
                   <div className="space-y-2">
@@ -199,14 +197,25 @@ export function UserLevelCard({
                         onClick={() => navigate(`/assignment/${assignment.id}`)}
                       >
                         <div className="flex-1">
-                          <h5 className="font-semibold mb-1">{assignment.title}</h5>
+                          <h5 className="font-semibold mb-1">
+                            {assignment.title}
+                          </h5>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                             {assignment.description}
                           </p>
                           <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                             <span>Pertemuan {assignment.meetingNumber}</span>
-                            <span>•</span>
-                            <span>Due: {new Date(assignment.dueDate).toLocaleDateString("id-ID")}</span>
+                            {assignment.dueDate && (
+                              <>
+                                <span>•</span>
+                                <span>
+                                  Due:{" "}
+                                  {new Date(
+                                    assignment.dueDate,
+                                  ).toLocaleDateString("id-ID")}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                         <Button
@@ -229,7 +238,8 @@ export function UserLevelCard({
               </div>
             )}
 
-            {activeTab === 'kuis' && (
+            {/* Kuis */}
+            {activeTab === "kuis" && (
               <div>
                 {quizzes.length > 0 ? (
                   <div className="space-y-2">
@@ -243,10 +253,18 @@ export function UserLevelCard({
                           <h5 className="font-semibold mb-1">{quiz.title}</h5>
                           <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                             <span>Pertemuan {quiz.meetingNumber}</span>
-                            <span>•</span>
-                            <span>{quiz.duration} menit</span>
-                            <span>•</span>
-                            <span>{quiz.questions.length} soal</span>
+                            {quiz.duration && (
+                              <>
+                                <span>•</span>
+                                <span>{quiz.duration} menit</span>
+                              </>
+                            )}
+                            {quiz.questions && quiz.questions.length > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{quiz.questions.length} soal</span>
+                              </>
+                            )}
                           </div>
                         </div>
                         <Button
@@ -272,7 +290,7 @@ export function UserLevelCard({
         </div>
       )}
 
-      {/* Locked Message */}
+      {/* Locked */}
       {isLocked && (
         <div className="border-t border-gray-200 dark:border-gray-800 p-6 text-center">
           <Lock className="h-8 w-8 mx-auto text-gray-400 mb-2" />

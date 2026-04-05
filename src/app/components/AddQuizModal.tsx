@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { X, Plus, Trash2, Clock } from "lucide-react";
-import { useAddKuis } from "../hooks/useAddKuis";
 
 interface MateriOption {
   id_materi: number;
@@ -20,7 +19,7 @@ interface Question {
   id: string;
   question: string;
   options: string[];
-  correctAnswer: number;
+  correctAnswer: number; // 0=A, 1=B, 2=C, 3=D
 }
 
 export function AddQuizModal({
@@ -33,16 +32,16 @@ export function AddQuizModal({
   const [title, setTitle] = useState("");
   const [meetingNumber, setMeetingNumber] = useState("");
   const [duration, setDuration] = useState("");
+  const [deadline, setDeadline] = useState("");
   const [numberOfQuestions, setNumberOfQuestions] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [selectedMateriId, setSelectedMateriId] = useState<number | "">("");
   const [materiOptions, setMateriOptions] = useState<MateriOption[]>([]);
   const [materiLoading, setMateriLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { addKuis, loading, error } = useAddKuis();
-
-  // Fetch daftar materi berdasarkan classId & level
   useEffect(() => {
     if (!isOpen || !classId) return;
     const fetchMateri = async () => {
@@ -122,9 +121,21 @@ export function AddQuizModal({
     setNumberOfQuestions((questions.length + 1).toString());
   };
 
+  const resetForm = () => {
+    setTitle("");
+    setMeetingNumber("");
+    setDuration("");
+    setDeadline("");
+    setNumberOfQuestions("");
+    setQuestions([]);
+    setShowQuestionForm(false);
+    setSelectedMateriId("");
+    setError(null);
+  };
+
   const handleSubmit = async () => {
-    if (!title || !meetingNumber || !duration) {
-      alert("Mohon lengkapi semua field yang wajib diisi");
+    if (!title || !meetingNumber || !duration || !deadline) {
+      alert("Mohon lengkapi semua field yang wajib diisi (termasuk deadline)");
       return;
     }
     if (!selectedMateriId) {
@@ -151,38 +162,80 @@ export function AddQuizModal({
       }
     }
 
-    await addKuis({
-      nama_tugas: title,
-      deskripsi: `Durasi: ${duration} menit | ${questions.length} soal`,
-      id_materi: Number(selectedMateriId),
-      id_kelas: Number(classId),
-      pertemuan: parseInt(meetingNumber),
-    });
+    setLoading(true);
+    setError(null);
 
-    onAdd({
-      id: `quiz-${Date.now()}`,
-      title,
-      classId,
-      meetingNumber: parseInt(meetingNumber),
-      level,
-      duration: parseInt(duration),
-      isPublished: true,
-      questions: questions.map((q) => ({
-        id: q.id,
-        question: q.question,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-      })),
-    });
+    try {
+      // 1. Simpan kuis ke tabel tugas
+      const kuisRes = await fetch(`${import.meta.env.VITE_API_URL}/api/tugas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nama_tugas: title,
+          deskripsi: "",
+          type: "Kuis",
+          id_materi: Number(selectedMateriId),
+          id_kelas: Number(classId),
+          pertemuan: parseInt(meetingNumber),
+          deadline: new Date(deadline).toISOString(), // ← deadline dikirim
+          durasi: parseInt(duration), // ← durasi dikirim
+        }),
+      });
+      const kuisJson = await kuisRes.json();
+      if (!kuisJson.success)
+        throw new Error(kuisJson.error ?? "Gagal menyimpan kuis");
 
-    setTitle("");
-    setMeetingNumber("");
-    setDuration("");
-    setNumberOfQuestions("");
-    setQuestions([]);
-    setShowQuestionForm(false);
-    setSelectedMateriId("");
-    onClose();
+      const id_tugas = kuisJson.data.id_tugas;
+
+      // 2. Simpan soal-soal ke tabel soal_kuis
+      const opsiMap = ["a", "b", "c", "d"];
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const soalRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/kuis/${id_tugas}/soal`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              pertanyaan: q.question,
+              opsi_a: q.options[0],
+              opsi_b: q.options[1],
+              opsi_c: q.options[2],
+              opsi_d: q.options[3],
+              jawaban_benar: opsiMap[q.correctAnswer], // "a"|"b"|"c"|"d"
+              urutan: i + 1,
+            }),
+          },
+        );
+        const soalJson = await soalRes.json();
+        if (!soalJson.success) throw new Error(`Gagal menyimpan soal ${i + 1}`);
+      }
+
+      // 3. Update local state
+      onAdd({
+        id: String(id_tugas),
+        title,
+        classId,
+        meetingNumber: parseInt(meetingNumber),
+        level,
+        duration: parseInt(duration),
+        dueDate: new Date(deadline).toISOString(),
+        isPublished: true,
+        questions: questions.map((q) => ({
+          id: q.id,
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+        })),
+      });
+
+      resetForm();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -243,12 +296,12 @@ export function AddQuizModal({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Contoh: Kuis: Dasar-dasar Perpajakan"
+                placeholder="Contoh: Kuis Dasar-dasar Perpajakan"
                 className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold mb-2">
                   Pertemuan Ke- <span className="text-red-500">*</span>
@@ -278,21 +331,36 @@ export function AddQuizModal({
                   <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold mb-2">
-                  Jumlah Soal <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={numberOfQuestions}
-                  onChange={(e) => setNumberOfQuestions(e.target.value)}
-                  placeholder="10"
-                  min="1"
-                  max="50"
-                  disabled={showQuestionForm}
-                  className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 disabled:opacity-50"
-                />
-              </div>
+            </div>
+
+            {/* Deadline */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Deadline <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+              />
+            </div>
+
+            {/* Jumlah soal */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Jumlah Soal <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={numberOfQuestions}
+                onChange={(e) => setNumberOfQuestions(e.target.value)}
+                placeholder="10"
+                min="1"
+                max="50"
+                disabled={showQuestionForm}
+                className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 disabled:opacity-50"
+              />
             </div>
 
             {!showQuestionForm && numberOfQuestions && (

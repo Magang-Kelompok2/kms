@@ -1,14 +1,12 @@
-// src/hooks/useAddKuis.ts
-// Kuis memakai tabel "tugas" yang sama, dengan type = "kuis"
 import { useState } from "react";
 
 export interface AddKuisPayload {
-  nama_tugas: string; // judul kuis
+  nama_tugas: string;
   deskripsi?: string;
   id_materi: number;
   id_kelas: number;
   pertemuan?: number;
-  deadline?: string; // ISO string
+  durasi?: number; // ← tambah, hapus deadline
 }
 
 interface UseAddKuisReturn {
@@ -38,7 +36,6 @@ export function useAddKuis(): UseAddKuisReturn {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tugas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // type di-hardcode "kuis" supaya bisa dibedakan dari tugas biasa
         body: JSON.stringify({ ...payload, type: "Kuis" }),
       });
 

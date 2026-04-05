@@ -32,22 +32,26 @@ export function AdminLevelCard({
   onAddQuiz,
 }: AdminLevelCardProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">("materi");
+  const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">(
+    "materi",
+  );
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
 
   const totalItems = materials.length + assignments.length + quizzes.length;
 
-  // Group materials by meeting
-  const materialsByMeeting = materials.reduce((acc, material) => {
-    const meeting = material.meetingNumber;
-    if (!acc[meeting]) {
-      acc[meeting] = [];
-    }
-    acc[meeting].push(material);
-    return acc;
-  }, {} as Record<number, Material[]>);
+  const materialsByMeeting = materials.reduce(
+    (acc, material) => {
+      const meeting = material.meetingNumber;
+      if (!acc[meeting]) {
+        acc[meeting] = [];
+      }
+      acc[meeting].push(material);
+      return acc;
+    },
+    {} as Record<number, Material[]>,
+  );
 
   const meetings = Object.keys(materialsByMeeting)
     .map(Number)
@@ -56,7 +60,7 @@ export function AdminLevelCard({
   return (
     <>
       <Card className="overflow-hidden">
-        {/* Header - Clickable to expand/collapse */}
+        {/* Header */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-full p-6 flex items-center justify-between transition-colors hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
@@ -78,8 +82,8 @@ export function AdminLevelCard({
                 </Badge>
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {totalItems} items ({materials.length} materi, {assignments.length} tugas,{" "}
-                {quizzes.length} kuis)
+                {totalItems} items ({materials.length} materi,{" "}
+                {assignments.length} tugas, {quizzes.length} kuis)
               </p>
             </div>
           </div>
@@ -93,11 +97,11 @@ export function AdminLevelCard({
           </div>
         </button>
 
-        {/* Content - Expanded */}
+        {/* Content */}
         {isOpen && (
           <div className="border-t border-gray-200 dark:border-gray-800 p-6 space-y-6">
             {/* Add Buttons */}
-            <div className="grid grid-cols-3 gap-3 ">
+            <div className="grid grid-cols-3 gap-3">
               <Button
                 onClick={() => setShowMaterialModal(true)}
                 variant="outline"
@@ -124,44 +128,45 @@ export function AdminLevelCard({
               </Button>
             </div>
 
-            {/* Tab Buttons */}
-          <div className="flex justify-center p-6">
-            <div className="inline-flex rounded-full border cursor-pointer border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-950 shadow-sm">
-              <button
-                onClick={() => setActiveTab('materi')}
-                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === 'materi'
-                    ? 'bg-secondary text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                Materi ({materials.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('tugas')}
-                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === 'tugas'
-                    ? 'bg-secondary text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                Tugas ({assignments.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('kuis')}
-                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === 'kuis'
-                    ? 'bg-secondary text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                Kuis ({quizzes.length})
-              </button>
+            {/* Tabs */}
+            <div className="flex justify-center p-6">
+              <div className="inline-flex rounded-full border cursor-pointer border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-950 shadow-sm">
+                <button
+                  onClick={() => setActiveTab("materi")}
+                  className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
+                    activeTab === "materi"
+                      ? "bg-secondary text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  Materi ({materials.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("tugas")}
+                  className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
+                    activeTab === "tugas"
+                      ? "bg-secondary text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  Tugas ({assignments.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("kuis")}
+                  className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
+                    activeTab === "kuis"
+                      ? "bg-secondary text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  Kuis ({quizzes.length})
+                </button>
+              </div>
             </div>
-          </div>
 
             {/* Tab Content */}
             <div>
+              {/* Materi */}
               {activeTab === "materi" && (
                 <div>
                   {meetings.length > 0 ? (
@@ -176,7 +181,9 @@ export function AdminLevelCard({
                               key={material.id}
                               className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
                             >
-                              <h5 className="font-semibold mb-1">{material.title}</h5>
+                              <h5 className="font-semibold mb-1">
+                                {material.title}
+                              </h5>
                               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                                 {material.description}
                               </p>
@@ -185,11 +192,17 @@ export function AdminLevelCard({
                                   {material.files?.length || 0} files
                                 </Badge>
                                 {material.isPublished ? (
-                                  <Badge variant="default" className="text-xs bg-green-600">
+                                  <Badge
+                                    variant="default"
+                                    className="text-xs bg-green-600"
+                                  >
                                     Berhasil diunggah
                                   </Badge>
                                 ) : (
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
                                     Draft
                                   </Badge>
                                 )}
@@ -207,6 +220,7 @@ export function AdminLevelCard({
                 </div>
               )}
 
+              {/* Tugas */}
               {activeTab === "tugas" && (
                 <div>
                   {assignments.length > 0 ? (
@@ -216,16 +230,25 @@ export function AdminLevelCard({
                           key={assignment.id}
                           className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
                         >
-                          <h5 className="font-semibold mb-1">{assignment.title}</h5>
+                          <h5 className="font-semibold mb-1">
+                            {assignment.title}
+                          </h5>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                             {assignment.description}
                           </p>
                           <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                             <span>Pertemuan {assignment.meetingNumber}</span>
-                            <span>•</span>
-                            <span>
-                              Due: {new Date(assignment.dueDate).toLocaleDateString("id-ID")}
-                            </span>
+                            {assignment.dueDate && (
+                              <>
+                                <span>•</span>
+                                <span>
+                                  Due:{" "}
+                                  {new Date(
+                                    assignment.dueDate,
+                                  ).toLocaleDateString("id-ID")}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -238,6 +261,7 @@ export function AdminLevelCard({
                 </div>
               )}
 
+              {/* Kuis */}
               {activeTab === "kuis" && (
                 <div>
                   {quizzes.length > 0 ? (
@@ -250,10 +274,18 @@ export function AdminLevelCard({
                           <h5 className="font-semibold mb-1">{quiz.title}</h5>
                           <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                             <span>Pertemuan {quiz.meetingNumber}</span>
-                            <span>•</span>
-                            <span>{quiz.duration} menit</span>
-                            <span>•</span>
-                            <span>{quiz.questions.length} soal</span>
+                            {quiz.duration && (
+                              <>
+                                <span>•</span>
+                                <span>{quiz.duration} menit</span>
+                              </>
+                            )}
+                            {quiz.questions && quiz.questions.length > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{quiz.questions.length} soal</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -272,7 +304,9 @@ export function AdminLevelCard({
               quizzes.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <p className="mb-4">Belum ada konten di tingkatan ini</p>
-                  <p className="text-sm">Klik tombol di atas untuk menambah konten</p>
+                  <p className="text-sm">
+                    Klik tombol di atas untuk menambah konten
+                  </p>
                 </div>
               )}
           </div>

@@ -11,6 +11,8 @@ import usersRoutes from "./routes/users";
 import materialsRoutes from "./routes/materials";
 import tugasRoutes from "./routes/tugas";
 import uploadRoutes from "./routes/upload";
+import pengumpulanRoutes from "./routes/pengumpulan"; // ← tambah ini
+import kuisRoutes from "./routes/kuis";
 
 dotenv.config();
 
@@ -29,6 +31,8 @@ app.use("/api/users", usersRoutes);
 app.use("/api/materials", materialsRoutes);
 app.use("/api/tugas", tugasRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/pengumpulan", pengumpulanRoutes); // ← tambah ini
+app.use("/api/kuis", kuisRoutes);
 
 // ─── START SERVER ─────────────────────────────────────────────────────────────
 async function start() {

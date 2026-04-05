@@ -18,7 +18,6 @@ export function MaterialViewPage() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [material, setMaterial] = useState<MaterialType | null>(null);
 
-  // Loading terpisah: satu untuk material, satu untuk progress
   const [materialLoading, setMaterialLoading] = useState(true);
   const [progressLoading, setProgressLoading] = useState(true);
 
@@ -43,6 +42,8 @@ export function MaterialViewPage() {
         setMaterial(json.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+        // FIX: Jika material gagal di-fetch, progress tidak perlu di-fetch juga
+        setProgressLoading(false);
       } finally {
         setMaterialLoading(false);
       }
@@ -51,12 +52,19 @@ export function MaterialViewPage() {
     fetchMaterial();
   }, [materialId]);
 
-  // ── 2. Fetch progress — tunggu sampai material tersedia ────────
+  // ── 2. Fetch progress ──────────────────────────────────────────
   useEffect(() => {
-    // Kalau material belum ada, belum bisa fetch progress
-    if (!material?.classId) return;
+    // FIX: Jika material belum ada (termasuk jika classId tidak ada),
+    // langsung set progressLoading false agar tidak stuck loading selamanya.
+    if (!material) return;
 
-    // Superadmin tidak butuh progress, langsung unlock
+    if (!material.classId) {
+      // classId tidak ada — tidak bisa fetch progress, anggap level 1
+      setProgressLoading(false);
+      return;
+    }
+
+    // Superadmin tidak butuh progress
     if (user?.role === "superadmin") {
       setProgressLoading(false);
       return;
@@ -72,31 +80,35 @@ export function MaterialViewPage() {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${material.classId}`,
         );
+
+        // FIX: Jika 404 atau error lain (user belum punya progress),
+        // default userLevel = 1 sehingga materi level 1 tetap bisa diakses.
         if (!res.ok) {
-          // Kalau endpoint belum ada / error, default level 1
+          setUserLevel(1);
           return;
         }
+
         const json = await res.json();
 
-        // Ambil tingkatan saat ini
-        setUserLevel(json.data?.tingkatanSaatIni ?? 1);
+        // FIX: Fallback eksplisit ke 1 jika data tidak ada
+        const level = json.data?.tingkatanSaatIni;
+        setUserLevel(typeof level === "number" && level >= 1 ? level : 1);
 
-        // Cek apakah materi ini sudah pernah diselesaikan
         const completedMaterials: string[] =
           json.data?.completedMaterials ?? [];
         if (materialId && completedMaterials.includes(materialId)) {
           setIsCompleted(true);
         }
       } catch {
-        // Gagal fetch progress → default userLevel tetap 1
+        // Gagal fetch progress → default level 1 agar tidak langsung ditolak
+        setUserLevel(1);
       } finally {
-        // Apapun hasilnya, progress loading selesai
         setProgressLoading(false);
       }
     };
 
     fetchProgress();
-  }, [material?.classId, user?.id, user?.role, materialId]);
+  }, [material, user?.id, user?.role, materialId]);
 
   // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
@@ -105,7 +117,7 @@ export function MaterialViewPage() {
     }
   }, [material, selectedFile]);
 
-  // ── Loading state — tunggu KEDUA fetch selesai ─────────────────
+  // ── Loading state ──────────────────────────────────────────────
   if (materialLoading || progressLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -143,8 +155,14 @@ export function MaterialViewPage() {
     );
   }
 
-  // ── Cek akses — baru dievaluasi SETELAH kedua fetch selesai ────
-  const hasAccess = user?.role === "superadmin" || material.level <= userLevel;
+  // ── Cek akses ──────────────────────────────────────────────────
+  // FIX: Jika material.level tidak terdefinisi/null, anggap level 1
+  const materialLevel =
+    typeof material.level === "number" && material.level >= 1
+      ? material.level
+      : 1;
+
+  const hasAccess = user?.role === "superadmin" || materialLevel <= userLevel;
 
   if (!hasAccess) {
     return (
@@ -155,7 +173,8 @@ export function MaterialViewPage() {
             <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
             <p className="text-gray-600 dark:text-gray-400">
               Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
-              materi ini.
+              materi ini. (Level materi: {materialLevel}, Level kamu:{" "}
+              {userLevel})
             </p>
             <Button onClick={() => navigate("/dashboard")} className="mt-4">
               Kembali ke Dashboard
@@ -317,7 +336,7 @@ export function MaterialViewPage() {
                         Pertemuan {material.meetingNumber}
                       </Badge>
                       <Badge variant="outline" className="text-sm">
-                        Level {material.level}
+                        Level {materialLevel}
                       </Badge>
                       {isCompleted && (
                         <Badge variant="default" className="text-sm">
