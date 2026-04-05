@@ -1,12 +1,11 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
-import { createClient } from '@supabase/supabase-js';
 import type { User } from "../types";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  token: string | null; // ← tambah ini biar bisa dipakai di hooks
+  token: string | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, username: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -15,138 +14,107 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-console.log("URL:", supabaseUrl)
-console.log("KEY:", supabaseKey)
-
-export const supabase = createClient(supabaseUrl, supabaseKey)
-
-// Helper: ambil data user dari tabel public.user berdasarkan email
-async function fetchUserProfile(email: string): Promise<Partial<User> | null> {
-  const { data, error } = await supabase
-    .from("user")
-    .select("id_user, username, role, id_kelas")
-    .eq("email", email)
-    .single();
-
-  if (error || !data) return null;
-
-  return {
-    id: String(data.id_user),
-    name: data.username,
-    role: data.role ?? "user",
-  };
-}
+const API = import.meta.env.VITE_API_URL ?? "";
+const SESSION_KEY = "taxacore_session";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Gabungkan Supabase auth user + profile dari tabel public.user
-  async function syncUser(supabaseUser: any, accessToken: string) {
-    const profile = await fetchUserProfile(supabaseUser.email);
-    setUser({
-      id: profile?.id ?? supabaseUser.id,
-      name: profile?.name ?? supabaseUser.email.split("@")[0],
-      email: supabaseUser.email,
-      role: profile?.role ?? "user",
-      createdAt: supabaseUser.created_at ?? new Date().toISOString(),
-    });
-    setToken(accessToken);
-  }
-
+  // Load session dari localStorage saat mount
   useEffect(() => {
-    // Cek session saat mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        await syncUser(session.user, session.access_token);
+    try {
+      const stored = localStorage.getItem(SESSION_KEY);
+      if (stored) {
+        const { user: u, token: t } = JSON.parse(stored);
+        setUser(u);
+        setToken(t);
       }
+    } catch {
+      localStorage.removeItem(SESSION_KEY);
+    } finally {
       setLoading(false);
-    });
-
-    // Listen perubahan auth (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (session?.user) {
-          await syncUser(session.user, session.access_token);
-        } else {
-          setUser(null);
-          setToken(null);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
+    }
   }, []);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { success: false, error: error.message };
-      if (data.user && data.session) {
-        await syncUser(data.user, data.session.access_token);
-      }
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message || "Terjadi kesalahan saat login" };
-    }
+  const saveSession = (userData: User, jwt: string) => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ user: userData, token: jwt }));
+    setUser(userData);
+    setToken(jwt);
   };
 
-const register = async (
-  email: string,
-  password: string,
-  username: string
-): Promise<{ success: boolean; error?: string }> => {
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { username } },
-    });
-    if (error) return { success: false, error: error.message };
-    if (!data.user) return { success: false, error: "Gagal membuat akun" };
-
-    // ← INSERT ke tabel public.user setelah signup
-    const { error: dbError } = await supabase.from("user").insert({
-      username,
-      email,
-      password: "supabase_managed",
-      role: "user",
-    });
-
-    if (dbError) {
-      console.error("Gagal insert ke public.user:", dbError);
-      // Tidak return error agar tidak block login, tapi log-nya perlu
-    }
-
-    if (data.session) {
-      await syncUser(data.user, data.session.access_token);
-    }
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Terjadi kesalahan" };
-  }
-};
-
-  const logout = async (): Promise<void> => {
-    await supabase.auth.signOut();
+  const clearSession = () => {
+    localStorage.removeItem(SESSION_KEY);
     setUser(null);
     setToken(null);
   };
 
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        return { success: false, error: json.error ?? "Email atau password salah" };
+      }
+
+      saveSession(json.user, json.token);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: "Tidak bisa terhubung ke server" };
+    }
+  };
+
+  const register = async (
+    email: string,
+    password: string,
+    username: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`${API}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, username }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        return { success: false, error: json.error ?? "Gagal membuat akun" };
+      }
+
+      saveSession(json.user, json.token);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: "Tidak bisa terhubung ke server" };
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    clearSession();
+  };
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      token,
-      login,
-      register,
-      logout,
-      isAuthenticated: !!user
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        token,
+        login,
+        register,
+        logout,
+        isAuthenticated: !!user,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -159,3 +127,6 @@ export function useAuth() {
   }
   return context;
 }
+
+// Export supabase client untuk keperluan data fetching (bukan auth)
+export { supabase } from "../../utils/supabase";

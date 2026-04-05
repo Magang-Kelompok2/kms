@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import express from "express";
 import dotenv from "dotenv";
 
 import { supabase } from "./lib/supabase";

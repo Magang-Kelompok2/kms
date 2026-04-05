@@ -1,53 +1,48 @@
-import { createClient } from '@supabase/supabase-js';
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import { supabase } from "../lib/supabase";
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const JWT_SECRET = process.env.JWT_SECRET ?? "taxacore_secret_key_ganti_ini";
 
 export interface AuthenticatedRequest extends Request {
   user: any;
 }
 
 export async function verifySupabaseToken(
-  req: AuthenticatedRequest, 
-  res: Response, 
+  req: AuthenticatedRequest,
+  res: Response,
   next: NextFunction
 ) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  
-  if (!token) {
-    return res.status(401).json({ error: 'Token tidak ditemukan' });
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Token tidak ditemukan" });
   }
 
+  const token = authHeader.replace("Bearer ", "");
+
   try {
-    // Verify JWT with Supabase
-    const { data, error } = await supabase.auth.getUser(token);
-    
-    if (error) {
-      return res.status(401).json({ error: 'Token tidak valid' });
+    // Verify JWT
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      id: number;
+      email: string;
+      role: string;
+    };
+
+    // Ambil data user terbaru dari DB
+    const { data: userData, error } = await supabase
+      .from("user")
+      .select("*")
+      .eq("id_user", decoded.id)
+      .maybeSingle();
+
+    if (error || !userData) {
+      return res.status(401).json({ error: "User tidak ditemukan" });
     }
 
-    // Get user data from our database
-    const { data: userData, error: dbError } = await supabase
-      .from('user')
-      .select('*')
-      .eq('email', data.user.email)
-      .single();
-
-    if (dbError) {
-      return res.status(500).json({ error: 'Terjadi kesalahan database' });
-    }
-
-    if (!userData) {
-      return res.status(404).json({ error: 'User tidak ditemukan' });
-    }
-
-    // Attach user data to request
-    req.user = { ...data.user, ...userData };
+    req.user = userData;
     next();
-  } catch (error) {
-    return res.status(500).json({ error: 'Autentikasi gagal' });
+  } catch (err) {
+    return res.status(401).json({ error: "Token tidak valid atau sudah expired" });
   }
 }
