@@ -38,15 +38,15 @@ async function start() {
     if (error) throw error;
     console.log("✅ Supabase connected!");
 
-    try {
-      const exists = await minioClient.bucketExists(BUCKET);
-      if (!exists) await minioClient.makeBucket(BUCKET);
-      console.log("✅ MinIO bucket ready!");
-    } catch {
-      console.warn(
-        "⚠️  MinIO tidak tersedia, upload file tidak akan berfungsi",
-      );
-    }
+    // try {
+    //   const exists = await minioClient.bucketExists(BUCKET);
+    //   if (!exists) await minioClient.makeBucket(BUCKET);
+    //   console.log("✅ MinIO bucket ready!");
+    // } catch {
+    //   console.warn(
+    //     "⚠️  MinIO tidak tersedia, upload file tidak akan berfungsi",
+    //   );
+    // }
 
     app.listen(PORT, () => console.log(`✅ Backend running on port ${PORT}`));
   } catch (error) {

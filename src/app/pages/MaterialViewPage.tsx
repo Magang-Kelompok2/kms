@@ -96,7 +96,7 @@ export function MaterialViewPage() {
 
   if (materialLoading || progressLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <p className="text-gray-500">Memuat materi...</p>
@@ -124,7 +124,7 @@ export function MaterialViewPage() {
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
-            <p className="text-red-500">Material tidak ditemukan</p>
+            <p className="text-red-500">Materi tidak ditemukan</p>
           </Card>
         </div>
       </div>
@@ -168,7 +168,7 @@ export function MaterialViewPage() {
   const selectedFileData = material.files.find((f) => f.id === selectedFile);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
       <DashboardHeader />
 
       <div className="container mx-auto px-4 md:px-6 py-6">

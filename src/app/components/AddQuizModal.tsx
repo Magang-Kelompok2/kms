@@ -187,9 +187,9 @@ export function AddQuizModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between z-10">
-          <h2 className="text-2xl font-bold">Tambah Kuis - Level {level}</h2>
+          <h2 className="text-2xl font-normal">Tambah Kuis - Level {level}</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
@@ -207,7 +207,7 @@ export function AddQuizModal({
 
           {/* Pilih Materi */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
+            <label className="block text-sm font-normal mb-2">
               Materi Terkait <span className="text-red-500">*</span>
             </label>
             {materiLoading ? (
@@ -236,7 +236,7 @@ export function AddQuizModal({
           <div className="space-y-6">
             {/* Title */}
             <div>
-              <label className="block text-sm font-semibold mb-2">
+              <label className="block text-sm font-normal mb-2">
                 Judul Kuis <span className="text-red-500">*</span>
               </label>
               <input
@@ -250,7 +250,7 @@ export function AddQuizModal({
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-semibold mb-2">
+                <label className="block text-sm font-normal mb-2">
                   Pertemuan Ke- <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -263,7 +263,7 @@ export function AddQuizModal({
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold mb-2">
+                <label className="block text-sm font-normal mb-2">
                   Durasi (menit) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -279,7 +279,7 @@ export function AddQuizModal({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold mb-2">
+                <label className="block text-sm font-normal mb-2">
                   Jumlah Soal <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -309,7 +309,7 @@ export function AddQuizModal({
           {showQuestionForm && questions.length > 0 && (
             <div className="space-y-6 border-t pt-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold">Soal-Soal Kuis</h3>
+                <h3 className="text-xl font-normal">Soal-Soal Kuis</h3>
                 <Button onClick={addQuestion} variant="outline" size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Tambah Soal
@@ -322,7 +322,7 @@ export function AddQuizModal({
                   className="border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-4"
                 >
                   <div className="flex items-start justify-between">
-                    <h4 className="font-bold text-lg">Soal {qIndex + 1}</h4>
+                    <h4 className="font-normal text-lg">Soal {qIndex + 1}</h4>
                     {questions.length > 1 && (
                       <button
                         onClick={() => removeQuestion(qIndex)}
@@ -333,7 +333,7 @@ export function AddQuizModal({
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold mb-2">
+                    <label className="block text-sm font-normal mb-2">
                       Pertanyaan <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -346,7 +346,7 @@ export function AddQuizModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold mb-3">
+                    <label className="block text-sm font-normal mb-3">
                       Pilihan Jawaban <span className="text-red-500">*</span>
                     </label>
                     <div className="space-y-3">
@@ -362,7 +362,7 @@ export function AddQuizModal({
                             className="w-5 h-5 text-blue-600"
                           />
                           <div className="flex-1 flex items-center gap-2">
-                            <span className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded font-semibold text-sm">
+                            <span className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded font-normal text-sm">
                               {String.fromCharCode(65 + oIndex)}
                             </span>
                             <input

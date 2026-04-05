@@ -135,7 +135,7 @@ router.get("/:classId/levels", async (req, res) => {
       const materiIds = new Set(materiDiTingkatan.map((m) => m.id_materi));
 
       const assignments = (tugasList ?? [])
-        .filter((t) => materiIds.has(t.id_materi))
+        .filter((t) => materiIds.has(t.id_materi) && t.type !== "Kuis")
         .map((t) => ({
           id: String(t.id_tugas),
           title: t.nama_tugas ?? "",
@@ -149,13 +149,27 @@ router.get("/:classId/levels", async (req, res) => {
           type: t.type ?? "",
         }));
 
+      const quizzes = (tugasList ?? [])
+        .filter((t) => materiIds.has(t.id_materi) && t.type === "Kuis")
+        .map((t) => ({
+          id: String(t.id_tugas),
+          title: t.nama_tugas ?? "",
+          description: t.deskripsi ?? "",
+          classId: String(classId),
+          meetingNumber: t.pertemuan,
+          level: tingkatan.id_tingkatan,
+          materialId: String(t.id_materi),
+          isPublished: true,
+          duration: 0,
+        }));
+
       return {
         id: String(tingkatan.id_tingkatan),
         level: tingkatan.id_tingkatan,
         namaLevel: tingkatan.nama_tingkatan,
         materials,
         assignments,
-        quizzes: [],
+        quizzes,
       };
     });
 

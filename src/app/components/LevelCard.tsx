@@ -52,7 +52,7 @@ export function LevelCard({
         className="w-full p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
       >
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-lg flex items-center justify-center text-white font-bold text-xl">
+          <div className="w-12 h-12 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-lg flex items-center justify-center text-white font-bold text-xl">
             {level}
           </div>
           <div className="text-left">

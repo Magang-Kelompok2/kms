@@ -159,7 +159,7 @@ export function QuizViewPage() {
               ) : (
                 <Card className="p-5 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 mb-6">
                   <div className="flex gap-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
                     <div>
                       <h3 className="text-base font-bold text-yellow-900 dark:text-yellow-100 mb-2">
                         Perhatian!
@@ -260,9 +260,9 @@ export function QuizViewPage() {
                       >
                         <div className="flex gap-3">
                           {isCorrect ? (
-                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
                           ) : (
-                            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                           )}
                           <div className="flex-1">
                             <p className="font-semibold text-base mb-2">
@@ -395,7 +395,7 @@ export function QuizViewPage() {
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${
                         answers[currentQuestion] === index
                           ? "border-blue-500 bg-blue-500"
                           : "border-gray-300 dark:border-gray-600"

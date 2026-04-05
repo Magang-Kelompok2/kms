@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import type { Material, Assignment } from "../types";
+import type { Material, Assignment, Quiz } from "../types";
 
 interface Level {
   id: string;
@@ -8,7 +8,7 @@ interface Level {
   namaLevel: string;
   materials: Material[];
   assignments: Assignment[];
-  quizzes: never[];
+  quizzes: Quiz[];
 }
 
 export function useLevels(classId: string | number | undefined) {

@@ -43,7 +43,7 @@ export function ProfilePage() {
         <Card className="p-8 mb-6">
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-6">
-              <div className="w-24 h-24 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center">
+              <div className="w-24 h-24 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center">
                 <User className="h-12 w-12 text-white" />
               </div>
               <div>

@@ -10,7 +10,7 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export async function verifySupabaseToken(
-  req: AuthenticatedRequest,
+  req: any,
   res: Response,
   next: NextFunction
 ) {
