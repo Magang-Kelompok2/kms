@@ -90,7 +90,7 @@ export function UserLevelCard({
             <p className="text-xs uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400 mb-2">
               Tingkatan {level}
             </p>
-            <h3 className="text-3xl font-normal">{namaLevel}</h3>
+            <h3 className="text-2xl font-bold">{namaLevel}</h3>
 
         <div className="flex items-center gap-4 mt-1">
           {/* <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
@@ -134,7 +134,7 @@ export function UserLevelCard({
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-normal cursor-pointer transition-colors focus:outline-none ${
+                className={`px-4 py-2 text-sm font-bold cursor-pointer transition-colors focus:outline-none ${
                   activeTab === tab
                     ? "bg-secondary text-white rounded-2xl"
                     : "text-gray-600 dark:text-gray-300 hover:text-black hover:bg-gray-200 dark:hover:text-white rounded-2xl"
@@ -159,7 +159,7 @@ export function UserLevelCard({
                       {item.number}
                     </div>
                     <div>
-                      <h4 className="font-normal text-xl">{item.title}</h4>
+                      <h4 className="font-bold text-xl">{item.title}</h4>
                       <p className="text-sm text-gray-500 dark:text-gray-400">{item.subtitle}</p>
                     </div>
                   </div>
@@ -183,7 +183,7 @@ export function UserLevelCard({
         <div className="border-t border-gray-200 dark:border-gray-800 p-6 text-center">
           <Lock className="h-8 w-8 mx-auto text-gray-400 mb-2" />
           <p className="text-gray-600 dark:text-gray-400">
-            Complete previous level to unlock this content
+            Selesaikan tingkatan sebelumnya untuk membuka akses ke tingkatan ini.
           </p>
         </div>
       )}

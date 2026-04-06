@@ -38,7 +38,7 @@ export function RegisterPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-950">
         <div className="w-full max-w-md">
           <div className="mb-10">
-            <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
+            <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
               Register
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
@@ -137,7 +137,7 @@ export function RegisterPage() {
               <img src="/LogoAlpha.svg" alt="TaxaCore Logo" width={64} height={64} />
             </div>
             <div>
-              <h2 className="text-3xl font-normal" style={{ fontFamily: 'Coolvetica, sans-serif' }}>
+              <h2 className="text-3xl font-normal" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
                 TaxaCore
               </h2>
               <p className="text-lg text-white/90">

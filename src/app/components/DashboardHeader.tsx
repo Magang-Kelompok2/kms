@@ -37,7 +37,7 @@ export function DashboardHeader() {
             <img src="/LogoAlpha.svg" alt="Alpha" />
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xl font-normal cursor-pointer" style={{ fontFamily: 'Coolvetica, sans-serif' }} onClick={() => navigate("/dashboard")}>TaxaCore</span>
+            <span className="text-xl font-bold cursor-pointer" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }} onClick={() => navigate("/dashboard")}>TaxaCore</span>
             {user && (
               <Badge
                 variant="outline"

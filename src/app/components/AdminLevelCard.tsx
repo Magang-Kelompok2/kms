@@ -281,10 +281,32 @@ export function AdminLevelCard({
               <p className="text-xs uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400 mb-2">
                 Tingkatan {level}
               </p>
-              <h3 className="text-3xl font-normal">{namaLevel}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              <h3 className="text-2xl font-bold">{namaLevel}</h3>
+
+              <div className="flex items-center gap-4 mt-1">
+          {/* <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            {totalItems} konten tersedia • Materi {materials.length} • Tugas {assignments.length} • Kuis {quizzes.length}
+          </p> */}
+          {/* Konten tersedia */}
+          {/* <div className="p-2 w-fit h-fit rounded-lg bg-secondary">
+            <p className="text-sm text-white">{totalItems} Konten tersedia</p>
+          </div> */}
+          {/* Jumlah Materi */}
+          <div className="p-2 w-fit h-fit rounded-lg bg-secondary shadow-md bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
+            <p className="font-medium text-sm text-white">{materials.length} Materi</p>
+          </div>
+          {/* Jumlah Tugas */}
+          <div className="p-2 w-fit h-fit rounded-lg bg-secondary shadow-md bg-linear-to-br from-slate-800 via-purple-600 to-pink-500">
+            <p className="text-sm text-white">{assignments.length} Tugas</p>
+          </div>
+          {/* Jumlah Kuis */}
+          <div className="p-2 w-fit h-fit rounded-lg bg-secondary shadow-md bg-linear-to-br from-slate-800 via-emerald-600 to-teal-500">
+            <p className="text-sm text-white">{quizzes.length} Kuis</p>
+          </div>
+        </div>
+              {/* <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 {totalItems} konten tersedia • Materi {materials.length} • Tugas {assignments.length} • Kuis {quizzes.length}
-              </p>
+              </p> */}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -316,7 +338,7 @@ export function AdminLevelCard({
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-normal cursor-pointer transition-colors focus:outline-none ${
+                  className={`px-4 py-2 text-sm font-semibold cursor-pointer transition-colors focus:outline-none ${
                     activeTab === tab
                       ? "bg-secondary text-white rounded-2xl"
                       : "text-gray-600 dark:text-gray-300 hover:text-black hover:bg-gray-200 dark:hover:text-white rounded-2xl"
@@ -354,7 +376,7 @@ export function AdminLevelCard({
                             {item.number}
                           </div>
                           <div>
-                            <h4 className="font-normal text-xl">{item.title}</h4>
+                            <h4 className="font-bold text-lg">{item.title}</h4>
                             <p className="text-sm text-gray-500 dark:text-gray-400">{item.subtitle}</p>
                           </div>
                         </div>

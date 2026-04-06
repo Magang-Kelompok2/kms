@@ -67,7 +67,7 @@ export function DashboardPage() {
       <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-normal mb-2">
+          <h1 className="text-3xl font-bold mb-2">
             Selamat datang kembali, {user?.name}!
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
@@ -175,7 +175,7 @@ export function DashboardPage() {
         {/* Classes Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-normal">Kelas Anda</h2>
+            <h2 className="text-2xl font-bold">Kelas Anda</h2>
           </div>
 
           {classesLoading ? (
@@ -200,8 +200,8 @@ export function DashboardPage() {
                       <div className="absolute right-4 top-8 rounded-full bg-white/10 w-24 h-24" />
                       <div className="absolute inset-0 flex items-center justify-center px-4">
                         <h3
-                          className="text-4xl font-normal text-white text-center"
-                          style={{ fontFamily: "Coolvetica, sans-serif" }}
+                          className="text-4xl font-bold text-white text-center"
+                          style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
                         >
                           {cls.name}
                         </h3>
@@ -228,7 +228,7 @@ export function DashboardPage() {
         {user?.role === "superadmin" && (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-normal">Manajemen Pengguna</h2>
+              <h2 className="text-2xl font-bold">Manajemen Pengguna</h2>
               <Button className="bg-secondary cursor-pointer" onClick={() => navigate("/users/create")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Buat Pengguna Baru
@@ -291,7 +291,7 @@ export function DashboardPage() {
                         >
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-normal">
+                              <div className="w-10 h-10 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-bold">
                                 {u.username.charAt(0).toUpperCase()}
                               </div>
                               <span className="font-medium">{u.username}</span>
@@ -379,7 +379,7 @@ export function DashboardPage() {
         {user?.role !== "superadmin" && (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-normal">Materi Terbaru</h2>
+              <h2 className="text-2xl font-bold">Materi Terbaru</h2>
             </div>
 
             <div className="grid gap-4">
@@ -401,7 +401,7 @@ export function DashboardPage() {
                             Pertemuan {m.pertemuan}
                           </Badge>
                         </div>
-                        <h3 className="font-normal mb-1">{m.title_materi}</h3>
+                        <h3 className="font-bold mb-1">{m.title_materi}</h3>
                       </div>
                       <FileText className="h-10 w-10 text-gray-300 dark:text-gray-700 ml-4" />
                     </div>

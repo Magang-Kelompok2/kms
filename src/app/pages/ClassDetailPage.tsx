@@ -130,8 +130,8 @@ export function ClassDetailPage() {
         <div className="relative h-48 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4]">
           <div className="absolute inset-0 flex items-center justify-center">
             <h1
-              className="text-4xl font-normal text-white"
-              style={{ fontFamily: "Coolvetica, sans-serif" }}
+              className="text-4xl font-bold text-white"
+              style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
             >
               {currentClass.name}
             </h1>
@@ -212,7 +212,7 @@ export function ClassDetailPage() {
           </div>
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-normal mb-2">
+              <h2 className="text-2xl font-bold mb-2">
                 Kelola Konten per Tingkatan
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -332,7 +332,7 @@ export function ClassDetailPage() {
           </Badge>
         </div>
         <div className="space-y-4">
-          <h2 className="text-2xl font-normal">Progres Pembelajaran</h2>
+          <h2 className="text-2xl font-bold">Progres Pembelajaran</h2>
           {levels.map((lvl) => (
             <UserLevelCard
               key={lvl.id}
