@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "./ui/card";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import type { Assignment, Quiz, Material } from "../types";
 
@@ -15,104 +17,68 @@ interface UserLevelCardProps {
   userLevel: number;
 }
 
-type LevelCardItem = {
-  id: string;
-  title: string;
-  subtitle: string;
-  badge: string;
-  number: number;
-  path: string;
-  extra?: string;
-};
-
 export function UserLevelCard({
   level,
   namaLevel,
   materials,
   assignments,
   quizzes,
+  classId,
   isLocked,
+  userLevel,
 }: UserLevelCardProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'materi' | 'tugas' | 'kuis'>('materi');
+  const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">(
+    "materi",
+  );
   const navigate = useNavigate();
 
   const totalItems = materials.length + assignments.length + quizzes.length;
 
-  const itemsByTab: Record<'materi' | 'tugas' | 'kuis', LevelCardItem[]> = {
-    materi: materials.map((item, index) => ({
-      id: item.id,
-      title: item.title,
-      subtitle: item.description,
-      badge: `${item.files?.length ?? 0} files`,
-      number: index + 1,
-      path: `/material/${item.id}`,
-    })),
-    tugas: assignments.map((item, index) => ({
-      id: item.id,
-      title: item.title,
-      subtitle: item.description,
-      badge: `Pertemuan ${item.meetingNumber}`,
-      extra: `Due ${new Date(item.dueDate).toLocaleDateString("id-ID")}`,
-      number: index + 1,
-      path: `/assignment/${item.id}`,
-    })),
-    kuis: quizzes.map((item, index) => ({
-      id: item.id,
-      title: item.title,
-      subtitle: item.questions?.length ? `${item.questions.length} soal` : "Kuis",
-      badge: `${item.duration} menit`,
-      extra: item.questions ? `${item.questions.length} soal` : undefined,
-      number: index + 1,
-      path: `/quiz/${item.id}`,
-    })),
-  };
+  const materialsByMeeting = materials.reduce(
+    (acc, material) => {
+      const meeting = material.meetingNumber;
+      if (!acc[meeting]) {
+        acc[meeting] = [];
+      }
+      acc[meeting].push(material);
+      return acc;
+    },
+    {} as Record<number, Material[]>,
+  );
+
+  const meetings = Object.keys(materialsByMeeting)
+    .map(Number)
+    .sort((a, b) => a - b);
 
   return (
     <Card className={`overflow-hidden ${isLocked ? "opacity-60" : ""}`}>
+      {/* Header */}
       <button
-        type="button"
         onClick={() => !isLocked && setIsOpen(!isOpen)}
         className={`cursor-pointer w-full p-6 flex items-center justify-between transition-colors ${
-          !isLocked ? "hover:bg-gray-50 dark:hover:bg-gray-900" : ""
+          !isLocked && "hover:bg-gray-50 dark:hover:bg-gray-900"
         }`}
         disabled={isLocked}
       >
-        <div className="flex items-center text-left gap-8">
+        <div className="flex items-center gap-4">
           <div
-            className={`w-21 h-21 rounded-2xl grid place-items-center text-white font-semibold text-2xl ${
-              isLocked ? "bg-gray-400 dark:bg-gray-600" : "bg-linear-to-br from-[#0C4E8C] to-[#11C4D4]"
+            className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl ${
+              isLocked
+                ? "bg-gray-400 dark:bg-gray-600"
+                : "bg-linear-to-br from-[#0C4E8C] to-[#11C4D4]"
             }`}
           >
             {level}
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400 mb-2">
-              Tingkatan {level}
+          <div className="text-left">
+            <h3 className="text-xl font-normal flex items-center gap-2">
+              {namaLevel}
+              {isLocked && <Lock className="h-5 w-5 text-gray-400" />}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {totalItems} items
             </p>
-            <h3 className="text-2xl font-bold">{namaLevel}</h3>
-
-        <div className="flex items-center gap-4 mt-1">
-          {/* <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-            {totalItems} konten tersedia • Materi {materials.length} • Tugas {assignments.length} • Kuis {quizzes.length}
-          </p> */}
-          {/* Konten tersedia */}
-          {/* <div className="p-2 w-fit h-fit rounded-lg bg-secondary">
-            <p className="text-sm text-white">{totalItems} Konten tersedia</p>
-          </div> */}
-          {/* Jumlah Materi */}
-          <div className="p-2 w-fit h-fit rounded-lg bg-secondary shadow-md bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
-            <p className="font-medium text-sm text-white">{materials.length} Materi</p>
-          </div>
-          {/* Jumlah Tugas */}
-          <div className="p-2 w-fit h-fit rounded-lg bg-secondary shadow-md bg-linear-to-br from-slate-800 via-purple-600 to-pink-500">
-            <p className="text-sm text-white">{assignments.length} Tugas</p>
-          </div>
-          {/* Jumlah Kuis */}
-          <div className="p-2 w-fit h-fit rounded-lg bg-secondary shadow-md bg-linear-to-br from-slate-800 via-emerald-600 to-teal-500">
-            <p className="text-sm text-white">{quizzes.length} Kuis</p>
-          </div>
-        </div>
           </div>
         </div>
 
@@ -127,63 +93,209 @@ export function UserLevelCard({
         )}
       </button>
 
+      {/* Content */}
       {isOpen && !isLocked && (
-        <div className="border-t border-gray-200 dark:border-gray-800 p-6 space-y-6">
-          <div className="w-fit flex mx-auto rounded-full border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-slate-900 shadow-sm px-1 py-1">
-            {(["materi", "tugas", "kuis"] as const).map((tab) => (
+        <div className="border-t border-gray-200 dark:border-gray-800">
+          {/* Tabs */}
+          <div className="flex justify-center p-6">
+            <div className="inline-flex rounded-full border cursor-pointer border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-950 shadow-sm">
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-bold cursor-pointer transition-colors focus:outline-none ${
-                  activeTab === tab
-                    ? "bg-secondary text-white rounded-2xl"
-                    : "text-gray-600 dark:text-gray-300 hover:text-black hover:bg-gray-200 dark:hover:text-white rounded-2xl"
+                onClick={() => setActiveTab("materi")}
+                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
+                  activeTab === "materi"
+                    ? "bg-primary text-white"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
-                {tab === "materi" ? `Materi (${materials.length})` : tab === "tugas" ? `Tugas (${assignments.length})` : `Kuis (${quizzes.length})`}
+                Materi ({materials.length})
               </button>
-            ))}
+              <button
+                onClick={() => setActiveTab("tugas")}
+                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
+                  activeTab === "tugas"
+                    ? "bg-primary text-white"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                Tugas ({assignments.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("kuis")}
+                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
+                  activeTab === "kuis"
+                    ? "bg-primary text-white"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                Kuis ({quizzes.length})
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-3">
-            {itemsByTab[activeTab].length > 0 ? (
-              itemsByTab[activeTab].map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => navigate(item.path)}
-                  className="w-full text-left flex items-center justify-between gap-4 p-4 rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] text-white grid place-items-center font-semibold">
-                      {item.number}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-xl">{item.title}</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{item.subtitle}</p>
-                    </div>
+          {/* Tab Content */}
+          <div className="p-6">
+            {/* Materi */}
+            {activeTab === "materi" && (
+              <div>
+                {meetings.length > 0 ? (
+                  <div className="space-y-2">
+                    {meetings.map((meeting) => (
+                      <div key={meeting}>
+                        <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          Pertemuan {meeting}
+                        </div>
+                        {materialsByMeeting[meeting].map((material) => (
+                          <div
+                            key={material.id}
+                            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors mb-2 cursor-pointer"
+                            onClick={() => navigate(`/material/${material.id}`)}
+                          >
+                            <div className="flex-1">
+                              <h5 className="font-semibold mb-1">
+                                {material.title}
+                              </h5>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {material.description}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {material.files?.length || 0} files
+                                </Badge>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/material/${material.id}`);
+                              }}
+                            >
+                              Lihat Materi
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-right text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                    <div>{item.badge}</div>
-                    {item.extra ? <div>{item.extra}</div> : null}
+                ) : (
+                  <p className="text-center text-gray-500 py-4">
+                    Tidak ada materi di tingkatan ini
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Tugas */}
+            {activeTab === "tugas" && (
+              <div>
+                {assignments.length > 0 ? (
+                  <div className="space-y-2">
+                    {assignments.map((assignment) => (
+                      <div
+                        key={assignment.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                        onClick={() => navigate(`/assignment/${assignment.id}`)}
+                      >
+                        <div className="flex-1">
+                          <h5 className="font-semibold mb-1">
+                            {assignment.title}
+                          </h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            {assignment.description}
+                          </p>
+                          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                            <span>Pertemuan {assignment.meetingNumber}</span>
+                            {assignment.dueDate && (
+                              <>
+                                <span>•</span>
+                                <span>
+                                  Due:{" "}
+                                  {new Date(
+                                    assignment.dueDate,
+                                  ).toLocaleDateString("id-ID")}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/assignment/${assignment.id}`);
+                          }}
+                        >
+                          Kerjakan
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                </button>
-              ))
-            ) : (
-              <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-950 rounded-3xl border border-gray-200 dark:border-gray-800">
-                Tidak ada konten di tab ini.
+                ) : (
+                  <p className="text-center text-gray-500 py-4">
+                    Tidak ada tugas di tingkatan ini
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Kuis */}
+            {activeTab === "kuis" && (
+              <div>
+                {quizzes.length > 0 ? (
+                  <div className="space-y-2">
+                    {quizzes.map((quiz) => (
+                      <div
+                        key={quiz.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                        onClick={() => navigate(`/quiz/${quiz.id}`)}
+                      >
+                        <div className="flex-1">
+                          <h5 className="font-semibold mb-1">{quiz.title}</h5>
+                          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                            <span>Pertemuan {quiz.meetingNumber}</span>
+                            {quiz.duration && (
+                              <>
+                                <span>•</span>
+                                <span>{quiz.duration} menit</span>
+                              </>
+                            )}
+                            {quiz.questions && quiz.questions.length > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{quiz.questions.length} soal</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/quiz/${quiz.id}`);
+                          }}
+                        >
+                          Mulai Kuis
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 py-4">
+                    Tidak ada kuis di tingkatan ini
+                  </p>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Locked Message */}
+      {/* Locked */}
       {isLocked && (
         <div className="border-t border-gray-200 dark:border-gray-800 p-6 text-center">
           <Lock className="h-8 w-8 mx-auto text-gray-400 mb-2" />
           <p className="text-gray-600 dark:text-gray-400">
-            Selesaikan tingkatan sebelumnya untuk membuka akses ke tingkatan ini.
+            Complete previous level to unlock this content
           </p>
         </div>
       )}

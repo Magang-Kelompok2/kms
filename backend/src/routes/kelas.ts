@@ -101,7 +101,7 @@ router.get("/:classId/levels", async (req, res) => {
     if (e2) throw e2;
     if (e3) throw e3;
 
-    const levels = (tingkatanList ?? []).map((tingkatan, index) => {
+    const levels = (tingkatanList ?? []).map((tingkatan) => {
       const materiDiTingkatan = (materiList ?? []).filter(
         (m) => m.id_tingkatan === tingkatan.id_tingkatan,
       );
@@ -155,12 +155,13 @@ router.get("/:classId/levels", async (req, res) => {
           id: String(t.id_tugas),
           title: t.nama_tugas ?? "",
           description: t.deskripsi ?? "",
+          dueDate: t.deadline ?? t.created_at,
           classId: String(classId),
           meetingNumber: t.pertemuan,
           level: tingkatan.id_tingkatan,
           materialId: String(t.id_materi),
           isPublished: true,
-          duration: 0,
+          type: t.type ?? "",
         }));
 
       return {

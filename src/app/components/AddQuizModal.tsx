@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { X, Plus, Trash2, Clock } from "lucide-react";
-import { useAddKuis } from "../hooks/useAddKuis";
 
 interface MateriOption {
   id_materi: number;
@@ -20,7 +19,7 @@ interface Question {
   id: string;
   question: string;
   options: string[];
-  correctAnswer: number;
+  correctAnswer: number; // 0=A, 1=B, 2=C, 3=D
 }
 
 export function AddQuizModal({
@@ -33,16 +32,16 @@ export function AddQuizModal({
   const [title, setTitle] = useState("");
   const [meetingNumber, setMeetingNumber] = useState("");
   const [duration, setDuration] = useState("");
+  const [deadline, setDeadline] = useState("");
   const [numberOfQuestions, setNumberOfQuestions] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [selectedMateriId, setSelectedMateriId] = useState<number | "">("");
   const [materiOptions, setMateriOptions] = useState<MateriOption[]>([]);
   const [materiLoading, setMateriLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { addKuis, loading, error } = useAddKuis();
-
-  // Fetch daftar materi berdasarkan classId & level
   useEffect(() => {
     if (!isOpen || !classId) return;
     const fetchMateri = async () => {
@@ -122,7 +121,20 @@ export function AddQuizModal({
     setNumberOfQuestions((questions.length + 1).toString());
   };
 
+  const resetForm = () => {
+    setTitle("");
+    setMeetingNumber("");
+    setDuration("");
+    setDeadline("");
+    setNumberOfQuestions("");
+    setQuestions([]);
+    setShowQuestionForm(false);
+    setSelectedMateriId("");
+    setError(null);
+  };
+
   const handleSubmit = async () => {
+    // FIX: deadline dihapus dari validasi wajib
     if (!title || !meetingNumber || !duration) {
       alert("Mohon lengkapi semua field yang wajib diisi");
       return;
@@ -151,45 +163,89 @@ export function AddQuizModal({
       }
     }
 
-    await addKuis({
-      nama_tugas: title,
-      deskripsi: `Durasi: ${duration} menit | ${questions.length} soal`,
-      id_materi: Number(selectedMateriId),
-      id_kelas: Number(classId),
-      pertemuan: parseInt(meetingNumber),
-    });
+    setLoading(true);
+    setError(null);
 
-    onAdd({
-      id: `quiz-${Date.now()}`,
-      title,
-      classId,
-      meetingNumber: parseInt(meetingNumber),
-      level,
-      duration: parseInt(duration),
-      isPublished: true,
-      questions: questions.map((q) => ({
-        id: q.id,
-        question: q.question,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-      })),
-    });
+    try {
+      // 1. Simpan kuis ke tabel tugas
+      const kuisRes = await fetch(`${import.meta.env.VITE_API_URL}/api/tugas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nama_tugas: title,
+          deskripsi: "",
+          type: "Kuis",
+          id_materi: Number(selectedMateriId),
+          id_kelas: Number(classId),
+          pertemuan: parseInt(meetingNumber),
+          // FIX: deadline null jika tidak diisi
+          deadline: deadline ? new Date(deadline).toISOString() : null,
+          durasi: parseInt(duration),
+        }),
+      });
+      const kuisJson = await kuisRes.json();
+      if (!kuisJson.success)
+        throw new Error(kuisJson.error ?? "Gagal menyimpan kuis");
 
-    setTitle("");
-    setMeetingNumber("");
-    setDuration("");
-    setNumberOfQuestions("");
-    setQuestions([]);
-    setShowQuestionForm(false);
-    setSelectedMateriId("");
-    onClose();
+      const id_tugas = kuisJson.data.id_tugas;
+
+      // 2. Simpan soal-soal ke tabel soal_kuis
+      const opsiMap = ["a", "b", "c", "d"];
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const soalRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/kuis/${id_tugas}/soal`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              pertanyaan: q.question,
+              opsi_a: q.options[0],
+              opsi_b: q.options[1],
+              opsi_c: q.options[2],
+              opsi_d: q.options[3],
+              jawaban_benar: opsiMap[q.correctAnswer],
+              urutan: i + 1,
+            }),
+          },
+        );
+        const soalJson = await soalRes.json();
+        if (!soalJson.success) throw new Error(`Gagal menyimpan soal ${i + 1}`);
+      }
+
+      // 3. Update local state
+      onAdd({
+        id: String(id_tugas),
+        title,
+        classId,
+        meetingNumber: parseInt(meetingNumber),
+        level,
+        duration: parseInt(duration),
+        // FIX: dueDate null jika deadline tidak diisi
+        dueDate: deadline ? new Date(deadline).toISOString() : null,
+        isPublished: true,
+        questions: questions.map((q) => ({
+          id: q.id,
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+        })),
+      });
+
+      resetForm();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between z-10">
-          <h2 className="text-2xl font-normal">Tambah Kuis - Level {level}</h2>
+          <h2 className="text-2xl font-bold">Tambah Kuis - Level {level}</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
@@ -207,7 +263,7 @@ export function AddQuizModal({
 
           {/* Pilih Materi */}
           <div>
-            <label className="block text-sm font-normal mb-2">
+            <label className="block text-sm font-semibold mb-2">
               Materi Terkait <span className="text-red-500">*</span>
             </label>
             {materiLoading ? (
@@ -236,21 +292,21 @@ export function AddQuizModal({
           <div className="space-y-6">
             {/* Title */}
             <div>
-              <label className="block text-sm font-normal mb-2">
+              <label className="block text-sm font-semibold mb-2">
                 Judul Kuis <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Contoh: Kuis: Dasar-dasar Perpajakan"
+                placeholder="Contoh: Kuis Dasar-dasar Perpajakan"
                 className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-normal mb-2">
+                <label className="block text-sm font-semibold mb-2">
                   Pertemuan Ke- <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -263,7 +319,7 @@ export function AddQuizModal({
                 />
               </div>
               <div>
-                <label className="block text-sm font-normal mb-2">
+                <label className="block text-sm font-semibold mb-2">
                   Durasi (menit) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -278,21 +334,39 @@ export function AddQuizModal({
                   <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-normal mb-2">
-                  Jumlah Soal <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={numberOfQuestions}
-                  onChange={(e) => setNumberOfQuestions(e.target.value)}
-                  placeholder="10"
-                  min="1"
-                  max="50"
-                  disabled={showQuestionForm}
-                  className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 disabled:opacity-50"
-                />
-              </div>
+            </div>
+
+            {/* FIX: Deadline opsional */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Deadline{" "}
+                <span className="text-gray-400 text-xs font-normal">
+                  (opsional)
+                </span>
+              </label>
+              <input
+                type="datetime-local"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+              />
+            </div>
+
+            {/* Jumlah soal */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Jumlah Soal <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={numberOfQuestions}
+                onChange={(e) => setNumberOfQuestions(e.target.value)}
+                placeholder="10"
+                min="1"
+                max="50"
+                disabled={showQuestionForm}
+                className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 disabled:opacity-50"
+              />
             </div>
 
             {!showQuestionForm && numberOfQuestions && (
@@ -309,7 +383,7 @@ export function AddQuizModal({
           {showQuestionForm && questions.length > 0 && (
             <div className="space-y-6 border-t pt-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-normal">Soal-Soal Kuis</h3>
+                <h3 className="text-xl font-bold">Soal-Soal Kuis</h3>
                 <Button onClick={addQuestion} variant="outline" size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Tambah Soal
@@ -322,7 +396,7 @@ export function AddQuizModal({
                   className="border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-4"
                 >
                   <div className="flex items-start justify-between">
-                    <h4 className="font-normal text-lg">Soal {qIndex + 1}</h4>
+                    <h4 className="font-bold text-lg">Soal {qIndex + 1}</h4>
                     {questions.length > 1 && (
                       <button
                         onClick={() => removeQuestion(qIndex)}
@@ -333,7 +407,7 @@ export function AddQuizModal({
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-normal mb-2">
+                    <label className="block text-sm font-semibold mb-2">
                       Pertanyaan <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -346,7 +420,7 @@ export function AddQuizModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-normal mb-3">
+                    <label className="block text-sm font-semibold mb-3">
                       Pilihan Jawaban <span className="text-red-500">*</span>
                     </label>
                     <div className="space-y-3">
@@ -362,7 +436,7 @@ export function AddQuizModal({
                             className="w-5 h-5 text-blue-600"
                           />
                           <div className="flex-1 flex items-center gap-2">
-                            <span className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded font-normal text-sm">
+                            <span className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded font-semibold text-sm">
                               {String.fromCharCode(65 + oIndex)}
                             </span>
                             <input

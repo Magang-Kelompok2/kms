@@ -11,7 +11,7 @@ import type { Material as MaterialType } from "../types";
 
 export function MaterialViewPage() {
   const { materialId } = useParams();
-  const { user, token } = useAuth(); // ← tambah token
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [completedFiles, setCompletedFiles] = useState<string[]>([]);
@@ -25,12 +25,13 @@ export function MaterialViewPage() {
   const [userLevel, setUserLevel] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  // 1. Fetch material
+  // ── 1. Fetch material ──────────────────────────────────────────
   useEffect(() => {
     const fetchMaterial = async () => {
       if (!materialId) return;
       setMaterialLoading(true);
       setError(null);
+
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/materials/${materialId}`,
@@ -41,23 +42,35 @@ export function MaterialViewPage() {
         setMaterial(json.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+        // FIX: Jika material gagal di-fetch, progress tidak perlu di-fetch juga
+        setProgressLoading(false);
       } finally {
         setMaterialLoading(false);
       }
     };
+
     fetchMaterial();
   }, [materialId]);
 
-  // 2. Fetch progress — tunggu material & token tersedia
+  // ── 2. Fetch progress ──────────────────────────────────────────
   useEffect(() => {
-    if (!material?.classId) return;
+    // FIX: Jika material belum ada (termasuk jika classId tidak ada),
+    // langsung set progressLoading false agar tidak stuck loading selamanya.
+    if (!material) return;
 
+    if (!material.classId) {
+      // classId tidak ada — tidak bisa fetch progress, anggap level 1
+      setProgressLoading(false);
+      return;
+    }
+
+    // Superadmin tidak butuh progress
     if (user?.role === "superadmin") {
       setProgressLoading(false);
       return;
     }
 
-    if (!user?.id || !token) {
+    if (!user?.id) {
       setProgressLoading(false);
       return;
     }
@@ -66,37 +79,48 @@ export function MaterialViewPage() {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${material.classId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` }, // ← kirim token
-          }
         );
-        if (!res.ok) return;
+
+        // FIX: Jika 404 atau error lain (user belum punya progress),
+        // default userLevel = 1 sehingga materi level 1 tetap bisa diakses.
+        if (!res.ok) {
+          setUserLevel(1);
+          return;
+        }
+
         const json = await res.json();
-        setUserLevel(json.data?.tingkatanSaatIni ?? 1);
-        const completedMaterials: string[] = json.data?.completedMaterials ?? [];
+
+        // FIX: Fallback eksplisit ke 1 jika data tidak ada
+        const level = json.data?.tingkatanSaatIni;
+        setUserLevel(typeof level === "number" && level >= 1 ? level : 1);
+
+        const completedMaterials: string[] =
+          json.data?.completedMaterials ?? [];
         if (materialId && completedMaterials.includes(materialId)) {
           setIsCompleted(true);
         }
       } catch {
-        // default level 1
+        // Gagal fetch progress → default level 1 agar tidak langsung ditolak
+        setUserLevel(1);
       } finally {
         setProgressLoading(false);
       }
     };
 
     fetchProgress();
-  }, [material?.classId, user?.id, user?.role, materialId, token]);
+  }, [material, user?.id, user?.role, materialId]);
 
-  // 3. Auto-select file pertama
+  // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
     if (material && material.files.length > 0 && !selectedFile) {
       setSelectedFile(material.files[0].id);
     }
   }, [material, selectedFile]);
 
+  // ── Loading state ──────────────────────────────────────────────
   if (materialLoading || progressLoading) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <p className="text-gray-500">Memuat materi...</p>
@@ -124,14 +148,21 @@ export function MaterialViewPage() {
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
-            <p className="text-red-500">Materi tidak ditemukan</p>
+            <p className="text-red-500">Material tidak ditemukan</p>
           </Card>
         </div>
       </div>
     );
   }
 
-  const hasAccess = user?.role === "superadmin" || material.level <= userLevel;
+  // ── Cek akses ──────────────────────────────────────────────────
+  // FIX: Jika material.level tidak terdefinisi/null, anggap level 1
+  const materialLevel =
+    typeof material.level === "number" && material.level >= 1
+      ? material.level
+      : 1;
+
+  const hasAccess = user?.role === "superadmin" || materialLevel <= userLevel;
 
   if (!hasAccess) {
     return (
@@ -142,7 +173,8 @@ export function MaterialViewPage() {
             <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
             <p className="text-gray-600 dark:text-gray-400">
               Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
-              materi ini.
+              materi ini. (Level materi: {materialLevel}, Level kamu:{" "}
+              {userLevel})
             </p>
             <Button onClick={() => navigate("/dashboard")} className="mt-4">
               Kembali ke Dashboard
@@ -168,7 +200,7 @@ export function MaterialViewPage() {
   const selectedFileData = material.files.find((f) => f.id === selectedFile);
 
   return (
-    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <DashboardHeader />
 
       <div className="container mx-auto px-4 md:px-6 py-6">
@@ -182,7 +214,7 @@ export function MaterialViewPage() {
         </Button>
 
         <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-180px)]">
-          {/* Left Sidebar */}
+          {/* ── Left Sidebar ── */}
           <div className="w-full lg:w-96 shrink-0">
             <Card className="h-full overflow-y-auto">
               <div className="p-5 border-b sticky top-0 bg-white dark:bg-gray-900 z-10">
@@ -193,6 +225,7 @@ export function MaterialViewPage() {
               </div>
 
               <div className="p-4 space-y-5">
+                {/* Video */}
                 {videoFiles.length > 0 && (
                   <div>
                     <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-red-600 dark:text-red-400">
@@ -206,12 +239,18 @@ export function MaterialViewPage() {
                           className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
                             selectedFile === file.id
                               ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                              : "border-gray-200 dark:border-gray-700 hover:border-red-300"
+                              : "border-gray-200 dark:border-gray-700 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50/50 dark:hover:bg-red-900/10"
                           }`}
                           onClick={() => setSelectedFile(file.id)}
                         >
                           <div className="flex items-start gap-3">
-                            <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-red-100 dark:bg-red-900/20">
+                            <div
+                              className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
+                                selectedFile === file.id
+                                  ? "bg-red-200 dark:bg-red-800/40"
+                                  : "bg-red-100 dark:bg-red-900/20"
+                              }`}
+                            >
                               <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -234,6 +273,7 @@ export function MaterialViewPage() {
                   </div>
                 )}
 
+                {/* PDF */}
                 {pdfFiles.length > 0 && (
                   <div>
                     <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
@@ -247,12 +287,18 @@ export function MaterialViewPage() {
                           className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
                             selectedFile === file.id
                               ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                              : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
+                              : "border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-900/10"
                           }`}
                           onClick={() => setSelectedFile(file.id)}
                         >
                           <div className="flex items-start gap-3">
-                            <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-blue-100 dark:bg-blue-900/20">
+                            <div
+                              className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
+                                selectedFile === file.id
+                                  ? "bg-blue-200 dark:bg-blue-800/40"
+                                  : "bg-blue-100 dark:bg-blue-900/20"
+                              }`}
+                            >
                               <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -278,9 +324,10 @@ export function MaterialViewPage() {
             </Card>
           </div>
 
-          {/* Right Content */}
+          {/* ── Right Content ── */}
           <div className="flex-1 min-w-0">
             <div className="h-full flex flex-col gap-6">
+              {/* Header */}
               <Card className="p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -289,7 +336,7 @@ export function MaterialViewPage() {
                         Pertemuan {material.meetingNumber}
                       </Badge>
                       <Badge variant="outline" className="text-sm">
-                        Level {material.level}
+                        Level {materialLevel}
                       </Badge>
                       {isCompleted && (
                         <Badge variant="default" className="text-sm">
@@ -298,7 +345,9 @@ export function MaterialViewPage() {
                         </Badge>
                       )}
                     </div>
-                    <h1 className="text-3xl font-normal mb-2">{material.title}</h1>
+                    <h1 className="text-3xl font-normal mb-2">
+                      {material.title}
+                    </h1>
                     <p className="text-base text-gray-600 dark:text-gray-400">
                       {material.description}
                     </p>
@@ -306,7 +355,8 @@ export function MaterialViewPage() {
                 </div>
               </Card>
 
-              {selectedFile && selectedFileData ? (
+              {/* Viewer */}
+              {selectedFile && selectedFileData && (
                 <Card className="flex-1 p-6 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -324,9 +374,12 @@ export function MaterialViewPage() {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-lg font-normal">{selectedFileData.name}</h3>
+                        <h3 className="text-lg font-normal">
+                          {selectedFileData.name}
+                        </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                          {selectedFileData.type} • {selectedFileData.duration || "View Only"}
+                          {selectedFileData.type} •{" "}
+                          {selectedFileData.duration || "View Only"}
                         </p>
                       </div>
                     </div>
@@ -355,8 +408,9 @@ export function MaterialViewPage() {
                     )}
                   </div>
                 </Card>
-              ) : null}
+              )}
 
+              {/* Completion banner */}
               {allFilesCompleted && !isCompleted && (
                 <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
                   <div className="flex items-center justify-between">
@@ -371,7 +425,9 @@ export function MaterialViewPage() {
                         </p>
                       </div>
                     </div>
-                    <Button onClick={() => navigate(`/class/${material.classId}`)}>
+                    <Button
+                      onClick={() => navigate(`/class/${material.classId}`)}
+                    >
                       Lanjut ke Kuis
                     </Button>
                   </div>

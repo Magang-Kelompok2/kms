@@ -1,79 +1,173 @@
-import { Router } from "express";
+// backend/src/routes/upload.ts
+import { Router, Request, Response } from "express";
 import multer from "multer";
-import { supabase } from "../lib/supabase";
 import { minioClient, BUCKET } from "../lib/minio";
+import { supabase } from "../lib/supabase";
+import { v4 as uuidv4 } from "uuid";
+import path from "path";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
-// POST /api/upload
-router.post("/", upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file)
+// Multer — simpan di memory, bukan disk
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+});
+
+// ── Helper: upload buffer ke MinIO ────────────────────────────────────────
+async function uploadToMinio(
+  buffer: Buffer,
+  originalName: string,
+  folder: string,
+  mimetype: string,
+): Promise<{ objectKey: string; url: string }> {
+  const ext = path.extname(originalName);
+  const objectKey = `${folder}/${uuidv4()}${ext}`;
+
+  await minioClient.putObject(BUCKET, objectKey, buffer, buffer.length, {
+    "Content-Type": mimetype,
+  });
+
+  // Buat presigned URL yang berlaku 7 hari (untuk akses user)
+  const url = await minioClient.presignedGetObject(
+    BUCKET,
+    objectKey,
+    7 * 24 * 60 * 60,
+  );
+
+  return { objectKey, url };
+}
+
+// ── POST /api/upload/materi-file ──────────────────────────────────────────
+// Upload PDF atau video untuk materi, simpan metadata ke tabel pdf/video
+// Body (multipart): file, type ("pdf"|"video"), id_materi, title
+router.post(
+  "/materi-file",
+  upload.single("file"),
+  async (req: Request, res: Response) => {
+    const file = req.file;
+    if (!file)
       return res
         .status(400)
-        .json({ success: false, error: "No file uploaded" });
+        .json({ success: false, error: "File tidak ditemukan" });
 
-    const { title, deskripsi, type, id_kelas, id_tingkatan, pertemuan } =
-      req.body;
-    const filename = `materi/${Date.now()}-${req.file.originalname}`;
-    const kelasId = id_kelas ? Number(id_kelas) : null;
-    const tingkatanId = id_tingkatan ? Number(id_tingkatan) : null;
-    const pertemuanNum = pertemuan ? Number(pertemuan) : 1;
+    const { type, id_materi, title } = req.body;
+    if (!type || !id_materi) {
+      return res
+        .status(400)
+        .json({ success: false, error: "type dan id_materi wajib diisi" });
+    }
 
-    // Upload ke MinIO
-    await minioClient.putObject(BUCKET, filename, req.file.buffer);
+    try {
+      const folder = type === "video" ? "videos" : "pdfs";
+      const { objectKey, url } = await uploadToMinio(
+        file.buffer,
+        file.originalname,
+        folder,
+        file.mimetype,
+      );
 
-    // Simpan materi ke Supabase
-    const { data: materi, error: materiError } = await supabase
-      .from("materi")
-      .insert({
-        title_materi: title,
-        deskripsi: deskripsi ?? null,
-        materi_path: filename,
-        id_kelas: kelasId,
-        id_tingkatan: tingkatanId,
-        pertemuan: pertemuanNum,
-      })
-      .select()
-      .single();
+      // Simpan metadata ke DB
+      if (type === "pdf") {
+        const { data, error } = await supabase
+          .from("pdf")
+          .insert({
+            id_materi: Number(id_materi),
+            title_pdf: title ?? file.originalname,
+            pdf_path: url,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return res.json({ success: true, data: { ...data, objectKey } });
+      } else {
+        const { data, error } = await supabase
+          .from("video")
+          .insert({
+            id_materi: Number(id_materi),
+            title_video: title ?? file.originalname,
+            video_path: url,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return res.json({ success: true, data: { ...data, objectKey } });
+      }
+    } catch (err: any) {
+      console.error("Error uploading materi file:", err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message ?? "Upload gagal" });
+    }
+  },
+);
 
-    if (materiError) throw materiError;
+// ── POST /api/upload/tugas-file ───────────────────────────────────────────
+// Upload file pengumpulan tugas oleh user
+// Body (multipart): file
+// Returns: id_file + url (untuk disimpan saat submit pengumpulan)
+router.post(
+  "/tugas-file",
+  upload.single("file"),
+  async (req: Request, res: Response) => {
+    const file = req.file;
+    if (!file)
+      return res
+        .status(400)
+        .json({ success: false, error: "File tidak ditemukan" });
 
-    if (type === "video") {
-      const { data: video, error: videoError } = await supabase
-        .from("video")
+    try {
+      const { objectKey, url } = await uploadToMinio(
+        file.buffer,
+        file.originalname,
+        "pengumpulan",
+        file.mimetype,
+      );
+
+      // Simpan metadata ke tabel file_pengumpulan
+      const { data, error } = await supabase
+        .from("file_pengumpulan")
         .insert({
-          id_materi: materi.id_materi,
-          title_video: title,
-          video_path: filename,
+          bucket_name: BUCKET,
+          object_key: objectKey,
+          ukuran_file: file.size,
+          original_filename: file.originalname,
         })
         .select()
         .single();
 
-      if (videoError) throw videoError;
-      return res.json({ success: true, materi, video });
+      if (error) throw error;
+
+      return res.json({ success: true, data: { ...data, url } });
+    } catch (err: any) {
+      console.error("Error uploading tugas file:", err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message ?? "Upload gagal" });
     }
+  },
+);
 
-    if (type === "pdf") {
-      const { data: pdf, error: pdfError } = await supabase
-        .from("pdf")
-        .insert({
-          title_pdf: title,
-          pdf_path: filename,
-          id_materi: materi.id_materi,
-        })
-        .select()
-        .single();
+// ── GET /api/upload/signed-url ────────────────────────────────────────────
+// Generate fresh presigned URL dari objectKey (untuk refresh URL yang expired)
+// Query: ?key=pdfs/xxx.pdf
+router.get("/signed-url", async (req: Request, res: Response) => {
+  const { key } = req.query;
+  if (!key || typeof key !== "string") {
+    return res.status(400).json({ success: false, error: "key wajib diisi" });
+  }
 
-      if (pdfError) throw pdfError;
-      return res.json({ success: true, materi, pdf });
-    }
-
-    res.json({ success: true, materi });
-  } catch (error) {
-    console.error("Upload error:", error);
-    res.status(500).json({ success: false, error: "Upload failed" });
+  try {
+    const url = await minioClient.presignedGetObject(
+      BUCKET,
+      key,
+      7 * 24 * 60 * 60,
+    );
+    return res.json({ success: true, url });
+  } catch (err: any) {
+    return res
+      .status(500)
+      .json({ success: false, error: err?.message ?? "Gagal generate URL" });
   }
 });
 

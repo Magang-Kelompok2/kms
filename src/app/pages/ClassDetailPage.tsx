@@ -52,12 +52,36 @@ export function ClassDetailPage() {
     error: levelsError,
   } = useLevels(classId);
 
-  // State untuk admin
+  // State untuk admin — localState sebagai optimistic update
+  // setelah tambah konten, useLevels akan di-refetch
   const [localMaterials, setLocalMaterials] = useState<Material[]>([]);
   const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
   const [localQuizzes, setLocalQuizzes] = useState<Quiz[]>([]);
 
-  const userLevel = 1; // nanti sambungkan ke API progress user
+  // Fetch userLevel dari API progress
+  const [userLevel, setUserLevel] = useState(1);
+
+  useEffect(() => {
+    if (!user?.id || !classId) return;
+
+    // Superadmin tidak butuh progress, skip
+    if (user.role === "superadmin") return;
+
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${classId}`,
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        setUserLevel(json.data.tingkatanSaatIni ?? 1);
+      } catch {
+        // kalau gagal, default tetap 1
+      }
+    };
+
+    fetchProgress();
+  }, [user?.id, user?.role, classId]);
 
   const canAccessLevel = (level: number) => {
     if (user?.role === "superadmin") return true;

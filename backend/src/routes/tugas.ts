@@ -9,7 +9,7 @@ router.get("/", async (_req, res) => {
     const { data, error } = await supabase
       .from("tugas")
       .select(
-        "id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas, pertemuan, deadline, created_at",
+        "id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas, pertemuan, deadline, durasi, created_at",
       )
       .order("id_tugas", { ascending: true });
 
@@ -34,13 +34,15 @@ router.get("/:tugasId", async (req, res) => {
       .from("tugas")
       .select(
         `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
-         pertemuan, deadline, created_at,
-         materi!inner(id_tingkatan, pertemuan)`,
+         pertemuan, deadline, durasi, created_at,
+         materi(id_tingkatan, pertemuan)`,
       )
       .eq("id_tugas", tugasId)
       .single();
 
     if (error) throw error;
+
+    const level = (data.materi as any)?.id_tingkatan ?? 1;
 
     res.json({
       success: true,
@@ -50,9 +52,10 @@ router.get("/:tugasId", async (req, res) => {
         description: data.deskripsi ?? "",
         dueDate: data.deadline ?? data.created_at,
         classId: String(data.id_kelas),
-        level: (data.materi as any)?.id_tingkatan ?? 1,
         meetingNumber: data.pertemuan,
         type: data.type ?? "",
+        level,
+        durasi: data.durasi ?? 60, // ← tambah
         materialId: String(data.id_materi),
         isPublished: true,
         attachments: [],
@@ -65,16 +68,16 @@ router.get("/:tugasId", async (req, res) => {
 });
 
 // POST /api/tugas
-// Tambah tugas baru
 router.post("/", async (req, res) => {
   const {
     nama_tugas,
     deskripsi,
-    type, // Ini yang dikirim dari frontend ("kuis")
+    type,
     id_materi,
     id_kelas,
     pertemuan,
     deadline,
+    durasi, // ← tambah
   } = req.body;
 
   if (!nama_tugas || !id_materi || !id_kelas)
@@ -84,8 +87,6 @@ router.post("/", async (req, res) => {
     });
 
   try {
-    // TAMBAHKAN LOGIKA PROTEKSI DI SINI
-    // Jika type yang masuk adalah "kuis", paksa jadi "Kuis"
     const validatedType = type?.toLowerCase() === "kuis" ? "Kuis" : type;
 
     const { data, error } = await supabase
@@ -93,11 +94,12 @@ router.post("/", async (req, res) => {
       .insert({
         nama_tugas,
         deskripsi: deskripsi ?? null,
-        type: validatedType, // Gunakan variabel yang sudah divalidasi
+        type: validatedType,
         id_materi: Number(id_materi),
         id_kelas: Number(id_kelas),
         pertemuan: pertemuan ? Number(pertemuan) : 1,
         deadline: deadline ?? null,
+        durasi: durasi ? Number(durasi) : 60, // ← tambah
       })
       .select()
       .single();
@@ -110,7 +112,7 @@ router.post("/", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to create tugas",
-      detail: error.message, // Ini biar kamu bisa lihat pesan error aslinya di response
+      detail: error.message,
     });
   }
 });
