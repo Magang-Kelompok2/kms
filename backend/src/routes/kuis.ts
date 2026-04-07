@@ -4,7 +4,6 @@ import { supabase } from "../lib/supabase";
 const router = Router();
 
 // ── POST /api/kuis/:tugasId/soal ───────────────────────────────────────────
-// Simpan satu soal untuk kuis (dipanggil dari AddQuizModal)
 router.post("/:tugasId/soal", async (req, res) => {
   const tugasId = Number(req.params.tugasId);
   if (isNaN(tugasId))
@@ -16,10 +15,9 @@ router.post("/:tugasId/soal", async (req, res) => {
     req.body;
 
   if (!pertanyaan || !opsi_a || !opsi_b || !opsi_c || !opsi_d || !jawaban_benar)
-    return res.status(400).json({
-      success: false,
-      error: "Semua field soal wajib diisi",
-    });
+    return res
+      .status(400)
+      .json({ success: false, error: "Semua field soal wajib diisi" });
 
   try {
     const { data: tugas, error: tugasError } = await supabase
@@ -54,20 +52,20 @@ router.post("/:tugasId/soal", async (req, res) => {
       .single();
 
     if (error) throw error;
-
     res.status(201).json({ success: true, data });
   } catch (error: any) {
     console.error("Error creating soal:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to create soal",
-      detail: error?.message ?? error,
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: "Failed to create soal",
+        detail: error?.message ?? error,
+      });
   }
 });
 
 // ── GET /api/kuis/:tugasId/soal ────────────────────────────────────────────
-// Ambil semua soal untuk kuis (tanpa jawaban_benar agar tidak bocor ke user)
 router.get("/:tugasId/soal", async (req, res) => {
   const tugasId = Number(req.params.tugasId);
   if (isNaN(tugasId))
@@ -78,7 +76,6 @@ router.get("/:tugasId/soal", async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("soal_kuis")
-      // Tidak select jawaban_benar agar tidak bocor ke frontend
       .select(
         "id_soal, id_tugas, pertanyaan, opsi_a, opsi_b, opsi_c, opsi_d, urutan",
       )
@@ -86,7 +83,6 @@ router.get("/:tugasId/soal", async (req, res) => {
       .order("urutan", { ascending: true });
 
     if (error) throw error;
-
     res.json({ success: true, data: data ?? [] });
   } catch (error: any) {
     console.error("Error fetching soal:", error);
@@ -95,7 +91,6 @@ router.get("/:tugasId/soal", async (req, res) => {
 });
 
 // ── GET /api/kuis/:tugasId/hasil/:userId ──────────────────────────────────
-// Cek apakah user sudah pernah mengerjakan kuis & ambil skornya
 router.get("/:tugasId/hasil/:userId", async (req, res) => {
   const tugasId = Number(req.params.tugasId);
   const userId = Number(req.params.userId);
@@ -117,9 +112,8 @@ router.get("/:tugasId/hasil/:userId", async (req, res) => {
 
     if (error) throw error;
 
-    if (!data) {
+    if (!data)
       return res.json({ success: true, sudahMengerjakan: false, data: null });
-    }
 
     res.json({
       success: true,
@@ -138,8 +132,6 @@ router.get("/:tugasId/hasil/:userId", async (req, res) => {
 });
 
 // ── POST /api/kuis/:tugasId/submit ────────────────────────────────────────
-// Submit jawaban, hitung skor, simpan ke hasil_kuis
-// Body: { id_user, jawaban: { [id_soal]: "a"|"b"|"c"|"d" } }
 router.post("/:tugasId/submit", async (req, res) => {
   const tugasId = Number(req.params.tugasId);
   if (isNaN(tugasId))
@@ -150,13 +142,12 @@ router.post("/:tugasId/submit", async (req, res) => {
   const { id_user, jawaban } = req.body;
 
   if (!id_user || !jawaban)
-    return res.status(400).json({
-      success: false,
-      error: "id_user dan jawaban wajib diisi",
-    });
+    return res
+      .status(400)
+      .json({ success: false, error: "id_user dan jawaban wajib diisi" });
 
   try {
-    // 1. Ambil semua soal beserta jawaban_benar
+    // 1. Ambil soal beserta jawaban benar
     const { data: soalList, error: soalError } = await supabase
       .from("soal_kuis")
       .select("id_soal, jawaban_benar")
@@ -164,10 +155,9 @@ router.post("/:tugasId/submit", async (req, res) => {
 
     if (soalError) throw soalError;
     if (!soalList || soalList.length === 0)
-      return res.status(400).json({
-        success: false,
-        error: "Kuis ini belum memiliki soal",
-      });
+      return res
+        .status(400)
+        .json({ success: false, error: "Kuis ini belum memiliki soal" });
 
     // 2. Hitung skor
     let benar = 0;
@@ -175,41 +165,58 @@ router.post("/:tugasId/submit", async (req, res) => {
 
     for (const soal of soalList) {
       const jawabanUser = jawaban[soal.id_soal];
-      if (jawabanUser?.toLowerCase() === soal.jawaban_benar?.toLowerCase()) {
+      if (jawabanUser?.toLowerCase() === soal.jawaban_benar?.toLowerCase())
         benar++;
-      }
     }
 
     const skor = Math.round((benar / total) * 100);
 
-    // 3. Simpan hasil
-    const { error: hasilError } = await supabase.from("hasil_kuis").insert({
-      id_tugas: tugasId,
-      id_user: Number(id_user),
-      skor,
-      benar,
-      total,
-      jawaban, // simpan jawaban user sebagai JSONB
-    });
+    // 3. Cek apakah sudah pernah submit
+    const { data: existing } = await supabase
+      .from("hasil_kuis")
+      .select("id_hasil")
+      .eq("id_user", Number(id_user))
+      .eq("id_tugas", tugasId)
+      .maybeSingle();
+
+    let hasilError;
+
+    if (existing) {
+      // Update hasil lama
+      const { error } = await supabase
+        .from("hasil_kuis")
+        .update({ skor, benar, total, jawaban: JSON.stringify(jawaban) })
+        .eq("id_hasil", existing.id_hasil);
+      hasilError = error;
+    } else {
+      // Insert baru
+      const { error } = await supabase.from("hasil_kuis").insert({
+        id_tugas: tugasId,
+        id_user: Number(id_user),
+        skor,
+        benar,
+        total,
+        jawaban: JSON.stringify(jawaban),
+      });
+      hasilError = error;
+    }
 
     if (hasilError) throw hasilError;
 
-    res.json({
-      success: true,
-      data: { skor, benar, total },
-    });
+    res.json({ success: true, data: { skor, benar, total } });
   } catch (error: any) {
     console.error("Error submitting kuis:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to submit kuis",
-      detail: error?.message ?? error,
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: "Failed to submit kuis",
+        detail: error?.message ?? error,
+      });
   }
 });
 
 // ── GET /api/kuis/:tugasId/hasil ──────────────────────────────────────────
-// Ambil semua hasil kuis untuk satu tugas (untuk superadmin)
 router.get("/:tugasId/hasil", async (req, res) => {
   const tugasId = Number(req.params.tugasId);
   if (isNaN(tugasId))
@@ -218,7 +225,6 @@ router.get("/:tugasId/hasil", async (req, res) => {
       .json({ success: false, error: "tugasId tidak valid" });
 
   try {
-    // Ambil hasil
     const { data: hasilList, error: hasilError } = await supabase
       .from("hasil_kuis")
       .select("id_hasil, id_user, skor, benar, total, created_at")
@@ -229,7 +235,6 @@ router.get("/:tugasId/hasil", async (req, res) => {
     if (!hasilList || hasilList.length === 0)
       return res.json({ success: true, data: [] });
 
-    // Ambil info user
     const userIds = [...new Set(hasilList.map((h) => h.id_user))];
     const { data: users, error: userError } = await supabase
       .from("user")

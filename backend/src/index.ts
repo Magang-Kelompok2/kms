@@ -1,7 +1,16 @@
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({
+  path: path.resolve(__dirname, "../.env"),
+});
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import dotenv from "dotenv";
 
 import { supabase } from "./lib/supabase";
 import { minioClient, BUCKET } from "./lib/minio";
@@ -13,8 +22,7 @@ import tugasRoutes from "./routes/tugas";
 import uploadRoutes from "./routes/upload";
 import pengumpulanRoutes from "./routes/pengumpulan"; // ← tambah ini
 import kuisRoutes from "./routes/kuis";
-
-dotenv.config();
+import authRoutes from "./routes/auth";
 
 const PORT = Number(process.env.PORT ?? 4000);
 const app = express();
@@ -33,6 +41,7 @@ app.use("/api/tugas", tugasRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/pengumpulan", pengumpulanRoutes); // ← tambah ini
 app.use("/api/kuis", kuisRoutes);
+app.use("/api/auth", authRoutes);
 
 // ─── START SERVER ─────────────────────────────────────────────────────────────
 async function start() {
