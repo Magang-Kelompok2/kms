@@ -52,7 +52,7 @@ export function UserProgressPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
       <DashboardHeader />
 
       <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
@@ -72,7 +72,7 @@ export function UserProgressPage() {
               {targetUser.name.charAt(0)}
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-normal mb-1">{targetUser.name}</h1>
+              <h1 className="text-2xl font-bold mb-1">{targetUser.name}</h1>
               <p className="text-gray-600 dark:text-gray-400 mb-3">
                 {targetUser.email}
               </p>
@@ -90,7 +90,7 @@ export function UserProgressPage() {
 
         {/* Class Progress */}
         <div className="mb-8">
-          <h2 className="text-2xl font-normal mb-4">Progres Kelas</h2>
+          <h2 className="text-2xl font-bold mb-4">Progres Kelas</h2>
           <div className="grid gap-6">
             {progress.map((p) => {
               const cls = classes.find((c) => c.id === p.classId);
@@ -100,7 +100,7 @@ export function UserProgressPage() {
                 <Card key={p.classId} className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="text-xl font-normal mb-1">{cls.name}</h3>
+                      <h3 className="text-xl font-bold mb-1">{cls.name}</h3>
                       <div className="flex items-center gap-2">
                         <Badge variant="default">
                           Tingkatan {p.currentLevel} / {cls.totalLevels}
@@ -117,7 +117,7 @@ export function UserProgressPage() {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-normal mb-2 text-base">
+                      <h4 className="font-bold mb-2 text-base">
                         Materi diselesaikan:
                       </h4>
                       {p.completedMaterials.length > 0 ? (
@@ -143,7 +143,7 @@ export function UserProgressPage() {
                     </div>
 
                     <div>
-                      <h4 className="font-normal mb-2 text-base">
+                      <h4 className="font-bold mb-2 text-base">
                         Kuis diselesaikan:
                       </h4>
                       {p.completedQuizzes.length > 0 ? (
@@ -176,7 +176,7 @@ export function UserProgressPage() {
 
         {/* Submissions */}
         <div>
-          <h2 className="text-2xl font-normal mb-4">Pengumpulan</h2>
+          <h2 className="text-2xl font-bold mb-4">Pengumpulan</h2>
           <div className="grid gap-4">
             {userSubmissions.map((submission) => {
               const cls = classes.find((c) => c.id === submission.classId);
@@ -189,7 +189,7 @@ export function UserProgressPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-normal">
+                        <h3 className="font-bold">
                           {quiz?.title || "Pengumpulan Tugas"}
                         </h3>
                         <Badge

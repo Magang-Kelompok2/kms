@@ -23,7 +23,7 @@ export function UserManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
       <DashboardHeader />
 
       <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
@@ -38,7 +38,7 @@ export function UserManagementPage() {
 
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-normal mb-2">Kelola Pengguna</h1>
+            <h1 className="text-3xl font-bold mb-2">Kelola Pengguna</h1>
             <p className="text-gray-600 dark:text-gray-400">
               Tambahkan, edit, atau hapus pengguna di platform
             </p>
@@ -66,7 +66,7 @@ export function UserManagementPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-normal text-lg">{u.name}</h3>
+                        <h3 className="font-bold text-lg">{u.name}</h3>
                         <Badge
                           variant={
                             u.role === "superadmin" ? "default" : "secondary"
@@ -89,7 +89,7 @@ export function UserManagementPage() {
 
                       {progress.length > 0 && u.role === "user" && (
                         <div className="mt-4 space-y-2">
-                          <p className="text-sm font-normal">
+                          <p className="text-sm font-bold">
                             Progres Kelas:
                           </p>
                           <div className="flex gap-2 flex-wrap">

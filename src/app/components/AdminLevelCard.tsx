@@ -98,7 +98,7 @@ export function AdminLevelCard({
                     .join("")}
             </div>
             <div className="text-left">
-              <h3 className="text-xl font-normal flex items-center gap-2">
+              <h3 className="text-xl font-bold flex items-center gap-2">
                 {namaLevel}
                 <Badge variant="secondary" className="text-xs">
                   Admin
