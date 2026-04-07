@@ -69,8 +69,9 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+  // Semua pengumpulan (tugas & kuis) pakai id_tugas karena tidak ada tabel terpisah
   {
-    path: "/submissions/:type/:itemId",
+    path: "/submissions/tugas/:tugasId",
     element: (
       <ProtectedRoute requireAdmin>
         <SubmissionListPage />

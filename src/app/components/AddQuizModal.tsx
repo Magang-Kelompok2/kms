@@ -134,8 +134,9 @@ export function AddQuizModal({
   };
 
   const handleSubmit = async () => {
-    if (!title || !meetingNumber || !duration || !deadline) {
-      alert("Mohon lengkapi semua field yang wajib diisi (termasuk deadline)");
+    // FIX: deadline dihapus dari validasi wajib
+    if (!title || !meetingNumber || !duration) {
+      alert("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
     if (!selectedMateriId) {
@@ -177,8 +178,9 @@ export function AddQuizModal({
           id_materi: Number(selectedMateriId),
           id_kelas: Number(classId),
           pertemuan: parseInt(meetingNumber),
-          deadline: new Date(deadline).toISOString(), // ← deadline dikirim
-          durasi: parseInt(duration), // ← durasi dikirim
+          // FIX: deadline null jika tidak diisi
+          deadline: deadline ? new Date(deadline).toISOString() : null,
+          durasi: parseInt(duration),
         }),
       });
       const kuisJson = await kuisRes.json();
@@ -202,7 +204,7 @@ export function AddQuizModal({
               opsi_b: q.options[1],
               opsi_c: q.options[2],
               opsi_d: q.options[3],
-              jawaban_benar: opsiMap[q.correctAnswer], // "a"|"b"|"c"|"d"
+              jawaban_benar: opsiMap[q.correctAnswer],
               urutan: i + 1,
             }),
           },
@@ -219,7 +221,8 @@ export function AddQuizModal({
         meetingNumber: parseInt(meetingNumber),
         level,
         duration: parseInt(duration),
-        dueDate: new Date(deadline).toISOString(),
+        // FIX: dueDate null jika deadline tidak diisi
+        dueDate: deadline ? new Date(deadline).toISOString() : null,
         isPublished: true,
         questions: questions.map((q) => ({
           id: q.id,
@@ -333,10 +336,13 @@ export function AddQuizModal({
               </div>
             </div>
 
-            {/* Deadline */}
+            {/* FIX: Deadline opsional */}
             <div>
               <label className="block text-sm font-semibold mb-2">
-                Deadline <span className="text-red-500">*</span>
+                Deadline{" "}
+                <span className="text-gray-400 text-xs font-normal">
+                  (opsional)
+                </span>
               </label>
               <input
                 type="datetime-local"
