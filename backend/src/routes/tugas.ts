@@ -117,4 +117,89 @@ router.post("/", async (req, res) => {
   }
 });
 
+// PUT /api/tugas/:tugasId
+router.put("/:tugasId", async (req, res) => {
+  const tugasId = Number(req.params.tugasId);
+  if (isNaN(tugasId)) {
+    return res
+      .status(400)
+      .json({ success: false, error: "tugasId harus berupa angka" });
+  }
+
+  const { nama_tugas, deskripsi, pertemuan, deadline } = req.body;
+
+  try {
+    const updateData: any = {};
+    if (nama_tugas) updateData.nama_tugas = nama_tugas;
+    if (deskripsi !== undefined) updateData.deskripsi = deskripsi;
+    if (pertemuan) updateData.pertemuan = Number(pertemuan);
+    if (deadline) updateData.deadline = deadline;
+
+    const { data, error } = await supabase
+      .from("tugas")
+      .update(updateData)
+      .eq("id_tugas", tugasId)
+      .select(
+        `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
+         pertemuan, deadline, created_at,
+         materi!inner(id_tingkatan, pertemuan)`,
+      )
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: {
+        id: String(data.id_tugas),
+        title: data.nama_tugas ?? "",
+        description: data.deskripsi ?? "",
+        dueDate: data.deadline ?? data.created_at,
+        classId: String(data.id_kelas),
+        level: (data.materi as any)?.id_tingkatan ?? 1,
+        meetingNumber: data.pertemuan,
+        type: data.type ?? "",
+        materialId: String(data.id_materi),
+        isPublished: true,
+        attachments: [],
+      },
+    });
+  } catch (error: any) {
+    console.error("Error updating tugas:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update tugas",
+      detail: error.message,
+    });
+  }
+});
+
+// DELETE /api/tugas/:tugasId
+router.delete("/:tugasId", async (req, res) => {
+  const tugasId = Number(req.params.tugasId);
+  if (isNaN(tugasId)) {
+    return res
+      .status(400)
+      .json({ success: false, error: "tugasId harus berupa angka" });
+  }
+
+  try {
+    const { error } = await supabase
+      .from("tugas")
+      .delete()
+      .eq("id_tugas", tugasId);
+
+    if (error) throw error;
+
+    res.json({ success: true, message: "Tugas deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting tugas:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete tugas",
+      detail: error.message,
+    });
+  }
+});
+
 export default router;

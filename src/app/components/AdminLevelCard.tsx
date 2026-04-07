@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { ChevronDown, ChevronUp, Plus, Eye, ClipboardList } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import type { Assignment, Quiz, Material } from "../types";
 import { AddMaterialModal } from "./AddMaterialModal";
 import { AddAssignmentModal } from "./AddAssignmentModal";
@@ -43,19 +43,42 @@ export function AdminLevelCard({
 
   const totalItems = materials.length + assignments.length + quizzes.length;
 
-  const materialsByMeeting = materials.reduce(
-    (acc, material) => {
-      const meeting = material.meetingNumber;
-      if (!acc[meeting]) acc[meeting] = [];
-      acc[meeting].push(material);
-      return acc;
-    },
-    {} as Record<number, Material[]>,
-  );
+  type TabItem = {
+    id: string;
+    type: "materi" | "tugas" | "kuis";
+    title: string;
+    subtitle: string;
+    badge: string;
+    number: number;
+    extra?: string;
+  };
 
-  const meetings = Object.keys(materialsByMeeting)
-    .map(Number)
-    .sort((a, b) => a - b);
+  const itemsByTab: Record<"materi" | "tugas" | "kuis", TabItem[]> = {
+    materi: materials.map((material) => ({
+      id: material.id,
+      type: "materi",
+      title: material.title,
+      subtitle: material.description ?? "",
+      badge: `Pertemuan ${material.meetingNumber}`,
+      number: material.meetingNumber,
+    })),
+    tugas: assignments.map((assignment) => ({
+      id: assignment.id,
+      type: "tugas",
+      title: assignment.title,
+      subtitle: assignment.description ?? "",
+      badge: `Pertemuan ${assignment.meetingNumber}`,
+      number: assignment.meetingNumber,
+    })),
+    kuis: quizzes.map((quiz) => ({
+      id: quiz.id,
+      type: "kuis",
+      title: quiz.title,
+      subtitle: quiz.description ?? "",
+      badge: `Durasi ${quiz.duration ?? (quiz as any).durasi ?? 0}m`,
+      number: quiz.meetingNumber,
+    })),
+  };
 
   return (
     <>
@@ -163,191 +186,38 @@ export function AdminLevelCard({
               </div>
             </div>
 
-            {/* Tab Content */}
-            <div>
-              {/* ── Materi ── */}
-              {activeTab === "materi" && (
-                <div>
-                  {meetings.length > 0 ? (
-                    <div className="space-y-4">
-                      {meetings.map((meeting) => (
-                        <div key={meeting}>
-                          <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            Pertemuan {meeting}
-                          </div>
-                          <div className="space-y-2">
-                            {materialsByMeeting[meeting].map((material) => (
-                              <div
-                                key={material.id}
-                                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
-                              >
-                                <div className="flex-1 min-w-0 mr-4">
-                                  <h5 className="font-semibold mb-1 truncate">
-                                    {material.title}
-                                  </h5>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-1">
-                                    {material.description}
-                                  </p>
-                                  <div className="flex items-center gap-2">
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      {material.files?.length || 0} files
-                                    </Badge>
-                                    <Badge
-                                      variant="default"
-                                      className="text-xs bg-green-600"
-                                    >
-                                      Diunggah
-                                    </Badge>
-                                  </div>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    navigate(`/material/${material.id}`)
-                                  }
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  Lihat
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
+            <div className="space-y-3">
+              {itemsByTab[activeTab].length > 0 ? (
+                itemsByTab[activeTab].map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => {
+                      if (item.type === "materi") navigate(`/material/${item.id}`);
+                      if (item.type === "tugas") navigate(`/assignment/${item.id}`);
+                      if (item.type === "kuis") navigate(`/quiz/${item.id}`);
+                    }}
+                  >
+                    <div className="w-full flex items-center justify-between gap-4 p-4 text-left">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] text-white grid place-items-center font-semibold">
+                          {item.number}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-gray-500 py-4">
-                      Tidak ada materi di tingkatan ini
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* ── Tugas ── */}
-              {activeTab === "tugas" && (
-                <div>
-                  {assignments.length > 0 ? (
-                    <div className="space-y-2">
-                      {assignments.map((assignment) => (
-                        <div
-                          key={assignment.id}
-                          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
-                        >
-                          <div className="flex-1 min-w-0 mr-4">
-                            <h5 className="font-semibold mb-1 truncate">
-                              {assignment.title}
-                            </h5>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-1">
-                              {assignment.description}
-                            </p>
-                            <div className="flex items-center gap-3 text-sm text-gray-500">
-                              <span>Pertemuan {assignment.meetingNumber}</span>
-                              {assignment.dueDate && (
-                                <>
-                                  <span>•</span>
-                                  <span>
-                                    Deadline:{" "}
-                                    {new Date(
-                                      assignment.dueDate,
-                                    ).toLocaleDateString("id-ID")}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2 shrink-0">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                navigate(`/assignment/${assignment.id}`)
-                              }
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Lihat
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                navigate(`/submissions/tugas/${assignment.id}`)
-                              }
-                            >
-                              <ClipboardList className="h-4 w-4 mr-1" />
-                              Pengumpulan
-                            </Button>
-                          </div>
+                        <div>
+                          <h4 className="font-bold text-lg">{item.title}</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{item.subtitle}</p>
                         </div>
-                      ))}
+                      </div>
+                      <div className="text-right text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                        <div>{item.badge}</div>
+                        {item.extra ? <div>{item.extra}</div> : null}
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-center text-gray-500 py-4">
-                      Tidak ada tugas di tingkatan ini
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* ── Kuis ── */}
-              {activeTab === "kuis" && (
-                <div>
-                  {quizzes.length > 0 ? (
-                    <div className="space-y-2">
-                      {quizzes.map((quiz) => (
-                        <div
-                          key={quiz.id}
-                          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
-                        >
-                          <div className="flex-1 min-w-0 mr-4">
-                            <h5 className="font-semibold mb-1 truncate">
-                              {quiz.title}
-                            </h5>
-                            <div className="flex items-center gap-3 text-sm text-gray-500">
-                              <span>Pertemuan {quiz.meetingNumber}</span>
-                              {quiz.duration && (
-                                <>
-                                  <span>•</span>
-                                  <span>{quiz.duration} menit</span>
-                                </>
-                              )}
-                              {quiz.questions && quiz.questions.length > 0 && (
-                                <>
-                                  <span>•</span>
-                                  <span>{quiz.questions.length} soal</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2 shrink-0">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => navigate(`/quiz/${quiz.id}`)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Lihat
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                navigate(`/submissions/tugas/${quiz.id}`)
-                              }
-                            >
-                              <ClipboardList className="h-4 w-4 mr-1" />
-                              Pengumpulan
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-gray-500 py-4">
-                      Tidak ada kuis di tingkatan ini
-                    </p>
-                  )}
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-950 rounded-3xl border border-gray-200 dark:border-gray-800">
+                  Tidak ada konten di tab ini.
                 </div>
               )}
             </div>

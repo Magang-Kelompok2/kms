@@ -5,13 +5,13 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { PDFViewer } from "../components/PDFViewer";
-import { ArrowLeft, FileText, PlayCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, FileText, PlayCircle, CheckCircle, Edit3, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Material as MaterialType } from "../types";
 
 export function MaterialViewPage() {
   const { materialId } = useParams();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const [completedFiles, setCompletedFiles] = useState<string[]>([]);
@@ -24,6 +24,13 @@ export function MaterialViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState({
+    title: "",
+    description: "",
+    meetingNumber: "",
+  });
 
   // ── 1. Fetch material ──────────────────────────────────────────
   useEffect(() => {
@@ -38,6 +45,7 @@ export function MaterialViewPage() {
         );
         if (!res.ok) throw new Error("Gagal mengambil data materi");
         const json = await res.json();
+        console.log("Material response:", json);
         if (!json.success || !json.data) throw new Error("Material not found");
         setMaterial(json.data);
       } catch (err) {
@@ -112,10 +120,76 @@ export function MaterialViewPage() {
 
   // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
-    if (material && material.files.length > 0 && !selectedFile) {
+    if (material && material.files && material.files.length > 0 && !selectedFile) {
+      console.log("Auto-selecting first file:", material.files[0]);
       setSelectedFile(material.files[0].id);
+    } else if (material && (!material.files || material.files.length === 0)) {
+      console.log("No files available in material");
+      setSelectedFile(null);
     }
-  }, [material, selectedFile]);
+  }, [material]);
+
+  // 4. Initialize edit draft
+  useEffect(() => {
+    if (material && isEditing) {
+      setEditDraft({
+        title: material.title,
+        description: material.description,
+        meetingNumber: material.meetingNumber.toString(),
+      });
+    }
+  }, [material, isEditing]);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!material) return;
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/materials/${material.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: editDraft.title,
+            description: editDraft.description,
+            meetingNumber: parseInt(editDraft.meetingNumber) || material.meetingNumber,
+          }),
+        }
+      );
+      if (!res.ok) throw new Error("Gagal mengupdate materi");
+      const json = await res.json();
+      setMaterial(json.data);
+      setIsEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!material) return;
+    if (!confirm("Hapus materi ini? Aksi ini tidak dapat dibatalkan.")) return;
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/materials/${material.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!res.ok) throw new Error("Gagal menghapus materi");
+      navigate(`/class/${material.classId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    }
+  };
 
   // ── Loading state ──────────────────────────────────────────────
   if (materialLoading || progressLoading) {
@@ -218,107 +292,104 @@ export function MaterialViewPage() {
           <div className="w-full lg:w-96 shrink-0">
             <Card className="h-full overflow-y-auto">
               <div className="p-5 border-b sticky top-0 bg-white dark:bg-gray-900 z-10">
-                <h2 className="text-xl font-normal mb-1">Daftar Materi</h2>
+                <h2 className="text-xl font-bold mb-1">Daftar Materi</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {material.files.length} file tersedia
                 </p>
               </div>
 
               <div className="p-4 space-y-5">
-                {/* Video */}
-                {videoFiles.length > 0 && (
-                  <div>
-                    <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-red-600 dark:text-red-400">
-                      <PlayCircle className="h-5 w-5" />
-                      Video Pembelajaran
-                    </h3>
-                    <div className="space-y-2">
-                      {videoFiles.map((file) => (
-                        <div
-                          key={file.id}
-                          className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                            selectedFile === file.id
-                              ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                              : "border-gray-200 dark:border-gray-700 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50/50 dark:hover:bg-red-900/10"
-                          }`}
-                          onClick={() => setSelectedFile(file.id)}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div
-                              className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
-                                selectedFile === file.id
-                                  ? "bg-red-200 dark:bg-red-800/40"
-                                  : "bg-red-100 dark:bg-red-900/20"
-                              }`}
-                            >
-                              <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <h4 className="font-normal text-base leading-tight">
-                                  {file.name}
-                                </h4>
-                                {completedFiles.includes(file.id) && (
-                                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                                )}
-                              </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
-                                {file.duration || "Video"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                {videoFiles.length === 0 && pdfFiles.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Belum ada file materi
+                    </p>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {videoFiles.length > 0 && (
+                      <div>
+                        <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-red-600 dark:text-red-400">
+                          <PlayCircle className="h-5 w-5" />
+                          Video Pembelajaran
+                        </h3>
+                        <div className="space-y-2">
+                          {videoFiles.map((file) => (
+                            <div
+                              key={file.id}
+                              className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                                selectedFile === file.id
+                                  ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-red-300"
+                              }`}
+                              onClick={() => setSelectedFile(file.id)}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-red-100 dark:bg-red-900/20">
+                                  <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <h4 className="font-bold text-base leading-tight">
+                                      {file.name}
+                                    </h4>
+                                    {completedFiles.includes(file.id) && (
+                                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    {file.duration || "Video"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                {/* PDF */}
-                {pdfFiles.length > 0 && (
-                  <div>
-                    <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                      <FileText className="h-5 w-5" />
-                      Dokumen PDF
-                    </h3>
-                    <div className="space-y-2">
-                      {pdfFiles.map((file) => (
-                        <div
-                          key={file.id}
-                          className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                            selectedFile === file.id
-                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                              : "border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-900/10"
-                          }`}
-                          onClick={() => setSelectedFile(file.id)}
-                        >
-                          <div className="flex items-start gap-3">
+                    {pdfFiles.length > 0 && (
+                      <div>
+                        <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                          <FileText className="h-5 w-5" />
+                          Dokumen PDF
+                        </h3>
+                        <div className="space-y-2">
+                          {pdfFiles.map((file) => (
                             <div
-                              className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${
+                              key={file.id}
+                              className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
                                 selectedFile === file.id
-                                  ? "bg-blue-200 dark:bg-blue-800/40"
-                                  : "bg-blue-100 dark:bg-blue-900/20"
+                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
                               }`}
+                              onClick={() => setSelectedFile(file.id)}
                             >
-                              <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <h4 className="font-normal text-base leading-tight">
-                                  {file.name}
-                                </h4>
-                                {completedFiles.includes(file.id) && (
-                                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                                )}
+                              <div className="flex items-start gap-3">
+                                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-blue-100 dark:bg-blue-900/20">
+                                  <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <h4 className="font-normal text-base leading-tight">
+                                      {file.name}
+                                    </h4>
+                                    {completedFiles.includes(file.id) && (
+                                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Dokumen
+                                  </p>
+                                </div>
                               </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Dokumen
-                              </p>
                             </div>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </Card>
@@ -336,7 +407,7 @@ export function MaterialViewPage() {
                         Pertemuan {material.meetingNumber}
                       </Badge>
                       <Badge variant="outline" className="text-sm">
-                        Level {materialLevel}
+                        Level {material.level}
                       </Badge>
                       {isCompleted && (
                         <Badge variant="default" className="text-sm">
@@ -345,14 +416,98 @@ export function MaterialViewPage() {
                         </Badge>
                       )}
                     </div>
-                    <h1 className="text-3xl font-normal mb-2">
-                      {material.title}
-                    </h1>
+                    <h1 className="text-3xl font-normal mb-2">{material.title}</h1>
                     <p className="text-base text-gray-600 dark:text-gray-400">
                       {material.description}
                     </p>
+
+                    {user?.role === "superadmin" && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleEdit}
+                          className="flex-1"
+                        >
+                          <Edit3 className="h-4 w-4 mr-2" />
+                          Edit Materi
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={handleDelete}
+                          className="flex-1"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Hapus Materi
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {isEditing && (
+                  <div className="mt-6 space-y-4 border-t pt-6">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Judul Materi
+                      </label>
+                      <input
+                        type="text"
+                        value={editDraft.title}
+                        onChange={(e) =>
+                          setEditDraft({ ...editDraft, title: e.target.value })
+                        }
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Deskripsi
+                      </label>
+                      <textarea
+                        value={editDraft.description}
+                        onChange={(e) =>
+                          setEditDraft({
+                            ...editDraft,
+                            description: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                        rows={4}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Pertemuan Ke-
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editDraft.meetingNumber}
+                        onChange={(e) =>
+                          setEditDraft({
+                            ...editDraft,
+                            meetingNumber: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <Button onClick={handleSaveEdit} className="flex-1">
+                        Simpan Perubahan
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsEditing(false)}
+                        className="flex-1"
+                      >
+                        Batal
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </Card>
 
               {/* Viewer */}
@@ -374,9 +529,7 @@ export function MaterialViewPage() {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-lg font-normal">
-                          {selectedFileData.name}
-                        </h3>
+                        <h3 className="text-lg font-normal">{selectedFileData.name}</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
                           {selectedFileData.type} •{" "}
                           {selectedFileData.duration || "View Only"}

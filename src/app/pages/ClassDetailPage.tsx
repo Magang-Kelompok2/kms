@@ -365,9 +365,7 @@ export function ClassDetailPage() {
               materials={lvl.materials}
               assignments={lvl.assignments}
               quizzes={lvl.quizzes}
-              classId={classId!}
               isLocked={!canAccessLevel(lvl.level)}
-              userLevel={userLevel}
             />
           ))}
         </div>

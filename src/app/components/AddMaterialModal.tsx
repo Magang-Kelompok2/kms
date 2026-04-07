@@ -469,10 +469,10 @@ export function AddMaterialModal({
         <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-6 flex gap-3">
           <Button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={uploadLoading || loading}
             className="flex-1 text-base py-6"
           >
-            {loading ? (
+            {uploadLoading || loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Menyimpan...

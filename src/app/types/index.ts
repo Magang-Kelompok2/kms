@@ -12,11 +12,11 @@ export interface Material {
   id: string;
   title: string;
   description: string;
-  content: string;
+  content?: string;
   classId: string;
   meetingNumber: number;
   level: number;
-  createdAt: string;
+  createdAt?: string;
   isPublished: boolean;
   files: MaterialFile[];
 }

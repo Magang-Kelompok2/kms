@@ -10,15 +10,16 @@ import {
   Calendar,
   CheckCircle,
   FileText,
-  Clock,
   File,
+  Edit3,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Assignment as AssignmentType } from "../types";
 
 export function AssignmentViewPage() {
   const { assignmentId } = useParams();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
   const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   const [submissionText, setSubmissionText] = useState("");
@@ -27,11 +28,18 @@ export function AssignmentViewPage() {
 
   const [assignment, setAssignment] = useState<AssignmentType | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(true);
-  const [progressLoading, setProgressLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userLevel, setUserLevel] = useState(1);
+  const userLevel = 1;
 
-  // ── 1. Fetch assignment ────────────────────────────────────────
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState({
+    title: "",
+    description: "",
+    dueDate: "",
+    meetingNumber: "",
+  });
+
+
   useEffect(() => {
     const fetchAssignment = async () => {
       if (!assignmentId) return;
@@ -49,7 +57,6 @@ export function AssignmentViewPage() {
         setAssignment(json.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
-        setProgressLoading(false);
       } finally {
         setAssignmentLoading(false);
       }
@@ -58,49 +65,71 @@ export function AssignmentViewPage() {
     fetchAssignment();
   }, [assignmentId]);
 
-  // ── 2. Fetch progress ──────────────────────────────────────────
+  // Initialize edit draft
   useEffect(() => {
+    if (assignment && isEditing) {
+      setEditDraft({
+        title: assignment.title,
+        description: assignment.description,
+        dueDate: assignment.dueDate.split("T")[0],
+        meetingNumber: assignment.meetingNumber.toString(),
+      });
+    }
+  }, [assignment, isEditing]);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
     if (!assignment) return;
-
-    if (!assignment.classId) {
-      setProgressLoading(false);
-      return;
-    }
-
-    if (user?.role === "superadmin") {
-      setProgressLoading(false);
-      return;
-    }
-
-    if (!user?.id) {
-      setProgressLoading(false);
-      return;
-    }
-
-    const fetchProgress = async () => {
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${assignment.classId}`,
-        );
-        if (!res.ok) {
-          setUserLevel(1);
-          return;
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/tugas/${assignment.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: editDraft.title,
+            description: editDraft.description,
+            dueDate: editDraft.dueDate,
+            meetingNumber: parseInt(editDraft.meetingNumber) || assignment.meetingNumber,
+          }),
         }
-        const json = await res.json();
-        const level = json.data?.tingkatanSaatIni;
-        setUserLevel(typeof level === "number" && level >= 1 ? level : 1);
-      } catch {
-        setUserLevel(1);
-      } finally {
-        setProgressLoading(false);
-      }
-    };
+      );
+      if (!res.ok) throw new Error("Gagal mengupdate tugas");
+      const json = await res.json();
+      setAssignment(json.data);
+      setIsEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    }
+  };
 
-    fetchProgress();
-  }, [assignment, user?.id, user?.role]);
+  const handleDelete = async () => {
+    if (!assignment) return;
+    if (!confirm("Hapus tugas ini? Aksi ini tidak dapat dibatalkan.")) return;
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/tugas/${assignment.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!res.ok) throw new Error("Gagal menghapus tugas");
+      navigate(`/class/${assignment.classId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    }
+  };
 
-  // ── Loading ────────────────────────────────────────────────────
-  if (assignmentLoading || progressLoading) {
+  if (assignmentLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />
@@ -247,53 +276,137 @@ export function AssignmentViewPage() {
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header */}
           <Card className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-3">
-                  <Badge variant="secondary" className="text-sm">
-                    Pertemuan {assignment.meetingNumber}
-                  </Badge>
-                  <Badge variant="outline" className="text-sm">
-                    Level {assignmentLevel}
-                  </Badge>
-                  {isSubmitted && (
-                    <Badge variant="default" className="text-sm bg-green-600">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Sudah Dikumpulkan
+            {!isEditing ? (
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge variant="secondary" className="text-sm">
+                      Pertemuan {assignment.meetingNumber}
                     </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-purple-100 dark:bg-purple-900/20">
-                    <FileText className="h-7 w-7 text-purple-600 dark:text-purple-400" />
+                    <Badge variant="outline" className="text-sm">
+                      Level {assignment.level}
+                    </Badge>
+                    {isSubmitted && (
+                      <Badge variant="default" className="text-sm bg-green-600">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Sudah Dikumpulkan
+                      </Badge>
+                    )}
                   </div>
-                  <div>
-                    <h1 className="text-3xl font-bold mb-1">
-                      {assignment.title}
-                    </h1>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>
-                          Deadline: {dueDate.toLocaleDateString("id-ID")}
-                        </span>
-                      </div>
-                      {!isOverdue && daysUntilDue > 0 && (
-                        <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-                          <Clock className="h-4 w-4" />
-                          <span>{daysUntilDue} hari lagi</span>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-purple-100 dark:bg-purple-900/20">
+                      <FileText className="h-7 w-7 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-bold mb-1">
+                        {assignment.title}
+                      </h1>
+                      <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>
+                            Deadline:{" "}
+                            {new Date(assignment.dueDate).toLocaleDateString(
+                              "id-ID",
+                            )}
+                          </span>
                         </div>
-                      )}
-                      {isOverdue && (
-                        <Badge variant="destructive" className="text-xs">
-                          Terlambat
-                        </Badge>
-                      )}
+                        <div>
+                          {isOverdue
+                            ? "Status: Terlambat"
+                            : `${daysUntilDue} hari tersisa`}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                  {user?.role === "superadmin" && (
+                    <div className="flex gap-3 mt-4">
+                      <Button size="sm" variant="outline" onClick={handleEdit}>
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleDelete}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Hapus
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Judul Tugas
+                  </label>
+                  <input
+                    type="text"
+                    value={editDraft.title}
+                    onChange={(e) =>
+                      setEditDraft({ ...editDraft, title: e.target.value })
+                    }
+                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Deskripsi
+                  </label>
+                  <textarea
+                    value={editDraft.description}
+                    onChange={(e) =>
+                      setEditDraft({ ...editDraft, description: e.target.value })
+                    }
+                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 h-28 resize-none"
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Deadline
+                    </label>
+                    <input
+                      type="date"
+                      value={editDraft.dueDate}
+                      onChange={(e) =>
+                        setEditDraft({ ...editDraft, dueDate: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Pertemuan Ke-
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editDraft.meetingNumber}
+                      onChange={(e) =>
+                        setEditDraft({ ...editDraft, meetingNumber: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <Button size="sm" onClick={handleSaveEdit}>
+                    Simpan
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsEditing(false)}
+                  >
+                    Batal
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="border-t pt-4">
               <h2 className="text-lg font-bold mb-2">Deskripsi Tugas</h2>

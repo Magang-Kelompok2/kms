@@ -34,7 +34,7 @@ export function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-950">
         <div className="w-full max-w-md">
           <div className="mb-10">
-            <h1 className="text-5xl font-normal mb-3" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+            <h1 className="text-5xl font-bold mb-3" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
               Login
             </h1>
             <p className="text-gray-600 dark:text-gray-400">

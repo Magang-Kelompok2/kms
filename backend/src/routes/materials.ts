@@ -42,20 +42,63 @@ router.get("/:materialId", async (req, res) => {
       .json({ success: false, error: "materialId harus berupa angka" });
 
   try {
+    // 1. Fetch materi
     const { data, error } = await supabase
       .from("materi")
       .select(
         `id_materi, title_materi, deskripsi, materi_path,
-         id_kelas, id_tingkatan, pertemuan,
-         kelas(nama_kelas),
-         tingkatan(id_tingkatan, nama_tingkatan),
-         video(id_video, title_video, video_path),
-         pdf(id_pdf, title_pdf, pdf_path)`,
+         id_kelas, id_tingkatan, pertemuan`,
       )
       .eq("id_materi", materialId)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase error:", error);
+      throw error;
+    }
+
+    // 2. Fetch videos dengan filter id_materi
+    const { data: videos, error: videoError } = await supabase
+      .from("video")
+      .select("id_video, title_video, video_path")
+      .eq("id_materi", materialId);
+
+    if (videoError) {
+      console.error("Video fetch error:", videoError);
+    }
+
+    // 3. Fetch pdfs dengan filter id_materi
+    const { data: pdfs, error: pdfError } = await supabase
+      .from("pdf")
+      .select("id_pdf, title_pdf, pdf_path")
+      .eq("id_materi", materialId);
+
+    if (pdfError) {
+      console.error("PDF fetch error:", pdfError);
+    }
+
+    console.log("Material data from DB:", {
+      id_materi: data.id_materi,
+      title_materi: data.title_materi,
+      video_count: videos?.length ?? 0,
+      pdf_count: pdfs?.length ?? 0,
+      videos: videos,
+      pdfs: pdfs,
+    });
+
+    const videoFiles = (videos ?? []).map((v: any) => ({
+      id: String(v.id_video),
+      name: v.title_video ?? "Untitled Video",
+      url: v.video_path,
+      type: "video" as const,
+    }));
+
+    const pdfFiles = (pdfs ?? []).map((p: any) => ({
+      id: String(p.id_pdf),
+      name: p.title_pdf ?? "Untitled PDF",
+      url: p.pdf_path,
+      type: "pdf" as const,
+    }));
 
     res.json({
       success: true,
@@ -68,20 +111,7 @@ router.get("/:materialId", async (req, res) => {
         // FIX: sertakan level dari id_tingkatan agar cek akses di frontend bisa jalan
         level: data.id_tingkatan,
         isPublished: true,
-        files: [
-          ...(data.video ?? []).map((v: any) => ({
-            id: String(v.id_video),
-            name: v.title_video ?? "Video",
-            url: v.video_path,
-            type: "video",
-          })),
-          ...(data.pdf ?? []).map((p: any) => ({
-            id: String(p.id_pdf),
-            name: p.title_pdf ?? "PDF",
-            url: p.pdf_path,
-            type: "pdf",
-          })),
-        ],
+        files: [...videoFiles, ...pdfFiles],
       },
     });
   } catch (error) {
@@ -158,6 +188,105 @@ router.post("/", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to create materi",
+      detail: error?.message ?? error,
+    });
+  }
+});
+
+// PUT /api/materials/:materialId
+// Body: { title_materi?, deskripsi?, pertemuan? }
+router.put("/:materialId", async (req, res) => {
+  const materialId = Number(req.params.materialId);
+  if (isNaN(materialId)) {
+    return res
+      .status(400)
+      .json({ success: false, error: "materialId harus berupa angka" });
+  }
+
+  const { title_materi, deskripsi, meetingNumber } = req.body;
+
+  try {
+    const updateData: any = {};
+    if (title_materi) updateData.title_materi = title_materi;
+    if (deskripsi !== undefined) updateData.deskripsi = deskripsi;
+    if (meetingNumber) updateData.pertemuan = Number(meetingNumber);
+
+    const { data, error } = await supabase
+      .from("materi")
+      .update(updateData)
+      .eq("id_materi", materialId)
+      .select(
+        `id_materi, title_materi, deskripsi, materi_path,
+         id_kelas, id_tingkatan, pertemuan,
+         kelas(nama_kelas),
+         tingkatan(id_tingkatan, nama_tingkatan),
+         video(id_video, title_video, video_path),
+         pdf(id_pdf, title_pdf, pdf_path)`,
+      )
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: {
+        id: String(data.id_materi),
+        title: data.title_materi,
+        description: data.deskripsi ?? "",
+        classId: String(data.id_kelas),
+        level: data.id_tingkatan,
+        meetingNumber: data.pertemuan,
+        isPublished: true,
+        files: [
+          ...(data.video ?? []).map((v: any) => ({
+            id: String(v.id_video),
+            name: v.title_video ?? "Video",
+            url: v.video_path,
+            type: "video",
+            duration: v.video_duration,
+          })),
+          ...(data.pdf ?? []).map((p: any) => ({
+            id: String(p.id_pdf),
+            name: p.title_pdf ?? "PDF",
+            url: p.pdf_path,
+            type: "pdf",
+          })),
+        ],
+      },
+    });
+  } catch (error: any) {
+    console.error("Error updating material:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update material",
+      detail: error?.message ?? error,
+    });
+  }
+});
+
+// DELETE /api/materials/:materialId
+router.delete("/:materialId", async (req, res) => {
+  const materialId = Number(req.params.materialId);
+  if (isNaN(materialId)) {
+    return res
+      .status(400)
+      .json({ success: false, error: "materialId harus berupa angka" });
+  }
+
+  try {
+    const { error } = await supabase
+      .from("materi")
+      .delete()
+      .eq("id_materi", materialId);
+
+    if (error) throw error;
+
+    res.json({ success: true, message: "Material deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting material:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete material",
       detail: error?.message ?? error,
     });
   }

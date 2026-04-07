@@ -12,6 +12,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Trophy,
+  Award,
+  AlertCircle,
+  Edit3,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
@@ -36,13 +40,15 @@ interface TugasKuis {
   type: string;
   materialId: string;
   durasi?: number;
+  duration?: number;
+  questions?: SoalKuis[];
 }
 
 type TahapKuis = "info" | "mengerjakan" | "selesai";
 
 export function QuizViewPage() {
   const { quizId } = useParams();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const [quiz, setQuiz] = useState<TugasKuis | null>(null);
@@ -51,6 +57,12 @@ export function QuizViewPage() {
   const [progressLoading, setProgressLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState({
+    title: "",
+    duration: "",
+    meetingNumber: "",
+  });
 
   const [tahap, setTahap] = useState<TahapKuis>("info");
   const [soalAktif, setSoalAktif] = useState(0);
@@ -182,29 +194,91 @@ export function QuizViewPage() {
   useEffect(() => {
     if (tahap !== "mengerjakan" || sisaWaktu <= 0) return;
 
-    const timer = setInterval(() => {
+    const timer = window.setInterval(() => {
       setSisaWaktu((prev) => {
         if (prev <= 1) {
-          clearInterval(timer);
-          handleSubmit();
+          window.clearInterval(timer);
+          setTahap("selesai");
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [tahap, sisaWaktu, handleSubmit]);
+    return () => window.clearInterval(timer);
+  }, [tahap]);
 
-  const formatWaktu = (detik: number) => {
-    const m = Math.floor(detik / 60)
-      .toString()
-      .padStart(2, "0");
-    const s = (detik % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
+  // Initialize edit draft
+  useEffect(() => {
+    if (quiz && isEditing) {
+      setEditDraft({
+        title: quiz.title,
+        duration: (quiz.durasi ?? quiz.duration ?? 60).toString(),
+        meetingNumber: quiz.meetingNumber.toString(),
+      });
+    }
+  }, [quiz, isEditing]);
+
+  const handleStart = () => {
+    if (soalList.length === 0) return;
+    setTahap("mengerjakan");
   };
 
-  // ── Loading / Error ────────────────────────────────────────────
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!quiz) return;
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/kuis/${quiz.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: editDraft.title,
+            duration: parseInt(editDraft.duration) || quiz.duration,
+            meetingNumber: parseInt(editDraft.meetingNumber) || quiz.meetingNumber,
+          }),
+        }
+      );
+      if (!res.ok) throw new Error("Gagal mengupdate kuis");
+      // Note: In real scenario, we should update the quiz object
+      // For now, we'll just close the edit mode
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : "Terjadi kesalahan");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!quiz) return;
+    if (!confirm("Hapus kuis ini? Aksi ini tidak dapat dibatalkan.")) return;
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/kuis/${quiz.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!res.ok) throw new Error("Gagal menghapus kuis");
+      navigate(`/class/${quiz.classId}`);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : "Terjadi kesalahan");
+    }
+  };
+
+  if (!quiz) {
+    return <div>Quiz not found</div>;
+  }
+
   if (quizLoading || progressLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -229,6 +303,8 @@ export function QuizViewPage() {
     );
   }
 
+  const quizDuration = quiz?.durasi ?? quiz?.duration ?? 60;
+  const questionCount = soalList.length;
   const quizLevel =
     typeof quiz.level === "number" && quiz.level >= 1 ? quiz.level : 1;
   const hasAccess = user?.role === "superadmin" || quizLevel <= userLevel;
@@ -260,24 +336,166 @@ export function QuizViewPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />
-        <div className="container mx-auto max-w-3xl px-4 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-bold">{quiz.title}</h2>
-              <p className="text-sm text-gray-500">
-                Soal {soalAktif + 1} dari {soalList.length}
-              </p>
-            </div>
-            <div
-              className={`flex items-center gap-2 px-4 py-2 rounded-full font-mono font-bold text-lg ${
-                sisaWaktu < 60
-                  ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-                  : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-              }`}
-            >
-              <Clock className="h-5 w-5" />
-              {formatWaktu(sisaWaktu)}
-            </div>
+        <div className="container mx-auto px-4 md:px-6 py-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate(`/class/${quiz.classId}`)}
+            className="mb-4 text-base"
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Kembali ke Kelas
+          </Button>
+
+          <div className="max-w-3xl mx-auto">
+            <Card className="p-8">
+              {!isEditing ? (
+                <>
+                  <div className="text-center mb-6">
+                    <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center mx-auto mb-4">
+                      <Award className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex items-center gap-2 justify-center mb-3">
+                      <Badge variant="secondary" className="text-sm">
+                        Pertemuan {quiz.meetingNumber}
+                      </Badge>
+                      <Badge variant="outline" className="text-sm">
+                        Level {quiz.level}
+                      </Badge>
+                    </div>
+                    <h1 className="text-3xl font-bold mb-2">{quiz.title}</h1>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-6 mb-6 space-y-4">
+                    <div className="flex items-center justify-between text-base">
+                      <span className="text-gray-600 dark:text-gray-400">Jumlah Soal</span>
+                      <span className="font-bold">{questionCount} pertanyaan</span>
+                    </div>
+                    <div className="flex items-center justify-between text-base">
+                      <span className="text-gray-600 dark:text-gray-400">Durasi</span>
+                      <span className="font-bold flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {quizDuration} menit
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-base">
+                      <span className="text-gray-600 dark:text-gray-400">Passing Grade</span>
+                      <span className="font-bold">70%</span>
+                    </div>
+                  </div>
+                  {user?.role === "superadmin" && (
+                    <div className="flex gap-3 mb-6">
+                      <Button size="sm" variant="outline" onClick={handleEdit} className="flex-1">
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleDelete}
+                        className="flex-1"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Hapus
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Judul Kuis</label>
+                    <input
+                      type="text"
+                      value={editDraft.title}
+                      onChange={(e) =>
+                        setEditDraft({ ...editDraft, title: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                    />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Durasi (menit)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editDraft.duration}
+                        onChange={(e) =>
+                          setEditDraft({ ...editDraft, duration: e.target.value })
+                        }
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Pertemuan Ke-
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editDraft.meetingNumber}
+                        onChange={(e) =>
+                          setEditDraft({ ...editDraft, meetingNumber: e.target.value })
+                        }
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button size="sm" onClick={handleSaveEdit} className="flex-1">
+                      Simpan
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsEditing(false)}
+                      className="flex-1"
+                    >
+                      Batal
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {questionCount === 0 ? (
+                <Card className="p-6 mb-6 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                  <div className="text-center">
+                    <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                      Belum ada soal yang dibuat
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-500">
+                      Soal kuis akan segera dibuat oleh admin.
+                    </p>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-5 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 mb-6">
+                  <div className="flex gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-base font-bold text-yellow-900 dark:text-yellow-100 mb-2">
+                        Perhatian!
+                      </h3>
+                      <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 list-disc list-inside">
+                        <li>Kuis hanya dapat dikerjakan satu kali</li>
+                        <li>Timer akan mulai berjalan setelah Anda klik "Mulai Kuis"</li>
+                        <li>Jawaban akan otomatis tersubmit saat waktu habis</li>
+                        <li>Pastikan koneksi internet stabil</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {questionCount > 0 && (
+                <Button onClick={handleStart} className="w-full text-base py-6">
+                  Mulai Kuis
+                </Button>
+              )}
+            </Card>
           </div>
 
           <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 mb-6">
@@ -493,7 +711,7 @@ export function QuizViewPage() {
             {sudahMengerjakan && (
               <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 mb-6">
                 <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
                   <div>
                     <h3 className="font-bold text-green-900 dark:text-green-100">
                       Sudah Dikerjakan

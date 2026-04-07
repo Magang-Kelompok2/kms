@@ -12,9 +12,7 @@ interface UserLevelCardProps {
   materials: Material[];
   assignments: Assignment[];
   quizzes: Quiz[];
-  classId: string;
   isLocked: boolean;
-  userLevel: number;
 }
 
 export function UserLevelCard({
@@ -23,9 +21,7 @@ export function UserLevelCard({
   materials,
   assignments,
   quizzes,
-  classId,
   isLocked,
-  userLevel,
 }: UserLevelCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">(
