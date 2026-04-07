@@ -67,7 +67,6 @@ router.post("/:tugasId/soal", async (req, res) => {
 router.post("/:tugasId/submit", async (req, res) => {
   const tugasId = Number(req.params.tugasId);
   const { id_user, jawaban } = req.body;
-  // jawaban: { "id_soal": "a"|"b"|"c"|"d", ... }
 
   if (!id_user || !jawaban)
     return res
@@ -94,7 +93,8 @@ router.post("/:tugasId/submit", async (req, res) => {
         benar++;
       }
     }
-    const skor = Math.round((benar / soalList.length) * 100);
+    const total = soalList.length;
+    const skor = Math.round((benar / total) * 100);
 
     // Simpan hasil (upsert)
     const { data: hasil, error: hasilError } = await supabase
@@ -105,6 +105,8 @@ router.post("/:tugasId/submit", async (req, res) => {
           id_tugas: tugasId,
           jawaban,
           skor,
+          benar, // ← fix: tambah benar
+          total, // ← fix: tambah total
         },
         { onConflict: "id_user,id_tugas" },
       )
@@ -113,7 +115,7 @@ router.post("/:tugasId/submit", async (req, res) => {
 
     if (hasilError) throw hasilError;
 
-    res.json({ success: true, data: { skor, benar, total: soalList.length } });
+    res.json({ success: true, data: { skor, benar, total } });
   } catch (error: any) {
     console.error("Error submitting kuis:", error);
     res.status(500).json({ success: false, error: "Failed to submit kuis" });
@@ -128,7 +130,7 @@ router.get("/:tugasId/hasil/:userId", async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("hasil_kuis")
-      .select("id_hasil, skor, jawaban, selesai_at")
+      .select("id_hasil, skor, jawaban, created_at") // ← fix: selesai_at → created_at
       .eq("id_tugas", tugasId)
       .eq("id_user", userId)
       .maybeSingle();
