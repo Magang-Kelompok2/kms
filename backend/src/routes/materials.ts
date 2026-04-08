@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
+import { getPresignedUrl } from "../lib/minio";
 
 const router = Router();
 
@@ -86,19 +87,23 @@ router.get("/:materialId", async (req, res) => {
       pdfs: pdfs,
     });
 
-    const videoFiles = (videos ?? []).map((v: any) => ({
-      id: String(v.id_video),
-      name: v.title_video ?? "Untitled Video",
-      url: v.video_path,
-      type: "video" as const,
-    }));
+    const videoFiles = await Promise.all(
+      (videos ?? []).map(async (v: any) => ({
+        id: String(v.id_video),
+        name: v.title_video ?? "Untitled Video",
+        url: await getPresignedUrl(v.video_path),
+        type: "video" as const,
+      })),
+    );
 
-    const pdfFiles = (pdfs ?? []).map((p: any) => ({
-      id: String(p.id_pdf),
-      name: p.title_pdf ?? "Untitled PDF",
-      url: p.pdf_path,
-      type: "pdf" as const,
-    }));
+    const pdfFiles = await Promise.all(
+      (pdfs ?? []).map(async (p: any) => ({
+        id: String(p.id_pdf),
+        name: p.title_pdf ?? "Untitled PDF",
+        url: await getPresignedUrl(p.pdf_path),
+        type: "pdf" as const,
+      })),
+    );
 
     res.json({
       success: true,

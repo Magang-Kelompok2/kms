@@ -194,7 +194,7 @@ export function MaterialViewPage() {
   // ── Loading state ──────────────────────────────────────────────
   if (materialLoading || progressLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <p className="text-gray-500">Memuat materi...</p>
@@ -205,7 +205,7 @@ export function MaterialViewPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
@@ -218,7 +218,7 @@ export function MaterialViewPage() {
 
   if (!material) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
         <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <Card className="p-8 text-center">
@@ -274,7 +274,7 @@ export function MaterialViewPage() {
   const selectedFileData = material.files.find((f) => f.id === selectedFile);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
       <DashboardHeader />
 
       <div className="container mx-auto px-4 md:px-6 py-6">
@@ -351,7 +351,7 @@ export function MaterialViewPage() {
 
                     {pdfFiles.length > 0 && (
                       <div>
-                        <h3 className="text-base font-normal mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                        <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
                           <FileText className="h-5 w-5" />
                           Dokumen PDF
                         </h3>
@@ -372,7 +372,7 @@ export function MaterialViewPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1.5">
-                                    <h4 className="font-normal text-base leading-tight">
+                                    <h4 className="font-semibold text-base leading-tight">
                                       {file.name}
                                     </h4>
                                     {completedFiles.includes(file.id) && (
@@ -416,7 +416,7 @@ export function MaterialViewPage() {
                         </Badge>
                       )}
                     </div>
-                    <h1 className="text-3xl font-normal mb-2">{material.title}</h1>
+                    <h1 className="text-3xl font-semibold mb-2">{material.title}</h1>
                     <p className="text-base text-gray-600 dark:text-gray-400">
                       {material.description}
                     </p>
@@ -529,7 +529,7 @@ export function MaterialViewPage() {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-lg font-normal">{selectedFileData.name}</h3>
+                        <h3 className="text-lg font-semibold">{selectedFileData.name}</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
                           {selectedFileData.type} •{" "}
                           {selectedFileData.duration || "View Only"}
@@ -546,13 +546,16 @@ export function MaterialViewPage() {
 
                   <div className="flex-1 min-h-0">
                     {selectedFileData.type === "video" ? (
-                      <div className="h-full bg-gray-900 rounded-lg overflow-hidden">
-                        <iframe
+                      <div className="h-full bg-black rounded-lg overflow-hidden">
+                        <video
+                          controls
+                          controlsList="nodownload"
+                          className="w-full h-full object-contain bg-black"
                           src={selectedFileData.url}
-                          className="w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
+                          onContextMenu={(e) => e.preventDefault()}
+                        >
+                          Your browser does not support the video tag.
+                        </video>
                       </div>
                     ) : (
                       <div className="h-full">

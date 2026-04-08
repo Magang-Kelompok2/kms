@@ -7,7 +7,6 @@ import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import type { Assignment, Quiz, Material } from "../types";
 
 interface UserLevelCardProps {
-  level: number;
   namaLevel: string;
   materials: Material[];
   assignments: Assignment[];
@@ -16,7 +15,6 @@ interface UserLevelCardProps {
 }
 
 export function UserLevelCard({
-  level,
   namaLevel,
   materials,
   assignments,
@@ -59,21 +57,27 @@ export function UserLevelCard({
       >
         <div className="flex items-center gap-4">
           <div
-            className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl ${
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-semibold text-lg ${
               isLocked
                 ? "bg-gray-400 dark:bg-gray-600"
                 : "bg-linear-to-br from-[#0C4E8C] to-[#11C4D4]"
             }`}
           >
-            {level}
+            {namaLevel.length <= 4
+              ? namaLevel
+              : namaLevel
+                  .split(" ")
+                  .map((segment) => segment[0]?.toUpperCase())
+                  .join("")}
           </div>
           <div className="text-left">
-            <h3 className="text-xl font-normal flex items-center gap-2">
+            <h3 className="text-xl font-bold flex items-center gap-2">
               {namaLevel}
               {isLocked && <Lock className="h-5 w-5 text-gray-400" />}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {totalItems} items
+              {totalItems} items ({materials.length} materi,{" "}
+              {assignments.length} tugas, {quizzes.length} kuis)
             </p>
           </div>
         </div>
@@ -134,7 +138,7 @@ export function UserLevelCard({
             {activeTab === "materi" && (
               <div>
                 {meetings.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {meetings.map((meeting) => (
                       <div key={meeting}>
                         <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -143,31 +147,25 @@ export function UserLevelCard({
                         {materialsByMeeting[meeting].map((material) => (
                           <div
                             key={material.id}
-                            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors mb-2 cursor-pointer"
+                            className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
                             onClick={() => navigate(`/material/${material.id}`)}
                           >
-                            <div className="flex-1">
+                            <div className="p-4">
                               <h5 className="font-semibold mb-1">
                                 {material.title}
                               </h5>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                                 {material.description}
                               </p>
-                              <div className="flex items-center gap-2 mt-2">
+                              <div className="flex items-center justify-between">
                                 <Badge variant="outline" className="text-xs">
                                   {material.files?.length || 0} files
                                 </Badge>
+                                <Button size="sm" variant="outline">
+                                  Lihat Materi
+                                </Button>
                               </div>
                             </div>
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/material/${material.id}`);
-                              }}
-                            >
-                              Lihat Materi
-                            </Button>
                           </div>
                         ))}
                       </div>
@@ -185,44 +183,29 @@ export function UserLevelCard({
             {activeTab === "tugas" && (
               <div>
                 {assignments.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {assignments.map((assignment) => (
                       <div
                         key={assignment.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                        className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
                         onClick={() => navigate(`/assignment/${assignment.id}`)}
                       >
-                        <div className="flex-1">
+                        <div className="p-4">
                           <h5 className="font-semibold mb-1">
                             {assignment.title}
                           </h5>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                             {assignment.description}
                           </p>
-                          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                            <span>Pertemuan {assignment.meetingNumber}</span>
-                            {assignment.dueDate && (
-                              <>
-                                <span>•</span>
-                                <span>
-                                  Due:{" "}
-                                  {new Date(
-                                    assignment.dueDate,
-                                  ).toLocaleDateString("id-ID")}
-                                </span>
-                              </>
-                            )}
+                          <div className="flex items-center justify-between">
+                            <Badge variant="outline" className="text-xs">
+                              Pertemuan {assignment.meetingNumber}
+                            </Badge>
+                            <Button size="sm" variant="outline">
+                              Kerjakan
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/assignment/${assignment.id}`);
-                          }}
-                        >
-                          Kerjakan
-                        </Button>
                       </div>
                     ))}
                   </div>
@@ -238,40 +221,27 @@ export function UserLevelCard({
             {activeTab === "kuis" && (
               <div>
                 {quizzes.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {quizzes.map((quiz) => (
                       <div
                         key={quiz.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                        className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
                         onClick={() => navigate(`/quiz/${quiz.id}`)}
                       >
-                        <div className="flex-1">
+                        <div className="p-4">
                           <h5 className="font-semibold mb-1">{quiz.title}</h5>
-                          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                            <span>Pertemuan {quiz.meetingNumber}</span>
-                            {quiz.duration && (
-                              <>
-                                <span>•</span>
-                                <span>{quiz.duration} menit</span>
-                              </>
-                            )}
-                            {quiz.questions && quiz.questions.length > 0 && (
-                              <>
-                                <span>•</span>
-                                <span>{quiz.questions.length} soal</span>
-                              </>
-                            )}
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            {quiz.description}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <Badge variant="outline" className="text-xs">
+                              Durasi {quiz.duration ?? (quiz as any).durasi ?? 0}m
+                            </Badge>
+                            <Button size="sm" variant="outline">
+                              Mulai Kuis
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/quiz/${quiz.id}`);
-                          }}
-                        >
-                          Mulai Kuis
-                        </Button>
                       </div>
                     ))}
                   </div>

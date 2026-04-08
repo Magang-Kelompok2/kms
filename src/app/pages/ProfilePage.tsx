@@ -70,7 +70,7 @@ export function ProfilePage() {
 
         {/* Profile Information */}
         <Card className="p-8">
-          <h2 className="text-2xl font-normal mb-6">Informasi Profil</h2>
+          <h2 className="text-2xl font-semibold mb-6">Informasi Profil</h2>
 
           <div className="space-y-6">
             {/* Name */}
@@ -164,13 +164,13 @@ export function ProfilePage() {
         </Card>
 
         {/* Security Section */}
-        <Card className="p-8 mt-6">
+        {/* <Card className="p-8 mt-6">
           <h2 className="text-2xl font-normal mb-4">Keamanan</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             Jaga keamanan akun Anda dengan mengubah password secara berkala.
           </p>
           <Button variant="outline">Ubah Password</Button>
-        </Card>
+        </Card> */}
       </div>
     </div>
   );

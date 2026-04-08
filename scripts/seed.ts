@@ -19,9 +19,9 @@ async function seed() {
 
   // 1. Seed Tabel Kelas
   const classes = [
-    { id_kelas: 1, nama_kelas: "Perpajakan" },
+    { id_kelas: 1, nama_kelas: "Akuntansi" },
     { id_kelas: 2, nama_kelas: "Audit" },
-    { id_kelas: 3, nama_kelas: "Akuntansi" },
+    { id_kelas: 3, nama_kelas: "Perpajakan" },
   ];
   const { error: errKelas } = await supabase.from("kelas").upsert(classes);
   if (errKelas) console.error("Error Kelas:", errKelas.message);

@@ -360,7 +360,6 @@ export function ClassDetailPage() {
           {levels.map((lvl) => (
             <UserLevelCard
               key={lvl.id}
-              level={lvl.level}
               namaLevel={lvl.namaLevel}
               materials={lvl.materials}
               assignments={lvl.assignments}
