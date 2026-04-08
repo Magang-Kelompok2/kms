@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
@@ -19,8 +19,13 @@ interface KelasData {
 
 export function ClassDetailPage() {
   const { classId } = useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const searchParams = new URLSearchParams(location.search);
+  const openLevel = Number(searchParams.get("openLevel") ?? "0");
+  const activeMaterialId = searchParams.get("activeMaterial") ?? undefined;
 
   // Fetch data kelas dari API
   const [currentClass, setCurrentClass] = useState<KelasData | null>(null);
@@ -87,6 +92,13 @@ export function ClassDetailPage() {
     if (user?.role === "superadmin") return true;
     return level <= userLevel;
   };
+
+  useEffect(() => {
+    if (location.hash !== "#materials") return;
+    const target = document.querySelector(location.hash);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash]);
 
   const loading = classLoading || levelsLoading;
 
@@ -355,7 +367,7 @@ export function ClassDetailPage() {
             Tingkatan Saat Ini: {userLevel} / {levels.length}
           </Badge>
         </div>
-        <div className="space-y-4">
+        <div id="materials" className="space-y-4">
           <h2 className="text-2xl font-bold">Progres Pembelajaran</h2>
           {levels.map((lvl) => (
             <UserLevelCard
@@ -365,6 +377,8 @@ export function ClassDetailPage() {
               assignments={lvl.assignments}
               quizzes={lvl.quizzes}
               isLocked={!canAccessLevel(lvl.level)}
+              defaultOpen={openLevel === lvl.level}
+              activeMaterialId={activeMaterialId}
             />
           ))}
         </div>

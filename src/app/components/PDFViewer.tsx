@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type WheelEvent } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Button } from "./ui/button";
 import {
@@ -59,9 +59,30 @@ export function PDFViewer({ url }: PDFViewerProps) {
     }
   };
 
-  const handleZoomIn = () => setScale((s) => Math.min(s + 0.25, 3));
-  const handleZoomOut = () => setScale((s) => Math.max(s - 0.25, 0.5));
+  const MIN_SCALE = 0.5;
+  const MAX_SCALE = 3.5;
+  const ZOOM_STEP = 0.1;
+
+  const normalizeScale = (value: number) =>
+    Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(value * 10) / 10));
+
+  const handleZoomIn = () => setScale((s) => normalizeScale(s + ZOOM_STEP));
+  const handleZoomOut = () => setScale((s) => normalizeScale(s - ZOOM_STEP));
   const handleResetZoom = () => setScale(1.0);
+
+  const handleWheelZoom = (event: WheelEvent<HTMLDivElement>) => {
+    if (!(event.ctrlKey || event.metaKey)) {
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        // Scroll horizontal
+        event.currentTarget.scrollLeft += event.deltaX;
+      }
+      return;
+    }
+    event.preventDefault();
+
+    const delta = Math.sign(-event.deltaY) * ZOOM_STEP;
+    setScale((s) => normalizeScale(s + delta));
+  };
 
   return (
     <div ref={viewerRef} className="h-full flex flex-col space-y-3">
@@ -132,7 +153,9 @@ export function PDFViewer({ url }: PDFViewerProps) {
           <div className="flex items-center justify-center h-full min-h-[400px]">
             <div className="text-center">
               <FileText className="h-12 w-12 text-red-400 mx-auto mb-3" />
-              <p className="text-sm text-red-500 font-medium">Gagal memuat dokumen</p>
+              <p className="text-sm text-red-500 font-medium">
+                Gagal memuat dokumen
+              </p>
               <p className="text-xs text-gray-400 mt-1">
                 Pastikan file PDF tersedia dan dapat diakses
               </p>
@@ -153,23 +176,32 @@ export function PDFViewer({ url }: PDFViewerProps) {
 
         {!loadError && (
           <div
-            className="flex justify-center p-4"
+            className="overflow-x-auto overflow-y-auto scrollbar-visible"
             onContextMenu={(e) => e.preventDefault()}
+            onWheel={handleWheelZoom}
+            style={{
+              touchAction: "pan-x pan-y pinch-zoom",
+              overscrollBehavior: "auto",
+              WebkitOverflowScrolling: "touch",
+              scrollbarWidth: "auto",
+            }}
           >
-            <Document
-              file={url}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={onDocumentLoadError}
-              loading=""
-            >
-              <Page
-                pageNumber={pageNumber}
-                renderTextLayer={true}
-                renderAnnotationLayer={false}
-                className="shadow-lg"
-                scale={scale}
-              />
-            </Document>
+            <div className="inline-block min-w-max mx-auto">
+              <Document
+                file={url}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
+                loading=""
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={false}
+                  className="shadow-lg"
+                  scale={scale}
+                />
+              </Document>
+            </div>
           </div>
         )}
       </div>

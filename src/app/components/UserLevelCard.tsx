@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -12,6 +12,8 @@ interface UserLevelCardProps {
   assignments: Assignment[];
   quizzes: Quiz[];
   isLocked: boolean;
+  defaultOpen?: boolean;
+  activeMaterialId?: string;
 }
 
 export function UserLevelCard({
@@ -20,12 +22,38 @@ export function UserLevelCard({
   assignments,
   quizzes,
   isLocked,
+  defaultOpen = false,
+  activeMaterialId,
 }: UserLevelCardProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">(
     "materi",
   );
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (defaultOpen) {
+      setIsOpen(true);
+    }
+  }, [defaultOpen]);
+
+  useEffect(() => {
+    if (!activeMaterialId) return;
+    const found = materials.some(
+      (material) => material.id === activeMaterialId,
+    );
+    if (found) {
+      setIsOpen(true);
+    }
+  }, [activeMaterialId, materials]);
+
+  useEffect(() => {
+    if (!isOpen || !activeMaterialId) return;
+    const target = document.getElementById(activeMaterialId);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [activeMaterialId, isOpen]);
 
   const totalItems = materials.length + assignments.length + quizzes.length;
 
@@ -146,8 +174,9 @@ export function UserLevelCard({
                         </div>
                         {materialsByMeeting[meeting].map((material) => (
                           <div
+                            id={material.id}
                             key={material.id}
-                            className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
+                            className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all duration-200 ease-out hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
                             onClick={() => navigate(`/material/${material.id}`)}
                           >
                             <div className="p-4">
@@ -235,7 +264,8 @@ export function UserLevelCard({
                           </p>
                           <div className="flex items-center justify-between">
                             <Badge variant="outline" className="text-xs">
-                              Durasi {quiz.duration ?? (quiz as any).durasi ?? 0}m
+                              Durasi{" "}
+                              {quiz.duration ?? (quiz as any).durasi ?? 0}m
                             </Badge>
                             <Button size="sm" variant="outline">
                               Mulai Kuis

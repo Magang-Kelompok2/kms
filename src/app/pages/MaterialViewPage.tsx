@@ -5,7 +5,14 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { PDFViewer } from "../components/PDFViewer";
-import { ArrowLeft, FileText, PlayCircle, CheckCircle, Edit3, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  PlayCircle,
+  CheckCircle,
+  Edit3,
+  Trash2,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Material as MaterialType } from "../types";
 
@@ -120,7 +127,12 @@ export function MaterialViewPage() {
 
   // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
-    if (material && material.files && material.files.length > 0 && !selectedFile) {
+    if (
+      material &&
+      material.files &&
+      material.files.length > 0 &&
+      !selectedFile
+    ) {
       console.log("Auto-selecting first file:", material.files[0]);
       setSelectedFile(material.files[0].id);
     } else if (material && (!material.files || material.files.length === 0)) {
@@ -158,9 +170,10 @@ export function MaterialViewPage() {
           body: JSON.stringify({
             title: editDraft.title,
             description: editDraft.description,
-            meetingNumber: parseInt(editDraft.meetingNumber) || material.meetingNumber,
+            meetingNumber:
+              parseInt(editDraft.meetingNumber) || material.meetingNumber,
           }),
-        }
+        },
       );
       if (!res.ok) throw new Error("Gagal mengupdate materi");
       const json = await res.json();
@@ -182,7 +195,7 @@ export function MaterialViewPage() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
       if (!res.ok) throw new Error("Gagal menghapus materi");
       navigate(`/class/${material.classId}`);
@@ -280,11 +293,15 @@ export function MaterialViewPage() {
       <div className="container mx-auto px-4 md:px-6 py-6">
         <Button
           variant="ghost"
-          onClick={() => navigate(`/class/${material.classId}`)}
+          onClick={() =>
+            navigate(
+              `/class/${material.classId}?openLevel=${material.level}&activeMaterial=${material.id}#materials`,
+            )
+          }
           className="mb-4 text-base"
         >
           <ArrowLeft className="h-5 w-5 mr-2" />
-          Kembali ke Kelas
+          Kembali ke Materi
         </Button>
 
         <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-180px)]">
@@ -416,7 +433,9 @@ export function MaterialViewPage() {
                         </Badge>
                       )}
                     </div>
-                    <h1 className="text-3xl font-semibold mb-2">{material.title}</h1>
+                    <h1 className="text-3xl font-semibold mb-2">
+                      {material.title}
+                    </h1>
                     <p className="text-base text-gray-600 dark:text-gray-400">
                       {material.description}
                     </p>
@@ -529,7 +548,9 @@ export function MaterialViewPage() {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold">{selectedFileData.name}</h3>
+                        <h3 className="text-lg font-semibold">
+                          {selectedFileData.name}
+                        </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
                           {selectedFileData.type} •{" "}
                           {selectedFileData.duration || "View Only"}
