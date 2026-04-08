@@ -13,7 +13,7 @@ import {
   ChevronRight,
   Trophy,
   AlertCircle,
-  Star, // ← FIX: hapus RotateCcw
+  Star,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
@@ -25,6 +25,11 @@ interface SoalKuis {
   opsi_c: string;
   opsi_d: string;
   urutan: number;
+}
+
+// Tipe soal yang sudah diacak opsinya
+interface SoalAcak extends SoalKuis {
+  opsiAcak: { key: "a" | "b" | "c" | "d"; teks: string }[];
 }
 
 interface TugasKuis {
@@ -52,6 +57,16 @@ const OPSI_COLOR = [
   "from-amber-500 to-amber-600",
 ];
 
+// Fungsi Fisher-Yates shuffle
+function shuffleArray<T>(arr: T[]): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 export function QuizViewPage() {
   const { quizId } = useParams();
   const { user, token } = useAuth();
@@ -63,12 +78,6 @@ export function QuizViewPage() {
   const [progressLoading, setProgressLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState({
-    title: "",
-    duration: "",
-    meetingNumber: "",
-  });
 
   const [tahap, setTahap] = useState<TahapKuis>("info");
   const [soalAktif, setSoalAktif] = useState(0);
@@ -82,6 +91,9 @@ export function QuizViewPage() {
   } | null>(null);
   const [sudahMengerjakan, setSudahMengerjakan] = useState(false);
   const [skorSebelumnya, setSkorSebelumnya] = useState<number | null>(null);
+
+  // State soal yang sudah diacak (soal & opsi) — dibuat saat klik Mulai Kuis
+  const [soalAcakList, setSoalAcakList] = useState<SoalAcak[]>([]);
 
   // ── 1. Fetch kuis ──────────────────────────────────────────────
   useEffect(() => {
@@ -161,8 +173,29 @@ export function QuizViewPage() {
     fetchAll();
   }, [quiz, user?.id, user?.role, quizId, token]);
 
+  // ── Fungsi mulai kuis: acak soal & opsi ───────────────────────
+  const handleMulaiKuis = useCallback(() => {
+    // Acak urutan soal
+    const soalTeracak = shuffleArray(soalList).map((soal) => {
+      // Acak urutan opsi, tapi simpan key aslinya agar jawaban ke backend tetap benar
+      const opsiRaw: { key: "a" | "b" | "c" | "d"; teks: string }[] = [
+        { key: "a", teks: soal.opsi_a },
+        { key: "b", teks: soal.opsi_b },
+        { key: "c", teks: soal.opsi_c },
+        { key: "d", teks: soal.opsi_d },
+      ];
+      return {
+        ...soal,
+        opsiAcak: shuffleArray(opsiRaw),
+      };
+    });
+    setSoalAcakList(soalTeracak);
+    setSoalAktif(0);
+    setJawaban({});
+    setTahap("mengerjakan");
+  }, [soalList]);
+
   // ── Submit ─────────────────────────────────────────────────────
-  // ← FIX: tambah update progress setelah lulus
   const handleSubmit = useCallback(async () => {
     if (!user?.id || !quizId || isSubmitting) return;
     setIsSubmitting(true);
@@ -179,7 +212,7 @@ export function QuizViewPage() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? "Gagal submit");
 
-      // ← FIX: update progress jika lulus (skor >= 70)
+      // Update progress jika lulus (skor >= 70)
       if (json.data.skor >= 70 && quiz?.classId && quiz?.level) {
         try {
           await fetch(
@@ -227,7 +260,7 @@ export function QuizViewPage() {
       setSisaWaktu((prev) => {
         if (prev <= 1) {
           window.clearInterval(timer);
-          setTahap("selesai");
+          handleSubmit();
           return 0;
         }
         return prev - 1;
@@ -282,8 +315,6 @@ export function QuizViewPage() {
     );
   }
 
-  const quizDuration = quiz?.durasi ?? quiz?.duration ?? 60;
-  const questionCount = soalList.length;
   const quizLevel =
     typeof quiz.level === "number" && quiz.level >= 1 ? quiz.level : 1;
   const hasAccess = user?.role === "superadmin" || quizLevel <= userLevel;
@@ -311,8 +342,9 @@ export function QuizViewPage() {
     );
   }
 
-  const soalSekarang = soalList[soalAktif];
-  const sudahJawabSemua = soalList.every((s) => jawaban[s.id_soal]);
+  // Gunakan soalAcakList saat mengerjakan, fallback ke soalList
+  const soalAktifData = soalAcakList[soalAktif] ?? soalList[soalAktif];
+  const sudahJawabSemua = soalAcakList.every((s) => jawaban[s.id_soal]);
   const jumlahDijawab = Object.keys(jawaban).length;
   const waktuKritis = sisaWaktu < 60;
 
@@ -333,7 +365,7 @@ export function QuizViewPage() {
                 <span className="font-semibold text-blue-600">
                   {soalAktif + 1}
                 </span>{" "}
-                dari {soalList.length}
+                dari {soalAcakList.length}
                 {" · "}
                 <span className="text-emerald-600 font-semibold">
                   {jumlahDijawab} dijawab
@@ -356,7 +388,9 @@ export function QuizViewPage() {
           <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 mb-6 overflow-hidden">
             <div
               className={`h-2 rounded-full transition-all duration-500 ${waktuKritis ? "bg-red-500" : "bg-blue-500"}`}
-              style={{ width: `${((soalAktif + 1) / soalList.length) * 100}%` }}
+              style={{
+                width: `${((soalAktif + 1) / soalAcakList.length) * 100}%`,
+              }}
             />
           </div>
 
@@ -367,21 +401,21 @@ export function QuizViewPage() {
                 {soalAktif + 1}
               </span>
               <p className="text-base font-semibold text-gray-800 dark:text-gray-100 leading-relaxed pt-0.5">
-                {soalSekarang?.pertanyaan}
+                {soalAktifData?.pertanyaan}
               </p>
             </div>
 
+            {/* Opsi — render dari opsiAcak agar urutan acak */}
             <div className="space-y-3">
-              {(["a", "b", "c", "d"] as const).map((opsi, idx) => {
-                const teks = soalSekarang?.[`opsi_${opsi}`];
-                const dipilih = jawaban[soalSekarang?.id_soal] === opsi;
+              {soalAktifData?.opsiAcak?.map((opsi, idx) => {
+                const dipilih = jawaban[soalAktifData.id_soal] === opsi.key;
                 return (
                   <button
-                    key={opsi}
+                    key={opsi.key}
                     onClick={() =>
                       setJawaban((prev) => ({
                         ...prev,
-                        [soalSekarang.id_soal]: opsi,
+                        [soalAktifData.id_soal]: opsi.key,
                       }))
                     }
                     className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
@@ -402,7 +436,7 @@ export function QuizViewPage() {
                     <span
                       className={`text-sm font-medium ${dipilih ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"}`}
                     >
-                      {teks}
+                      {opsi.teks}
                     </span>
                     {dipilih && (
                       <CheckCircle className="h-4 w-4 text-blue-500 ml-auto flex-shrink-0" />
@@ -415,7 +449,7 @@ export function QuizViewPage() {
 
           {/* Navigasi soal */}
           <div className="flex flex-wrap gap-2 mb-5">
-            {soalList.map((s, i) => (
+            {soalAcakList.map((s, i) => (
               <button
                 key={s.id_soal}
                 onClick={() => setSoalAktif(i)}
@@ -443,7 +477,7 @@ export function QuizViewPage() {
               <ChevronLeft className="h-4 w-4 mr-1" /> Sebelumnya
             </Button>
 
-            {soalAktif < soalList.length - 1 ? (
+            {soalAktif < soalAcakList.length - 1 ? (
               <Button
                 onClick={() => setSoalAktif((p) => p + 1)}
                 className="flex-1"
@@ -470,7 +504,7 @@ export function QuizViewPage() {
                     <CheckCircle className="h-4 w-4 mr-2" /> Kumpulkan Jawaban
                   </>
                 ) : (
-                  `Kumpulkan (${jumlahDijawab}/${soalList.length})`
+                  `Kumpulkan (${jumlahDijawab}/${soalAcakList.length})`
                 )}
               </Button>
             )}
@@ -548,7 +582,7 @@ export function QuizViewPage() {
                 </div>
               </div>
 
-              {/* Badge */}
+              {/* Badge lulus/tidak */}
               <div
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-8 ${
                   lulus
@@ -567,7 +601,6 @@ export function QuizViewPage() {
                 )}
               </div>
 
-              {/* ← FIX: hanya tombol kembali, tidak ada "Coba Lagi" */}
               <div className="max-w-sm mx-auto">
                 <Button
                   onClick={() => navigate(`/class/${quiz.classId}`)}
@@ -642,7 +675,7 @@ export function QuizViewPage() {
                 </div>
               </div>
 
-              {/* ← FIX: sudah mengerjakan → tampilkan info, bukan tombol kerjakan ulang */}
+              {/* Info sudah mengerjakan */}
               {sudahMengerjakan && (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 mb-5">
                   <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
@@ -669,8 +702,9 @@ export function QuizViewPage() {
                   {[
                     "Pastikan koneksi internet stabil sebelum memulai",
                     "Timer mulai berjalan saat kamu klik Mulai Kuis",
+                    "Urutan soal dan pilihan jawaban diacak setiap sesi",
                     "Kuis otomatis dikumpulkan saat waktu habis",
-                    "Kamu hanya bisa mengerjakan kuis ini satu kali", // ← FIX: update petunjuk
+                    "Kamu hanya bisa mengerjakan kuis ini satu kali",
                   ].map((item, i) => (
                     <li
                       key={i}
@@ -685,7 +719,7 @@ export function QuizViewPage() {
                 </ul>
               </div>
 
-              {/* ← FIX: tombol mulai hanya muncul jika belum mengerjakan */}
+              {/* Tombol mulai / info sudah dikerjakan */}
               {soalList.length > 0 ? (
                 sudahMengerjakan ? (
                   <div className="w-full py-4 px-6 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-center">
@@ -699,7 +733,7 @@ export function QuizViewPage() {
                   </div>
                 ) : (
                   <Button
-                    onClick={() => setTahap("mengerjakan")}
+                    onClick={handleMulaiKuis}
                     className="w-full py-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white shadow-lg shadow-blue-200 dark:shadow-none"
                   >
                     <Trophy className="h-5 w-5 mr-2" /> Mulai Kuis
