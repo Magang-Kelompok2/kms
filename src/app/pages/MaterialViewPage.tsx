@@ -446,7 +446,7 @@ export function MaterialViewPage() {
                           size="sm"
                           variant="outline"
                           onClick={handleEdit}
-                          className="flex-1"
+                          className="flex-1 max-w-fit"
                         >
                           <Edit3 className="h-4 w-4 mr-2" />
                           Edit Materi
@@ -455,7 +455,7 @@ export function MaterialViewPage() {
                           size="sm"
                           variant="destructive"
                           onClick={handleDelete}
-                          className="flex-1"
+                          className="flex-1 max-w-fit"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Hapus Materi
