@@ -8,7 +8,9 @@ const router = Router();
 // Gunakan fallback agar tidak crash saat dev, tapi log warning
 const JWT_SECRET = process.env.JWT_SECRET ?? "taxacore_secret_key_dev_only";
 if (!process.env.JWT_SECRET) {
-  console.warn("⚠️  JWT_SECRET tidak diset di .env, menggunakan fallback dev key");
+  console.warn(
+    "⚠️  JWT_SECRET tidak diset di .env, menggunakan fallback dev key",
+  );
 }
 
 const SALT_ROUNDS = 10;
@@ -18,18 +20,22 @@ router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ success: false, error: "Email dan password wajib diisi" });
+    return res
+      .status(400)
+      .json({ success: false, error: "Email dan password wajib diisi" });
   }
 
   try {
     const { data: user, error } = await supabase
       .from("user")
-      .select("id_user, username, email, password, role, id_kelas, created_at")
+      .select("id_user, username, email, password, role, created_at")
       .eq("email", email)
       .maybeSingle();
 
     if (error || !user) {
-      return res.status(401).json({ success: false, error: "Email atau password salah" });
+      return res
+        .status(401)
+        .json({ success: false, error: "Email atau password salah" });
     }
 
     // Cek password - support plain text lama DAN bcrypt baru
@@ -53,14 +59,16 @@ router.post("/login", async (req, res) => {
     }
 
     if (!isValid) {
-      return res.status(401).json({ success: false, error: "Email atau password salah" });
+      return res
+        .status(401)
+        .json({ success: false, error: "Email atau password salah" });
     }
 
     // Buat JWT token
     const token = jwt.sign(
       { id: user.id_user, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     return res.json({
@@ -76,7 +84,9 @@ router.post("/login", async (req, res) => {
     });
   } catch (err: any) {
     console.error("Login error:", err);
-    return res.status(500).json({ success: false, error: "Terjadi kesalahan server" });
+    return res
+      .status(500)
+      .json({ success: false, error: "Terjadi kesalahan server" });
   }
 });
 
@@ -85,11 +95,15 @@ router.post("/register", async (req, res) => {
   const { email, password, username } = req.body;
 
   if (!email || !password || !username) {
-    return res.status(400).json({ success: false, error: "Semua field wajib diisi" });
+    return res
+      .status(400)
+      .json({ success: false, error: "Semua field wajib diisi" });
   }
 
   if (password.length < 6) {
-    return res.status(400).json({ success: false, error: "Password minimal 6 karakter" });
+    return res
+      .status(400)
+      .json({ success: false, error: "Password minimal 6 karakter" });
   }
 
   try {
@@ -101,7 +115,9 @@ router.post("/register", async (req, res) => {
       .maybeSingle();
 
     if (existing) {
-      return res.status(400).json({ success: false, error: "Email sudah terdaftar" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Email sudah terdaftar" });
     }
 
     // Hash password
@@ -116,14 +132,16 @@ router.post("/register", async (req, res) => {
 
     if (error || !newUser) {
       console.error("Register DB error:", error);
-      return res.status(500).json({ success: false, error: "Gagal membuat akun" });
+      return res
+        .status(500)
+        .json({ success: false, error: "Gagal membuat akun" });
     }
 
     // Buat JWT token
     const token = jwt.sign(
       { id: newUser.id_user, email: newUser.email, role: newUser.role },
       JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     return res.status(201).json({
@@ -139,7 +157,9 @@ router.post("/register", async (req, res) => {
     });
   } catch (err: any) {
     console.error("Register error:", err);
-    return res.status(500).json({ success: false, error: "Terjadi kesalahan server" });
+    return res
+      .status(500)
+      .json({ success: false, error: "Terjadi kesalahan server" });
   }
 });
 

@@ -1,11 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
+import bcrypt from "bcryptjs";
 
-// Load environment variables dari .env
-dotenv.config();
+// Load environment variables dari .env di backend
+dotenv.config({ path: "../backend/.env" });
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SALT_ROUNDS = 10;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error("URL atau Key Supabase tidak ditemukan di .env");
@@ -82,19 +84,22 @@ async function seed() {
   console.log("✅ Tabel Tugas berhasil diisi");
 
   // 5. Seed Tabel User (Mock)
+  const adminPasswordHash = await bcrypt.hash("admin123", SALT_ROUNDS);
+  const userPasswordHash = await bcrypt.hash("user123", SALT_ROUNDS);
+
   const users = [
     {
       id_user: 1,
       username: "admin",
       email: "admin@example.com",
-      password: "hashedpassword",
+      password: adminPasswordHash,
       role: "superadmin",
     },
     {
       id_user: 2,
       username: "johndoe",
       email: "user@example.com",
-      password: "hashedpassword",
+      password: userPasswordHash,
       role: "user",
     },
   ];

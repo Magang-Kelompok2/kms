@@ -5,13 +5,13 @@ dotenv.config();
 export const BUCKET = process.env.MINIO_BUCKET ?? "alpha";
 
 console.log("MinIO config:", {
-  endPoint: process.env.MINIO_ENDPOINT ?? "192.168.101.191",
+  endPoint: process.env.MINIO_ENDPOINT ?? "127.0.0.1",
   port: Number(process.env.MINIO_PORT ?? 9000),
   bucket: process.env.MINIO_BUCKET,
 });
 
 export const minioClient = new Minio.Client({
-  endPoint: process.env.MINIO_ENDPOINT ?? "192.168.101.191",
+  endPoint: process.env.MINIO_ENDPOINT ?? "127.0.0.1",
   port: Number(process.env.MINIO_PORT ?? 9000),
   useSSL: false,
   accessKey: process.env.MINIO_ACCESS_KEY ?? "alpha",
@@ -38,7 +38,11 @@ export async function getPresignedUrl(resourcePath: string) {
       7 * 24 * 60 * 60,
     );
   } catch (err) {
-    console.error("Failed to create presigned URL for MinIO object:", objectKey, err);
+    console.error(
+      "Failed to create presigned URL for MinIO object:",
+      objectKey,
+      err,
+    );
     return resourcePath;
   }
 }
