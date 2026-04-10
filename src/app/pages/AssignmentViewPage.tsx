@@ -28,8 +28,9 @@ export function AssignmentViewPage() {
 
   const [assignment, setAssignment] = useState<AssignmentType | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(true);
+  const [progressLoading, setProgressLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const userLevel = 1;
+  const [userLevel, setUserLevel] = useState(1);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState({
@@ -57,6 +58,7 @@ export function AssignmentViewPage() {
         setAssignment(json.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+        setProgressLoading(false);
       } finally {
         setAssignmentLoading(false);
       }
@@ -64,6 +66,48 @@ export function AssignmentViewPage() {
 
     fetchAssignment();
   }, [assignmentId]);
+
+  useEffect(() => {
+    if (!assignment) return;
+
+    if (user?.role === "superadmin") {
+      setProgressLoading(false);
+      return;
+    }
+
+    if (!user?.id || !assignment.classId || !token) {
+      setProgressLoading(false);
+      return;
+    }
+
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${assignment.classId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (!res.ok) {
+          setUserLevel(1);
+          return;
+        }
+
+        const json = await res.json();
+        const level = json.data?.tingkatanSaatIni;
+        setUserLevel(typeof level === "number" && level >= 1 ? level : 1);
+      } catch {
+        setUserLevel(1);
+      } finally {
+        setProgressLoading(false);
+      }
+    };
+
+    fetchProgress();
+  }, [assignment, user?.id, user?.role, token]);
 
   // Initialize edit draft
   useEffect(() => {
@@ -129,7 +173,7 @@ export function AssignmentViewPage() {
     }
   };
 
-  if (assignmentLoading) {
+  if (assignmentLoading || progressLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <DashboardHeader />

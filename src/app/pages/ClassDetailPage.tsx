@@ -20,7 +20,7 @@ interface KelasData {
 export function ClassDetailPage() {
   const { classId } = useParams();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const searchParams = new URLSearchParams(location.search);
@@ -76,6 +76,11 @@ export function ClassDetailPage() {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${classId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -86,7 +91,7 @@ export function ClassDetailPage() {
     };
 
     fetchProgress();
-  }, [user?.id, user?.role, classId]);
+  }, [user?.id, user?.role, classId, token]);
 
   const canAccessLevel = (level: number) => {
     if (user?.role === "superadmin") return true;

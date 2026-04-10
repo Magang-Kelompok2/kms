@@ -94,6 +94,11 @@ export function MaterialViewPage() {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${material.classId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
 
         // FIX: Jika 404 atau error lain (user belum punya progress),
@@ -123,7 +128,7 @@ export function MaterialViewPage() {
     };
 
     fetchProgress();
-  }, [material, user?.id, user?.role, materialId]);
+  }, [material, user?.id, user?.role, materialId, token]);
 
   // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
