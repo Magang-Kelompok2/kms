@@ -52,7 +52,7 @@ interface HasilKuisItem {
 
 export function SubmissionListPage() {
   const { tugasId } = useParams<{ tugasId: string }>();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const [tugas, setTugas] = useState<TugasDetail | null>(null);
@@ -85,24 +85,35 @@ export function SubmissionListPage() {
         setTugas(tugasData);
 
         const isKuis = tugasData.type?.toLowerCase() === "kuis";
+        const authHeaders = token
+          ? { Authorization: `Bearer ${token}` }
+          : undefined;
 
         if (isKuis) {
           // Fetch hasil kuis
           const hasilRes = await fetch(
             `${import.meta.env.VITE_API_URL}/api/kuis/${tugasId}/hasil`,
+            { headers: authHeaders },
           );
           if (hasilRes.ok) {
             const hasilJson = await hasilRes.json();
             setHasilKuisList(hasilJson.data ?? []);
+          } else {
+            const errorJson = await hasilRes.json();
+            throw new Error(errorJson.error ?? "Gagal mengambil hasil kuis");
           }
         } else {
           // Fetch pengumpulan tugas biasa
           const pengRes = await fetch(
             `${import.meta.env.VITE_API_URL}/api/pengumpulan/tugas/${tugasId}`,
+            { headers: authHeaders },
           );
           if (pengRes.ok) {
             const pengJson = await pengRes.json();
             setPengumpulanList(pengJson.data ?? []);
+          } else {
+            const errorJson = await pengRes.json();
+            throw new Error(errorJson.error ?? "Gagal mengambil pengumpulan");
           }
         }
       } catch (err) {

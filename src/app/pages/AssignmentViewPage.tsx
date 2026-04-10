@@ -40,7 +40,6 @@ export function AssignmentViewPage() {
     meetingNumber: "",
   });
 
-
   useEffect(() => {
     const fetchAssignment = async () => {
       if (!assignmentId) return;
@@ -140,9 +139,10 @@ export function AssignmentViewPage() {
             title: editDraft.title,
             description: editDraft.description,
             dueDate: editDraft.dueDate,
-            meetingNumber: parseInt(editDraft.meetingNumber) || assignment.meetingNumber,
+            meetingNumber:
+              parseInt(editDraft.meetingNumber) || assignment.meetingNumber,
           }),
-        }
+        },
       );
       if (!res.ok) throw new Error("Gagal mengupdate tugas");
       const json = await res.json();
@@ -164,7 +164,7 @@ export function AssignmentViewPage() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
       if (!res.ok) throw new Error("Gagal menghapus tugas");
       navigate(`/class/${assignment.classId}`);
@@ -365,6 +365,15 @@ export function AssignmentViewPage() {
                   </div>
                   {user?.role === "superadmin" && (
                     <div className="flex gap-3 mt-4">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() =>
+                          navigate(`/submissions/tugas/${assignmentId}`)
+                        }
+                      >
+                        Lihat Pengumpulan
+                      </Button>
                       <Button size="sm" variant="outline" onClick={handleEdit}>
                         <Edit3 className="h-4 w-4 mr-2" />
                         Edit
@@ -403,7 +412,10 @@ export function AssignmentViewPage() {
                   <textarea
                     value={editDraft.description}
                     onChange={(e) =>
-                      setEditDraft({ ...editDraft, description: e.target.value })
+                      setEditDraft({
+                        ...editDraft,
+                        description: e.target.value,
+                      })
                     }
                     className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 h-28 resize-none"
                   />
@@ -431,7 +443,10 @@ export function AssignmentViewPage() {
                       min={1}
                       value={editDraft.meetingNumber}
                       onChange={(e) =>
-                        setEditDraft({ ...editDraft, meetingNumber: e.target.value })
+                        setEditDraft({
+                          ...editDraft,
+                          meetingNumber: e.target.value,
+                        })
                       }
                       className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
                     />

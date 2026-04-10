@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
+import { verifySupabaseToken, AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
 
@@ -55,13 +56,11 @@ router.post("/:tugasId/soal", async (req, res) => {
     res.status(201).json({ success: true, data });
   } catch (error: any) {
     console.error("Error creating soal:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: "Failed to create soal",
-        detail: error?.message ?? error,
-      });
+    res.status(500).json({
+      success: false,
+      error: "Failed to create soal",
+      detail: error?.message ?? error,
+    });
   }
 });
 
@@ -206,23 +205,26 @@ router.post("/:tugasId/submit", async (req, res) => {
     res.json({ success: true, data: { skor, benar, total } });
   } catch (error: any) {
     console.error("Error submitting kuis:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: "Failed to submit kuis",
-        detail: error?.message ?? error,
-      });
+    res.status(500).json({
+      success: false,
+      error: "Failed to submit kuis",
+      detail: error?.message ?? error,
+    });
   }
 });
 
 // ── GET /api/kuis/:tugasId/hasil ──────────────────────────────────────────
-router.get("/:tugasId/hasil", async (req, res) => {
+router.get("/:tugasId/hasil", verifySupabaseToken, async (req: any, res) => {
   const tugasId = Number(req.params.tugasId);
   if (isNaN(tugasId))
     return res
       .status(400)
       .json({ success: false, error: "tugasId tidak valid" });
+
+  // Check if user is superadmin
+  if (req.user.role !== "superadmin") {
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+  }
 
   try {
     const { data: hasilList, error: hasilError } = await supabase

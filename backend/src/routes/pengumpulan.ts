@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
+import { verifySupabaseToken, AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
 
@@ -52,12 +53,17 @@ router.post("/", async (req, res) => {
 
 // GET /api/pengumpulan/tugas/:tugasId
 // Ambil semua pengumpulan untuk satu tugas (untuk superadmin review)
-router.get("/tugas/:tugasId", async (req, res) => {
+router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
   const tugasId = Number(req.params.tugasId);
   if (isNaN(tugasId))
     return res
       .status(400)
       .json({ success: false, error: "tugasId tidak valid" });
+
+  // Check if user is superadmin
+  if (req.user.role !== "superadmin") {
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+  }
 
   try {
     const { data, error } = await supabase

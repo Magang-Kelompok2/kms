@@ -20,7 +20,9 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
   const { username, email, password, role = "user", accesses } = req.body ?? {};
 
   const normalizedUsername = String(username ?? "").trim();
-  const normalizedEmail = String(email ?? "").trim().toLowerCase();
+  const normalizedEmail = String(email ?? "")
+    .trim()
+    .toLowerCase();
   const normalizedPassword = String(password ?? "");
   const requestedAccesses: RequestedAccess[] = Array.isArray(accesses)
     ? accesses
@@ -92,7 +94,7 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
     }> = [];
     const progressRows: Array<{
       id_kelas: number;
-      tingkatan_saat_ini: number;
+      id_tingkatan: number;
     }> = [];
 
     for (const access of uniqueByClass) {
@@ -141,7 +143,7 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
 
       progressRows.push({
         id_kelas: access.id_kelas,
-        tingkatan_saat_ini: access.id_tingkatan,
+        id_tingkatan: access.id_tingkatan,
       });
     }
 
@@ -188,7 +190,7 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
             progressRows.map((item) => ({
               id_user: createdUser.id_user,
               id_kelas: item.id_kelas,
-              tingkatan_saat_ini: item.tingkatan_saat_ini,
+              id_tingkatan: item.id_tingkatan,
               updated_at: now,
             })),
           );
@@ -292,7 +294,7 @@ router.get(
     try {
       const { data, error } = await supabase
         .from("user_progress")
-        .select("tingkatan_saat_ini")
+        .select("id_tingkatan")
         .eq("id_user", userId)
         .eq("id_kelas", classId)
         .single();
@@ -302,7 +304,7 @@ router.get(
 
       res.json({
         success: true,
-        data: { tingkatanSaatIni: data?.tingkatan_saat_ini ?? 1 },
+        data: { tingkatanSaatIni: data?.id_tingkatan ?? 1 },
       });
     } catch (error) {
       console.error("Error fetching progress:", error);
@@ -333,7 +335,7 @@ router.put(
         {
           id_user: userId,
           id_kelas: classId,
-          tingkatan_saat_ini: tingkatanSaatIni,
+          id_tingkatan: tingkatanSaatIni,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "id_user,id_kelas" },

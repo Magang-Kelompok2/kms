@@ -647,6 +647,17 @@ export function QuizViewPage() {
                     Level {quizLevel}
                   </Badge>
                 </div>
+                {user?.role === "superadmin" && (
+                  <div className="mb-4">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => navigate(`/submissions/tugas/${quizId}`)}
+                    >
+                      Lihat Hasil Kuis
+                    </Button>
+                  </div>
+                )}
                 <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-2">
                   {quiz.title}
                 </h1>
