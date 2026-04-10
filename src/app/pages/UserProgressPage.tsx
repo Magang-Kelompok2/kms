@@ -128,6 +128,11 @@ export function UserProgressPage() {
   const { userId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [overrides, setOverrides] = useState<Record<string, { status: string; feedback?: string }>>({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalAction, setModalAction] = useState<"approved" | "rejected" | null>(null);
+  const [modalTargetId, setModalTargetId] = useState<string | null>(null);
+  const [feedbackInput, setFeedbackInput] = useState("");
 
   if (user?.role !== "superadmin") {
     navigate("/dashboard");
@@ -143,15 +148,23 @@ export function UserProgressPage() {
   }
 
   // 🔥 APPROVE & REJECT
-  const handleApprove = (submissionId: string) => {
-    alert(`Approved submission ${submissionId}`);
+  const openModal = (id: string, action: "approved" | "rejected") => {
+    setModalTargetId(id);
+    setModalAction(action);
+    setFeedbackInput("");
+    setModalOpen(true);
   };
 
-  const handleReject = (submissionId: string) => {
-    const feedback = prompt("Masukkan feedback:");
-    if (feedback) {
-      alert(`Rejected submission ${submissionId} dengan feedback: ${feedback}`);
-    }
+  const handleConfirm = () => {
+    if (!modalTargetId || !modalAction) return;
+    setOverrides((prev) => ({
+      ...prev,
+      [modalTargetId]: { status: modalAction, feedback: feedbackInput || undefined },
+    }));
+    setModalOpen(false);
+    setModalTargetId(null);
+    setModalAction(null);
+    setFeedbackInput("");
   };
 
   return (
@@ -250,76 +263,82 @@ export function UserProgressPage() {
 
         {/* PENGUMPULAN */}
         <div>
-          <h2 className="text-2xl font-normal mb-4">
-            Pengumpulan
-          </h2>
+          <h2 className="text-2xl font-normal mb-4">Pengumpulan</h2>
 
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {userSubmissions.map((submission) => {
+              const override = overrides[submission.id];
+              const status = (override?.status ?? submission.status) as "approved" | "rejected" | "pending";
+              const feedback = override?.feedback ?? submission.feedback;
+
               const cls = classes.find((c) => c.id === submission.classId);
               const quiz = submission.quizId
                 ? quizzes.find((q) => q.id === submission.quizId)
                 : null;
 
+              const statusConfig =
+                status === "approved"
+                  ? { label: "approved", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: <CheckCircle className="h-3 w-3" /> }
+                  : status === "rejected"
+                  ? { label: "rejected", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: <XCircle className="h-3 w-3" /> }
+                  : { label: "pending", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-600", icon: <Clock className="h-3 w-3" /> };
+
               return (
-                <Card key={submission.id} className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3>
-                          {quiz?.title || "Pengumpulan Tugas"}
-                        </h3>
-
-                        <Badge>
-                          {submission.status === "pending" && (
-                            <Clock className="h-3 w-3 mr-1" />
-                          )}
-                          {submission.status === "approved" && (
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                          )}
-                          {submission.status === "rejected" && (
-                            <XCircle className="h-3 w-3 mr-1" />
-                          )}
-                          {submission.status}
-                        </Badge>
-                      </div>
-
-                      <div className="text-sm text-gray-500 mb-2">
-                        {cls?.name} • Tingkatan {submission.level}
-                      </div>
-
-                      {submission.score !== undefined && (
-                        <div className="flex items-center gap-2 mb-2">
-                          <Award className="h-4 w-4 text-yellow-500" />
-                          Skor: {submission.score}
-                        </div>
-                      )}
-
-                      {submission.feedback && (
-                        <p className="text-sm bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                          <strong>Feedback:</strong> {submission.feedback}
-                        </p>
-                      )}
+                <Card
+                  key={submission.id}
+                  className="flex flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  {/* Card Header */}
+                  <div className="h-24 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] p-4 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/80 text-xs font-medium uppercase tracking-wide">
+                        {quiz ? "Kuis" : "Tugas"}
+                      </span>
+                      <span className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusConfig.className}`}>
+                        {statusConfig.icon}
+                        {statusConfig.label}
+                      </span>
                     </div>
+                    <h3 className="text-white font-semibold text-sm leading-tight line-clamp-2">
+                      {quiz?.title || "Pengumpulan Tugas"}
+                    </h3>
+                  </div>
 
-                    {/* ACTION BUTTON */}
-                    {submission.status === "pending" && (
-                      <div className="flex gap-2 ml-4">
+                  {/* Card Body */}
+                  <div className="flex flex-col flex-1 p-4 gap-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {cls?.name} • Tingkatan {submission.level}
+                    </p>
+
+                    {submission.score !== undefined && (
+                      <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+                        <Award className="h-4 w-4 text-yellow-500" />
+                        Skor: <span className="font-semibold">{submission.score}</span>
+                      </div>
+                    )}
+
+                    {feedback && (
+                      <p className="text-xs bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-lg text-gray-600 dark:text-gray-300">
+                        <strong>Feedback:</strong> {feedback}
+                      </p>
+                    )}
+
+                    {status === "pending" && (
+                      <div className="flex gap-2 mt-auto pt-2">
                         <Button
                           size="sm"
-                          className="bg-green-500 hover:bg-green-600 text-white"
-                          onClick={() => handleApprove(submission.id)}
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs"
+                          onClick={() => openModal(submission.id, "approved")}
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
+                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
                           Approve
                         </Button>
-
                         <Button
                           size="sm"
-                          className="bg-red-500 hover:bg-red-600 text-white"
-                          onClick={() => handleReject(submission.id)}
+                          className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs"
+                          onClick={() => openModal(submission.id, "rejected")}
                         >
-                          <XCircle className="h-4 w-4 mr-1" />
+                          <XCircle className="h-3.5 w-3.5 mr-1" />
                           Reject
                         </Button>
                       </div>
@@ -330,15 +349,54 @@ export function UserProgressPage() {
             })}
 
             {userSubmissions.length === 0 && (
-              <Card className="p-12 text-center">
-                <TrendingUp className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">
-                  Belum ada pengumpulan.
-                </p>
-              </Card>
+              <div className="col-span-full">
+                <Card className="p-12 text-center">
+                  <TrendingUp className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Belum ada pengumpulan.
+                  </p>
+                </Card>
+              </div>
             )}
           </div>
         </div>
+
+        {/* MODAL FEEDBACK */}
+        {modalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+                {modalAction === "approved" ? "Approve Pengumpulan" : "Reject Pengumpulan"}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {modalAction === "approved"
+                  ? "Tambahkan feedback untuk siswa (opsional)."
+                  : "Berikan alasan penolakan untuk siswa."}
+              </p>
+              <textarea
+                className="w-full border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                placeholder="Tulis feedback di sini..."
+                value={feedbackInput}
+                onChange={(e) => setFeedbackInput(e.target.value)}
+              />
+              <div className="flex gap-2 mt-4 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setModalOpen(false)}>
+                  Batal
+                </Button>
+                <Button
+                  size="sm"
+                  className={modalAction === "approved"
+                    ? "bg-green-500 hover:bg-green-600 text-white"
+                    : "bg-red-500 hover:bg-red-600 text-white"}
+                  onClick={handleConfirm}
+                >
+                  {modalAction === "approved" ? "Approve" : "Reject"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
