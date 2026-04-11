@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -212,37 +211,28 @@ export function MaterialViewPage() {
   // ── Loading state ──────────────────────────────────────────────
   if (materialLoading || progressLoading) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <p className="text-gray-500">Memuat materi...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <p className="text-gray-500">Memuat materi...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">{error}</p>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 flex items-center justify-center">
+        <Card className="p-8 text-center">
+          <p className="text-red-500">{error}</p>
+        </Card>
       </div>
     );
   }
 
   if (!material) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">Material tidak ditemukan</p>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 flex items-center justify-center">
+        <Card className="p-8 text-center">
+          <p className="text-red-500">Materi tidak ditemukan</p>
+        </Card>
       </div>
     );
   }
@@ -258,21 +248,18 @@ export function MaterialViewPage() {
 
   if (!hasAccess) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-12 text-center">
-            <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
-              materi ini. (Level materi: {materialLevel}, Level kamu:{" "}
-              {userLevel})
-            </p>
-            <Button onClick={() => navigate("/dashboard")} className="mt-4">
-              Kembali ke Dashboard
-            </Button>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 flex items-center justify-center">
+        <Card className="p-12 text-center max-w-md">
+          <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
+            materi ini. (Level materi: {materialLevel}, Level kamu:{" "}
+            {userLevel})
+          </p>
+          <Button onClick={() => navigate("/dashboard")} className="mt-4">
+            Kembali ke Dashboard
+          </Button>
+        </Card>
       </div>
     );
   }
@@ -293,7 +280,6 @@ export function MaterialViewPage() {
 
   return (
     <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-      <DashboardHeader />
 
       <div className="container mx-auto px-4 md:px-6 py-6">
         <Button

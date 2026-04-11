@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -14,7 +13,6 @@ import {
   assignments,
 } from "../data/mockData";
 import {
-  ArrowLeft,
   Clock,
   CheckCircle,
   XCircle,
@@ -107,7 +105,7 @@ function DonutChart({
       </svg>
 
       {hover && (
-        <div className="absolute -top-2 translate-y-[-100%] px-3 py-2 text-xs bg-gray-900 text-white dark:bg-white dark:text-black rounded shadow-lg whitespace-nowrap">
+        <div className="absolute -top-2 -translate-y-full px-3 py-2 text-xs bg-gray-900 text-white dark:bg-white dark:text-black rounded shadow-lg whitespace-nowrap">
           {hover === "materi" && (
             <div>Materi: {materi} telah diselesaikan</div>
           )}
@@ -168,48 +166,30 @@ export function UserProgressPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <DashboardHeader />
+    <div className="space-y-6">
+      {/* User Header */}
+      <Card className="p-5">
+        <div className="flex items-start gap-4">
+          <div className="w-14 h-14 rounded-full bg-linear-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-lg font-semibold shrink-0">
+            {targetUser.name.charAt(0)}
+          </div>
 
-      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/users")}
-          className="mb-6"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Kembali ke Laman Pengguna
-        </Button>
-
-        {/* USER HEADER */}
-        <Card className="p-6 mb-8">
-          <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] flex items-center justify-center text-white text-xl font-semibold">
-              {targetUser.name.charAt(0)}
-            </div>
-
-            <div className="flex-1">
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {targetUser.name}
-              </h1>
-
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                {targetUser.email}
-              </p>
-
-              <div className="flex gap-6 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                <span>Bergabung: {targetUser.createdAt}</span>
-                <span>Total Pengumpulan: {userSubmissions.length}</span>
-              </div>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">{targetUser.name}</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+              {targetUser.email}
+            </p>
+            <div className="flex gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>Bergabung: {targetUser.createdAt}</span>
+              <span>Total Pengumpulan: {userSubmissions.length}</span>
             </div>
           </div>
-        </Card>
+        </div>
+      </Card>
 
-        {/* PROGRESS */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">
-            Progres Kelas
-          </h2>
+      {/* Progress */}
+      <div>
+        <h2 className="text-xl font-bold tracking-tight mb-4">Progres Kelas</h2>
 
           <div className="grid md:grid-cols-3 gap-6">
             {progress.map((p) => {
@@ -264,7 +244,6 @@ export function UserProgressPage() {
         {/* PENGUMPULAN */}
         <div>
           <h2 className="text-2xl font-bold mb-4">Pengumpulan</h2>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {userSubmissions.map((submission) => {
               const override = overrides[submission.id];
@@ -288,8 +267,7 @@ export function UserProgressPage() {
                   key={submission.id}
                   className="flex flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow"
                 >
-                  {/* Card Header */}
-                  <div className="h-24 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] p-4 flex flex-col justify-between">
+                  <div className="h-24 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] p-4 flex flex-col justify-between">
                     <div className="flex items-center justify-between">
                       <span className="text-white/80 text-xs font-medium uppercase tracking-wide">
                         {quiz ? "Kuis" : "Tugas"}
@@ -304,7 +282,6 @@ export function UserProgressPage() {
                     </h3>
                   </div>
 
-                  {/* Card Body */}
                   <div className="flex flex-col flex-1 p-4 gap-3">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {cls?.name} • Tingkatan {submission.level}
@@ -361,7 +338,6 @@ export function UserProgressPage() {
           </div>
         </div>
 
-        {/* MODAL FEEDBACK */}
         {modalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
@@ -397,7 +373,6 @@ export function UserProgressPage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

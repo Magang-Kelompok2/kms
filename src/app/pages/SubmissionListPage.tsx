@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -128,13 +127,10 @@ export function SubmissionListPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8 flex justify-center">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-2" />
-            <p className="text-gray-500">Memuat data...</p>
-          </div>
+      <div className="flex justify-center items-center py-12">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-2" />
+          <p className="text-gray-500">Memuat data...</p>
         </div>
       </div>
     );
@@ -142,21 +138,16 @@ export function SubmissionListPage() {
 
   if (error || !tugas) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">{error ?? "Data tidak ditemukan"}</p>
-            <Button
-              variant="outline"
-              onClick={() => navigate(-1)}
-              className="mt-4"
-            >
-              Kembali
-            </Button>
-          </Card>
-        </div>
-      </div>
+      <Card className="p-8 text-center">
+        <p className="text-red-500">{error ?? "Data tidak ditemukan"}</p>
+        <Button
+          variant="outline"
+          onClick={() => navigate(-1)}
+          className="mt-4"
+        >
+          Kembali
+        </Button>
+      </Card>
     );
   }
 
@@ -166,32 +157,21 @@ export function SubmissionListPage() {
     : pengumpulanList.length;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <DashboardHeader />
-      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(`/class/${tugas.classId}`)}
-          className="mb-6"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Kembali ke Kelas
-        </Button>
-
-        {/* Header */}
-        <Card className="p-6 mb-8">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-3">
-                <Badge variant="outline">Pertemuan {tugas.meetingNumber}</Badge>
-                <Badge variant="outline">Level {tugas.level}</Badge>
-                <Badge variant="default">{isKuis ? "Kuis" : "Tugas"}</Badge>
-              </div>
-              <h1 className="text-3xl font-bold mb-2">{tugas.title}</h1>
-              {tugas.description && (
-                <p className="text-gray-600 dark:text-gray-400 mb-3">
-                  {tugas.description}
-                </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <Card className="p-5">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="outline" className="text-xs">Pertemuan {tugas.meetingNumber}</Badge>
+              <Badge variant="outline" className="text-xs">Level {tugas.level}</Badge>
+              <Badge variant="default" className="text-xs">{isKuis ? "Kuis" : "Tugas"}</Badge>
+            </div>
+            <h1 className="text-2xl font-bold mb-1">{tugas.title}</h1>
+            {tugas.description && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                {tugas.description}
+              </p>
               )}
               {tugas.dueDate && (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -340,7 +320,7 @@ export function SubmissionListPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-bold shrink-0">
+                      <div className="w-10 h-10 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-bold shrink-0">
                         {item.user?.username?.charAt(0)?.toUpperCase() ?? "?"}
                       </div>
                       <div>
@@ -425,7 +405,6 @@ export function SubmissionListPage() {
             ))
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -15,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { ArrowLeft, Plus, Trash2, UserPlus } from "lucide-react";
+import { Plus, Trash2, UserPlus } from "lucide-react";
 
 type SelectedAccess = {
   classId: string;
@@ -165,40 +164,27 @@ export function CreateUserPage() {
   };
 
   return (
-    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-      <DashboardHeader />
+    <div className="max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold tracking-tight mb-1">
+          Buat Pengguna Baru
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 text-sm">
+          Tambahkan pengguna baru ke platform
+        </p>
+      </div>
 
-      <div className="container mx-auto px-4 md:px-6 py-8 max-w-2xl">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/users")}
-          className="mb-6"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Kembali ke Laman Pengguna
-        </Button>
-
-        <Card className="p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-lg flex items-center justify-center">
-              <UserPlus className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-normal">Buat Akun Baru</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Buat Akun untuk Pengguna Baru
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nama Lengkap</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Masukkan nama lengkap"
-                value={formData.name}
+      <Card className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-sm font-medium">
+              Nama Lengkap
+            </Label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="Masukkan nama lengkap"
+              value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
@@ -366,9 +352,8 @@ export function CreateUserPage() {
                 Cancel
               </Button>
             </div>
-          </form>
-        </Card>
-      </div>
+        </form>
+      </Card>
     </div>
   );
 }

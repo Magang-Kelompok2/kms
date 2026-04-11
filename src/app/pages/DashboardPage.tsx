@@ -1,12 +1,10 @@
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import {
   BookOpen,
   FileText,
   ClipboardCheck,
   Calendar,
-  Trash2,
   Plus,
   Eye,
   Search,
@@ -54,6 +52,7 @@ export function DashboardPage() {
       u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+  
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const currentUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
@@ -61,161 +60,111 @@ export function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-      <DashboardHeader />
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Selamat datang kembali, {user?.name}!
+        </h1>
+        <p className="text-gray-600 mt-1">
+          Lanjutkan perjalanan pembelajaran Anda
+        </p>
+      </div>
 
-      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            Selamat datang kembali, {user?.name}!
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            {user?.role === "superadmin"
-              ? "Kelola kelas, materi, dan akses siswa Anda"
-              : "Lanjutkan perjalanan pembelajaran Anda"}
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 max-w-6xl mx-auto">
-          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
-                  Total Kelas
-                </p>
-                <p className="text-4xl font-semibold">
-                  {classesLoading ? "-" : classes.length}
-                </p>
-              </div>
-              <div className="rounded-3xl bg-white/15 p-3">
-                <BookOpen className="h-10 w-10 text-white opacity-90" />
-              </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Kelas</p>
+              <p className="text-3xl font-bold mt-2">{classesLoading ? "-" : classes.length}</p>
             </div>
-            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
-              <span>Semua kelas aktif</span>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                Overview
-              </span>
+            <div className="p-2.5 rounded-lg bg-blue-100">
+              <BookOpen className="w-5 h-5 text-blue-600" />
             </div>
-          </Card>
-
-          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-violet-600 via-fuchsia-500 to-sky-500">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
-                  Materi
-                </p>
-                <p className="text-4xl font-semibold">
-                  {materiLoading ? "-" : materi.length}
-                </p>
-              </div>
-              <div className="rounded-3xl bg-white/15 p-3">
-                <FileText className="h-10 w-10 text-white opacity-90" />
-              </div>
-            </div>
-            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
-              <span>Total materi</span>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                Pelajari sekarang
-              </span>
-            </div>
-          </Card>
-
-          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-emerald-500 via-teal-500 to-cyan-500">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
-                  Penugasan
-                </p>
-                <p className="text-4xl font-semibold">
-                  {tugasLoading ? "-" : penugasan.length}
-                </p>
-              </div>
-              <div className="rounded-3xl bg-white/15 p-3">
-                <ClipboardCheck className="h-10 w-10 text-white opacity-90" />
-              </div>
-            </div>
-            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
-              <span>Task progress</span>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                Fokus kerja
-              </span>
-            </div>
-          </Card>
-
-          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-orange-500 via-rose-500 to-pink-500">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
-                  Kuis
-                </p>
-                <p className="text-4xl font-semibold">
-                  {tugasLoading ? "-" : kuis.length}
-                </p>
-              </div>
-              <div className="rounded-3xl bg-white/15 p-3">
-                <Calendar className="h-10 w-10 text-white opacity-90" />
-              </div>
-            </div>
-            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
-              <span>Persiapan ujian</span>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                Review
-              </span>
-            </div>
-          </Card>
-        </div>
-
-        {/* Classes Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Kelas Anda</h2>
           </div>
+        </Card>
 
+        <Card className="p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Materi</p>
+              <p className="text-3xl font-bold mt-2">{materiLoading ? "-" : materi.length}</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-purple-100">
+              <FileText className="w-5 h-5 text-purple-600" />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Penguasan</p>
+              <p className="text-3xl font-bold mt-2">{tugasLoading ? "-" : penugasan.length}</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-green-100">
+              <ClipboardCheck className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Kuis</p>
+              <p className="text-3xl font-bold mt-2">{tugasLoading ? "-" : kuis.length}</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-orange-100">
+              <Calendar className="w-5 h-5 text-orange-600" />
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Main Content Grid - 2 Columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Classes */}
+        <div className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold tracking-tight">• KELAS ANDA</h2>
+            <Button variant="link" size="sm" className="text-blue-600">Lihat Semua</Button>
+          </div>
           {classesLoading ? (
             <p className="text-gray-500">Memuat kelas...</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {classes.map((cls) => {
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {classes.slice(0, 3).map((cls) => {
                 const kelasMateri = materi.filter((m) => m.id_kelas === cls.id);
-                const kelasTugas = tugas.filter(
-                  (t) => t.id_kelas === cls.id && t.type === "Kuis",
-                );
+                const kelasTugas = tugas.filter((t) => t.id_kelas === cls.id && t.type === "Kuis");
 
                 return (
                   <Card
                     key={cls.id}
-                    className="group cursor-pointer hover:shadow-2xl transition-all duration-300 overflow-hidden rounded-4xl"
+                    className="group cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden"
                     onClick={() => navigate(`/class/${cls.id}`)}
                   >
-                    <div className="relative h-50 overflow-hidden bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.25),transparent_40%)]" />
-                      <div className="absolute left-6 top-6 rounded-full bg-white/20 w-14 h-14 blur-2xl" />
-                      <div className="absolute right-4 top-8 rounded-full bg-white/10 w-24 h-24" />
+                    <div className="relative h-40 overflow-hidden bg-linear-to-br from-blue-600 to-cyan-500">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.2),transparent_40%)]" />
                       <div className="absolute inset-0 flex items-center justify-center px-4">
-                        <h3
-                          className="text-4xl font-bold text-white text-center"
-                          style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
-                        >
-                          {cls.name}
-                        </h3>
+                        <h3 className="text-2xl font-bold text-white text-center line-clamp-2">{cls.name}</h3>
                       </div>
                     </div>
-                    <div className="p-6">
-                      <div className="flex gap-4 text-sm text-gray-500 mb-2">
-                        <span className="font-bold text-base">{kelasMateri.length} Materi</span>
-                        <span className="font-bold text-base">{kelasTugas.length} Kuis</span>
+                    <div className="p-4">
+                      <div className="flex gap-4 text-sm mb-3">
+                        <div>
+                          <span className="font-medium text-gray-700">{kelasMateri.length} Materi</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">{kelasTugas.length} Kuis</span>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-500">
-                        Dibuat:{" "}
-                        {new Date(cls.createdAt).toLocaleDateString("id-ID")}
-                      </p>
+                      <Button 
+                        className="w-full bg-white text-gray-900 border border-gray-300 hover:bg-gray-50"
+                        size="sm"
+                      >
+                        Lanjutkan
+                      </Button>
                     </div>
                   </Card>
                 );
@@ -224,193 +173,126 @@ export function DashboardPage() {
           )}
         </div>
 
-        {/* User Management for Superadmin */}
-        {user?.role === "superadmin" && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Manajemen Pengguna</h2>
-              <Button className="bg-secondary cursor-pointer" onClick={() => navigate("/users/create")}>
-                <Plus className="h-4 w-4 mr-2" />
-                Buat Pengguna Baru
-              </Button>
-            </div>
-
-            <div className="mb-4">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Cari pengguna..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="pl-10"
-                />
+        {/* Right Column - Sidebar with Alerts/Info */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* Audit Section */}
+          <Card className="p-4 border-l-4 border-l-purple-500">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-purple-600 font-bold">A</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-purple-600 uppercase">Audit</p>
+                <h4 className="font-semibold text-sm">Audit - Pertemuan 1</h4>
+                <p className="text-xs text-gray-500 mt-1">Pengarsipan dan profesional...</p>
+                <p className="text-xs text-gray-400 mt-2">2 jam lalu</p>
               </div>
             </div>
+          </Card>
 
-            <Card>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Nama
-                      </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Email
-                      </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Role
-                      </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Dibuat Pada
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">
-                        Aksi
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {usersLoading ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-6 py-8 text-center text-gray-500"
-                        >
-                          Memuat pengguna...
-                        </td>
-                      </tr>
-                    ) : (
-                      currentUsers.map((u) => (
-                        <tr
-                          key={u.id}
-                          className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-bold">
-                                {u.username.charAt(0).toUpperCase()}
-                              </div>
-                              <span className="font-medium">{u.username}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                            {u.email}
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge
-                              variant={
-                                u.role === "superadmin"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                            {new Date(u.created_at).toLocaleDateString("id-ID")}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  navigate(`/users/${u.id}/progress`)
-                                }
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                Lihat
-                              </Button>
-                              {u.role !== "superadmin" && (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteUser(u.id, u.role);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+          {/* Alasan Section */}
+          <Card className="p-4 border-l-4 border-l-blue-500">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-blue-600 font-bold">A</span>
               </div>
-              <div className="flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-gray-900">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
-                >
-                  Sebelumnya
-                </Button>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Halaman {currentPage} dari {Math.max(totalPages, 1)}
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages || totalPages === 0}
-                >
-                  Selanjutnya
-                </Button>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-blue-600 uppercase">Alasan</p>
+                <h4 className="font-semibold text-sm">Akuntansi - Pertemuan 0</h4>
+                <p className="text-xs text-gray-500 mt-1">Keranjang konsep pelaporan...</p>
               </div>
-            </Card>
-          </div>
-        )}
-
-        {/* Materi Terbaru untuk user non-superadmin */}
-        {user?.role !== "superadmin" && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Materi Terbaru</h2>
             </div>
+          </Card>
 
-            <div className="grid gap-4">
-              {materi.slice(0, 5).map((m) => {
-                const cls = classes.find((c) => c.id === m.id_kelas);
-                return (
-                  <Card
-                    key={m.id_materi}
-                    className="p-6 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => navigate(`/class/${m.id_kelas}`)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline" className="text-xs">
-                            {cls?.name}
-                          </Badge>
-                          <Badge variant="secondary" className="text-xs">
-                            Pertemuan {m.pertemuan}
-                          </Badge>
-                        </div>
-                        <h3 className="font-bold mb-1">{m.title_materi}</h3>
-                      </div>
-                      <FileText className="h-10 w-10 text-gray-300 dark:text-gray-700 ml-4" />
-                    </div>
-                  </Card>
-                );
-              })}
+          {/* Perpajakan Section */}
+          <Card className="p-4 border-l-4 border-l-green-500">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-green-600 font-bold">P</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-green-600 uppercase">Perpajakan</p>
+                <h4 className="font-semibold text-sm">Hukum Pajak Materi I</h4>
+                <p className="text-xs text-gray-500 mt-1">Asas dan dasar perhitungan pajak...</p>
+                <p className="text-xs text-gray-400 mt-2">2 hari lalu</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Target Mingguan */}
+          <Card className="p-4">
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-sm">Target Mingguan</h4>
+                <span className="text-sm font-bold text-green-600">75%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-green-500 h-2 rounded-full" style={{width: "75%"}}></div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">
+              Anda telah menyelesaikan 12 dari 16 materi target mingguan.
+            </p>
+            <Button variant="link" size="sm" className="text-blue-600 p-0 h-auto mt-2">
+              Terus semangat!
+            </Button>
+          </Card>
+
+          {/* "Buka Katalog Materi" Link */}
+          <Button 
+            variant="outline" 
+            className="w-full text-blue-600 border-blue-600 hover:bg-blue-50"
+            size="sm"
+          >
+            Buka Katalog Materi
+          </Button>
+        </div>
+      </div>
+
+      {/* Bottom Section - 3 Columns */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+        {/* Pencapaian Baru */}
+        <Card className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <span className="text-lg">🎯</span>
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-sm">Pencapaian Baru</h4>
+              <p className="text-xs text-gray-600 mt-1">Anda telah menyelesaikan 5 materi berturut-turut!</p>
             </div>
           </div>
-        )}
+        </Card>
+
+        {/* Klain XP */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-semibold text-sm">Klain XP</h4>
+              <p className="text-xs text-gray-600 mt-1">Tersedia untuk diklaim</p>
+            </div>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+              size="sm"
+            >
+              Klain XP
+            </Button>
+          </div>
+        </Card>
+
+        {/* Jadwal Mendatang */}
+        <Card className="p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <h4 className="font-semibold text-sm">Jadwal Mendatang</h4>
+              <p className="text-xs text-gray-600 mt-1">Ujian Tengah Semester - Perpajakan</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-400">Besok</p>
+              <p className="text-xs text-gray-400">09:00 WIB</p>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );

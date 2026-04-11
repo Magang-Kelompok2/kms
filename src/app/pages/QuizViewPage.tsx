@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -280,12 +279,9 @@ export function QuizViewPage() {
   // ── Loading ────────────────────────────────────────────────────
   if (quizLoading || progressLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-3xl px-4 py-16 flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
-          <p className="text-gray-500 font-medium">Memuat kuis...</p>
-        </div>
+      <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center">
+        <div className="w-16 h-16 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
+        <p className="text-gray-500 font-medium">Memuat kuis...</p>
       </div>
     );
   }
@@ -293,10 +289,8 @@ export function QuizViewPage() {
   // ── Error ──────────────────────────────────────────────────────
   if (error || !quiz) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-3xl px-4 py-16">
-          <Card className="p-10 text-center border-red-100 dark:border-red-900">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900 p-4 flex items-center justify-center">
+        <Card className="p-10 text-center border-red-100 dark:border-red-900 max-w-md">
             <AlertCircle className="h-14 w-14 text-red-400 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-red-600 mb-2">
               Terjadi Kesalahan
@@ -310,7 +304,6 @@ export function QuizViewPage() {
               <ArrowLeft className="h-4 w-4 mr-2" /> Kembali
             </Button>
           </Card>
-        </div>
       </div>
     );
   }
@@ -322,10 +315,8 @@ export function QuizViewPage() {
   // ── Akses Ditolak ──────────────────────────────────────────────
   if (!hasAccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-3xl px-4 py-16">
-          <Card className="p-12 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900 p-4 flex items-center justify-center">
+        <Card className="p-12 text-center max-w-md">
             <div className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center mx-auto mb-6">
               <AlertCircle className="h-10 w-10 text-amber-500" />
             </div>
@@ -337,7 +328,6 @@ export function QuizViewPage() {
               <ArrowLeft className="h-4 w-4 mr-2" /> Kembali ke Dashboard
             </Button>
           </Card>
-        </div>
       </div>
     );
   }
@@ -352,7 +342,7 @@ export function QuizViewPage() {
   if (tahap === "mengerjakan") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
+
         <div className="container mx-auto max-w-3xl px-4 py-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
@@ -439,7 +429,7 @@ export function QuizViewPage() {
                       {opsi.teks}
                     </span>
                     {dipilih && (
-                      <CheckCircle className="h-4 w-4 text-blue-500 ml-auto flex-shrink-0" />
+                      <CheckCircle className="h-4 w-4 text-blue-500 ml-auto shrink-0" />
                     )}
                   </button>
                 );
@@ -490,8 +480,8 @@ export function QuizViewPage() {
                 disabled={isSubmitting}
                 className={`flex-1 text-white font-semibold ${
                   sudahJawabSemua
-                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
-                    : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
+                    ? "bg-linear-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
+                    : "bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
                 }`}
               >
                 {isSubmitting ? (
@@ -521,19 +511,19 @@ export function QuizViewPage() {
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
+
         <div className="container mx-auto max-w-2xl px-4 py-10">
           <Card className="overflow-hidden shadow-xl border-0">
             <div
-              className={`h-3 w-full ${lulus ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-red-400 to-rose-500"}`}
+              className={`h-3 w-full ${lulus ? "bg-linear-to-r from-emerald-400 to-teal-500" : "bg-linear-to-r from-red-400 to-rose-500"}`}
             />
 
             <div className="p-8 text-center">
               <div
                 className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg ${
                   lulus
-                    ? "bg-gradient-to-br from-emerald-400 to-teal-500"
-                    : "bg-gradient-to-br from-red-400 to-rose-500"
+                    ? "bg-linear-to-br from-emerald-400 to-teal-500"
+                    : "bg-linear-to-br from-red-400 to-rose-500"
                 }`}
               >
                 <Trophy className="h-12 w-12 text-white" />
@@ -604,7 +594,7 @@ export function QuizViewPage() {
               <div className="max-w-sm mx-auto">
                 <Button
                   onClick={() => navigate(`/class/${quiz.classId}`)}
-                  className="w-full py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold"
+                  className="w-full py-6 bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold"
                 >
                   Kembali ke Kelas
                 </Button>
@@ -619,7 +609,7 @@ export function QuizViewPage() {
   // ── TAHAP: INFO ────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-      <DashboardHeader />
+
       <div className="container mx-auto px-4 md:px-6 py-8">
         <Button
           variant="ghost"
@@ -631,12 +621,12 @@ export function QuizViewPage() {
 
         <div className="max-w-2xl mx-auto">
           <Card className="overflow-hidden shadow-xl border-0">
-            <div className="h-2 bg-gradient-to-r from-blue-500 via-violet-500 to-blue-600" />
+            <div className="h-2 bg-linear-to-r from-blue-500 via-violet-500 to-blue-600" />
 
             <div className="p-8">
               {/* Header */}
               <div className="text-center mb-8">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center mx-auto mb-5 shadow-lg">
+                <div className="w-20 h-20 rounded-2xl bg-linear-to-br from-blue-500 to-violet-600 flex items-center justify-center mx-auto mb-5 shadow-lg">
                   <FileText className="h-10 w-10 text-white" />
                 </div>
                 <div className="flex items-center gap-2 justify-center mb-3">
@@ -689,7 +679,7 @@ export function QuizViewPage() {
               {/* Info sudah mengerjakan */}
               {sudahMengerjakan && (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 mb-5">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
                     <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
@@ -721,7 +711,7 @@ export function QuizViewPage() {
                       key={i}
                       className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
                     >
-                      <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                      <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                         {i + 1}
                       </span>
                       {item}
@@ -745,7 +735,7 @@ export function QuizViewPage() {
                 ) : (
                   <Button
                     onClick={handleMulaiKuis}
-                    className="w-full py-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white shadow-lg shadow-blue-200 dark:shadow-none"
+                    className="w-full py-6 text-base font-semibold bg-linear-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white shadow-lg shadow-blue-200 dark:shadow-none"
                   >
                     <Trophy className="h-5 w-5 mr-2" /> Mulai Kuis
                   </Button>

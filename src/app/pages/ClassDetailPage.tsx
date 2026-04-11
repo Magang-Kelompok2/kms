@@ -1,6 +1,5 @@
 import { useParams, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -109,38 +108,29 @@ export function ClassDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="flex items-center justify-center py-40">
-          <p className="text-gray-500">Memuat data kelas...</p>
-        </div>
+      <div className="min-h-screen bg-blue-50 dark:bg-gray-950 flex items-center justify-center">
+        <p className="text-gray-500">Memuat data kelas...</p>
       </div>
     );
   }
 
   if (!currentClass) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">Kelas tidak ditemukan</p>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-blue-50 dark:bg-gray-950 p-4 flex items-center justify-center">
+        <Card className="p-8 text-center">
+          <p className="text-red-500">Kelas tidak ditemukan</p>
+        </Card>
       </div>
     );
   }
 
   if (levelsError) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500 mb-2">Gagal memuat data tingkatan</p>
-            <p className="text-sm text-gray-500">{levelsError}</p>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-blue-50 dark:bg-gray-950 p-4 flex items-center justify-center">
+        <Card className="p-8 text-center">
+          <p className="text-red-500 mb-2">Gagal memuat data tingkatan</p>
+          <p className="text-sm text-gray-500">{levelsError}</p>
+        </Card>
       </div>
     );
   }
@@ -186,7 +176,6 @@ export function ClassDetailPage() {
   if (user?.role === "superadmin") {
     return (
       <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <ClassHeader />
           <div className="grid md:grid-cols-3 gap-4 mb-8">
@@ -300,7 +289,6 @@ export function ClassDetailPage() {
   // ─── USER VIEW ────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-      <DashboardHeader />
       <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
         <ClassHeader />
         <div className="grid md:grid-cols-3 gap-4 mb-8">
