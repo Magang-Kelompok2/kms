@@ -8,24 +8,33 @@ const router = Router();
 router.get("/", async (_req, res) => {
   try {
     const classIdFilter = _req.query.classId;
+    const limit = Math.min(Number(_req.query.limit ?? 30), 100);
+    const offset = Number(_req.query.offset ?? 0);
 
-    let query = supabase.from("materi").select(`
-      id_materi, title_materi, deskripsi, materi_path,
-      id_kelas, id_tingkatan, pertemuan,
-      kelas(nama_kelas),
-      tingkatan(nama_tingkatan),
-      video(id_video, title_video, video_path),
-      pdf(id_pdf, title_pdf, pdf_path)
-    `);
+    let query = supabase.from("materi").select(
+      `
+      id_materi, title_materi, deskripsi,
+      id_kelas, id_tingkatan, pertemuan
+    `,
+      { count: "exact" },
+    );
 
     if (classIdFilter) {
       query = query.eq("id_kelas", Number(classIdFilter));
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query
+      .order("pertemuan", { ascending: true })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    res.json({ success: true, data: data ?? [] });
+    res.json({
+      success: true,
+      data: data ?? [],
+      total: count ?? 0,
+      limit,
+      offset,
+    });
   } catch (error) {
     console.error("Error fetching materials:", error);
     res

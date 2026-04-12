@@ -89,8 +89,8 @@ router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
 });
 
 // GET /api/pengumpulan/user/:userId/tugas/:tugasId
-// Cek apakah user sudah mengumpulkan tugas tertentu
-router.get("/user/:userId/tugas/:tugasId", async (req, res) => {
+// Cek apakah user sudah mengumpulkan tugas tertentu (ambil submission terbaru)
+router.get("/user/:userId/tugas/:tugasId", async (req: any, res) => {
   const userId = Number(req.params.userId);
   const tugasId = Number(req.params.tugasId);
 
@@ -100,7 +100,9 @@ router.get("/user/:userId/tugas/:tugasId", async (req, res) => {
       .json({ success: false, error: "Parameter tidak valid" });
 
   try {
-    const { data, error } = await supabase
+    // Query user_pengumpulan untuk user ini, join dengan pengumpulan, filter task
+    // Ambil yang latest
+    const { data: result, error: checkError } = await supabase
       .from("user_pengumpulan")
       .select(
         `id_pengumpulan,
@@ -108,14 +110,27 @@ router.get("/user/:userId/tugas/:tugasId", async (req, res) => {
       )
       .eq("id_user", userId)
       .eq("pengumpulan.id_tugas", tugasId)
-      .maybeSingle();
+      .limit(5); // Ambil max 5, nanti pilih yang latest di code
 
-    if (error) throw error;
+    if (checkError) throw checkError;
+
+    // Cari yang latest dari array
+    let submission = null;
+    if (result && result.length > 0) {
+      // Sort by created_at DESC, ambil [0]
+      const sorted = result.sort((a: any, b: any) => {
+        const dateA = new Date(a.pengumpulan?.created_at || 0).getTime();
+        const dateB = new Date(b.pengumpulan?.created_at || 0).getTime();
+        return dateB - dateA; // DESC
+      });
+      submission = sorted[0]?.pengumpulan || null;
+    }
 
     res.json({
       success: true,
-      data: data ?? null,
-      sudahMengumpulkan: !!data,
+      data: submission ?? null,
+      sudahMengumpulkan: !!submission,
+      submission: submission ?? null,
     });
   } catch (error: any) {
     console.error("Error checking pengumpulan:", error);

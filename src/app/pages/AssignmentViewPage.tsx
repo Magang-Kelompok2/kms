@@ -25,6 +25,7 @@ export function AssignmentViewPage() {
   const [submissionText, setSubmissionText] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionData, setSubmissionData] = useState<any>(null); // State untuk menyimpan data submission
 
   const [assignment, setAssignment] = useState<AssignmentType | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(true);
@@ -107,6 +108,53 @@ export function AssignmentViewPage() {
 
     fetchProgress();
   }, [assignment, user?.id, user?.role, token]);
+
+  // ── 3. Check apakah user sudah submit sebelumnya ─────────────────
+  useEffect(() => {
+    if (!user?.id || !assignmentId || user.role === "superadmin") {
+      return;
+    }
+
+    const checkSubmission = async () => {
+      try {
+        console.log(
+          "Checking submission for user:",
+          user.id,
+          "task:",
+          assignmentId,
+        );
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/pengumpulan/user/${user.id}/tugas/${assignmentId}`,
+        );
+
+        if (res.ok) {
+          const json = await res.json();
+          console.log("Submission check response:", json);
+
+          if (json.sudahMengumpulkan) {
+            setIsSubmitted(true);
+            // Ambil submission data
+            const submissionInfo =
+              json.submission || json.data?.pengumpulan || null;
+            if (submissionInfo) {
+              setSubmissionData(submissionInfo);
+            }
+          }
+        } else {
+          console.error(
+            "Submission check failed:",
+            res.status,
+            await res.text(),
+          );
+        }
+      } catch (err) {
+        console.error("Error checking submission:", err);
+      }
+    };
+
+    // Check segera tanpa delay untuk UX yang lebih baik
+    checkSubmission();
+  }, [user?.id, assignmentId, user?.role]);
 
   // Initialize edit draft
   useEffect(() => {
@@ -217,9 +265,8 @@ export function AssignmentViewPage() {
             Akses Ditolak
           </h1>
           <p className="text-muted-foreground">
-            Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
-            tugas ini. (Level tugas: {assignmentLevel}, Level kamu:{" "}
-            {userLevel})
+            Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses tugas
+            ini. (Level tugas: {assignmentLevel}, Level kamu: {userLevel})
           </p>
           <Button onClick={() => navigate("/dashboard")} className="mt-4">
             Kembali ke Dashboard
@@ -274,7 +321,16 @@ export function AssignmentViewPage() {
       const submitJson = await submitRes.json();
       if (!submitJson.success) throw new Error("Gagal mengumpulkan tugas");
 
+      // Set submission state dan data
       setIsSubmitted(true);
+      setSubmissionData({
+        id_pengumpulan: submitJson.data?.id_pengumpulan,
+        answer: submissionText.trim() || null,
+        created_at: submitJson.data?.created_at || new Date().toISOString(),
+        id_file: id_file,
+      });
+      setSubmissionText(""); // Clear form
+      setSubmissionFile(null);
     } catch (err) {
       alert(
         err instanceof Error
@@ -295,375 +351,373 @@ export function AssignmentViewPage() {
 
   return (
     <AppLayout className="py-6">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(`/class/${assignment.classId}`)}
-          className="mb-4 text-base"
-        >
-          <ArrowLeft className="h-5 w-5 mr-2" />
-          Kembali ke Kelas
-        </Button>
+      <Button
+        variant="ghost"
+        onClick={() => navigate(`/class/${assignment.classId}`)}
+        className="mb-4 text-base"
+      >
+        <ArrowLeft className="h-5 w-5 mr-2" />
+        Kembali ke Kelas
+      </Button>
 
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Header */}
-          <Card className="p-6">
-            {!isEditing ? (
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="secondary" className="text-sm">
-                      Pertemuan {assignment.meetingNumber}
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <Card className="p-6">
+          {!isEditing ? (
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge variant="secondary" className="text-sm">
+                    Pertemuan {assignment.meetingNumber}
+                  </Badge>
+                  <Badge variant="outline" className="text-sm">
+                    Level {assignment.level}
+                  </Badge>
+                  {isSubmitted && (
+                    <Badge variant="default" className="text-sm bg-green-600">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Sudah Dikumpulkan
                     </Badge>
-                    <Badge variant="outline" className="text-sm">
-                      Level {assignment.level}
-                    </Badge>
-                    {isSubmitted && (
-                      <Badge variant="default" className="text-sm bg-green-600">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Sudah Dikumpulkan
-                      </Badge>
-                    )}
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-purple-100 dark:bg-purple-900/20">
+                    <FileText className="h-7 w-7 text-purple-600 dark:text-purple-400" />
                   </div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-purple-100 dark:bg-purple-900/20">
-                      <FileText className="h-7 w-7 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-bold mb-1">
-                        {assignment.title}
-                      </h1>
-                      <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>
-                            Deadline:{" "}
-                            {new Date(assignment.dueDate).toLocaleDateString(
-                              "id-ID",
-                            )}
-                          </span>
-                        </div>
-                        <div>
-                          {isOverdue
-                            ? "Status: Terlambat"
-                            : `${daysUntilDue} hari tersisa`}
-                        </div>
+                  <div>
+                    <h1 className="text-3xl font-bold mb-1">
+                      {assignment.title}
+                    </h1>
+                    <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        <span>
+                          Deadline:{" "}
+                          {new Date(assignment.dueDate).toLocaleDateString(
+                            "id-ID",
+                          )}
+                        </span>
+                      </div>
+                      <div>
+                        {isOverdue
+                          ? "Status: Terlambat"
+                          : `${daysUntilDue} hari tersisa`}
                       </div>
                     </div>
                   </div>
-                  {user?.role === "superadmin" && (
-                    <div className="flex gap-3 mt-4">
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() =>
-                          navigate(`/submissions/tugas/${assignmentId}`)
-                        }
-                      >
-                        Lihat Pengumpulan
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={handleEdit}>
-                        <Edit3 className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={handleDelete}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Hapus
-                      </Button>
-                    </div>
-                  )}
                 </div>
+                {user?.role === "superadmin" && (
+                  <div className="flex gap-3 mt-4">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() =>
+                        navigate(`/submissions/tugas/${assignmentId}`)
+                      }
+                    >
+                      Lihat Pengumpulan
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleEdit}>
+                      <Edit3 className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={handleDelete}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Hapus
+                    </Button>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="space-y-4">
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Judul Tugas
+                </label>
+                <input
+                  type="text"
+                  value={editDraft.title}
+                  onChange={(e) =>
+                    setEditDraft({ ...editDraft, title: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Deskripsi
+                </label>
+                <textarea
+                  value={editDraft.description}
+                  onChange={(e) =>
+                    setEditDraft({
+                      ...editDraft,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 h-28 resize-none"
+                />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Judul Tugas
+                    Deadline
                   </label>
                   <input
-                    type="text"
-                    value={editDraft.title}
+                    type="date"
+                    value={editDraft.dueDate}
                     onChange={(e) =>
-                      setEditDraft({ ...editDraft, title: e.target.value })
+                      setEditDraft({ ...editDraft, dueDate: e.target.value })
                     }
                     className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Deskripsi
+                    Pertemuan Ke-
                   </label>
-                  <textarea
-                    value={editDraft.description}
+                  <input
+                    type="number"
+                    min={1}
+                    value={editDraft.meetingNumber}
                     onChange={(e) =>
                       setEditDraft({
                         ...editDraft,
-                        description: e.target.value,
+                        meetingNumber: e.target.value,
                       })
                     }
-                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 h-28 resize-none"
+                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
                   />
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Deadline
-                    </label>
-                    <input
-                      type="date"
-                      value={editDraft.dueDate}
-                      onChange={(e) =>
-                        setEditDraft({ ...editDraft, dueDate: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Pertemuan Ke-
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={editDraft.meetingNumber}
-                      onChange={(e) =>
-                        setEditDraft({
-                          ...editDraft,
-                          meetingNumber: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <Button size="sm" onClick={handleSaveEdit}>
-                    Simpan
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setIsEditing(false)}
-                  >
-                    Batal
-                  </Button>
-                </div>
               </div>
-            )}
-
-            <div className="border-t pt-4">
-              <h2 className="text-lg font-bold mb-2">Deskripsi Tugas</h2>
-              <p className="text-base text-gray-700 dark:text-gray-300 leading-relaxed">
-                {assignment.description}
-              </p>
+              <div className="flex gap-3">
+                <Button size="sm" onClick={handleSaveEdit}>
+                  Simpan
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditing(false)}
+                >
+                  Batal
+                </Button>
+              </div>
             </div>
-          </Card>
-
-          {/* Attachments dari superadmin */}
-          {assignment.attachments && assignment.attachments.length > 0 && (
-            <Card className="p-6">
-              <h2 className="text-xl font-bold mb-4">
-                📎 File Tugas dari Superadmin
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Silakan baca dan download file berikut sebelum mengerjakan
-                tugas:
-              </p>
-              <div className="space-y-3">
-                {assignment.attachments.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-red-100 dark:bg-red-900/20">
-                        <File className="h-6 w-6 text-red-600 dark:text-red-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-base">{file.name}</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          PDF Document
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => window.open(file.url, "_blank")}
-                      >
-                        Lihat
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const link = document.createElement("a");
-                          link.href = file.url;
-                          link.download = file.name;
-                          link.click();
-                        }}
-                      >
-                        Download
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
           )}
 
-          {/* Form Pengumpulan */}
+          <div className="border-t pt-4">
+            <h2 className="text-lg font-bold mb-2">Deskripsi Tugas</h2>
+            <p className="text-base text-gray-700 dark:text-gray-300 leading-relaxed">
+              {assignment.description}
+            </p>
+          </div>
+        </Card>
+
+        {/* Attachments dari superadmin */}
+        {assignment.attachments && assignment.attachments.length > 0 && (
           <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4">Pengumpulan Tugas</h2>
-
-            {isSubmitted ? (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 text-center">
-                <CheckCircle className="h-16 w-16 text-green-600 dark:text-green-400 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-green-900 dark:text-green-100 mb-2">
-                  Tugas Berhasil Dikumpulkan!
-                </h3>
-                <p className="text-sm text-green-700 dark:text-green-300 mb-4">
-                  Tugas Anda sedang direview oleh superadmin.
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsSubmitted(false);
-                      setSubmissionText("");
-                      setSubmissionFile(null);
-                    }}
-                  >
-                    Kirim Ulang
-                  </Button>
-                  <Button
-                    onClick={() => navigate(`/class/${assignment.classId}`)}
-                  >
-                    Kembali ke Kelas
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2">
-                    Jawaban (Teks)
-                  </label>
-                  <textarea
-                    value={submissionText}
-                    onChange={(e) => setSubmissionText(e.target.value)}
-                    placeholder="Ketik jawaban Anda di sini..."
-                    className="w-full h-48 px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 resize-none"
-                  />
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {submissionText.length} karakter
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2">
-                    Upload File (Opsional)
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center hover:border-blue-400 dark:hover:border-blue-600 transition-colors">
-                    <input
-                      type="file"
-                      id="file-upload"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    />
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                      {submissionFile ? (
-                        <div>
-                          <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                            {submissionFile.name}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {(submissionFile.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                            Klik untuk upload file
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            PDF, DOC, DOCX, JPG, PNG (Max 10MB)
-                          </p>
-                        </div>
-                      )}
-                    </label>
+            <h2 className="text-xl font-bold mb-4">
+              📎 File Tugas dari Superadmin
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Silakan baca dan download file berikut sebelum mengerjakan tugas:
+            </p>
+            <div className="space-y-3">
+              {assignment.attachments.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-red-100 dark:bg-red-900/20">
+                      <File className="h-6 w-6 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-base">{file.name}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        PDF Document
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(file.url, "_blank")}
+                    >
+                      Lihat
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const link = document.createElement("a");
+                        link.href = file.url;
+                        link.download = file.name;
+                        link.click();
+                      }}
+                    >
+                      Download
+                    </Button>
                   </div>
                 </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={
-                      (!submissionText.trim() && !submissionFile) ||
-                      isSubmitting
-                    }
-                    className="flex-1 text-base py-6"
-                  >
-                    {isSubmitting ? (
-                      <span className="flex items-center gap-2">
-                        <svg
-                          className="animate-spin h-4 w-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8v8H4z"
-                          />
-                        </svg>
-                        Mengumpulkan...
-                      </span>
-                    ) : (
-                      <>
-                        <Upload className="h-5 w-5 mr-2" />
-                        Kumpulkan Tugas
-                      </>
+        {/* Form Pengumpulan */}
+        <Card className="p-6">
+          <h2 className="text-xl font-bold mb-4">Pengumpulan Tugas</h2>
+
+          {isSubmitted ? (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 text-center">
+              <CheckCircle className="h-16 w-16 text-green-600 dark:text-green-400 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-green-900 dark:text-green-100 mb-2">
+                ✅ Anda Sudah Mengerjakan Tugas Ini
+              </h3>
+              <p className="text-sm text-green-700 dark:text-green-300 mb-4">
+                Tugas Anda telah dikumpulkan dan sedang dalam proses review.
+                Anda tidak dapat mengumpulkan tugas ini lagi.
+              </p>
+              {submissionData && (
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-4 mb-4 text-left">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <strong>Waktu Pengumpulan:</strong>{" "}
+                    {new Date(submissionData.created_at).toLocaleString(
+                      "id-ID",
                     )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate(`/class/${assignment.classId}`)}
-                    className="text-base py-6"
-                    disabled={isSubmitting}
-                  >
-                    Batal
-                  </Button>
+                  </p>
+                </div>
+              )}
+              <Button
+                onClick={() => navigate(`/class/${assignment.classId}`)}
+                className="w-full"
+              >
+                Kembali ke Kelas
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Jawaban (Teks)
+                </label>
+                <textarea
+                  value={submissionText}
+                  onChange={(e) => setSubmissionText(e.target.value)}
+                  placeholder="Ketik jawaban Anda di sini..."
+                  className="w-full h-48 px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 resize-none"
+                />
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {submissionText.length} karakter
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Upload File (Opsional)
+                </label>
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center hover:border-blue-400 dark:hover:border-blue-600 transition-colors">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    {submissionFile ? (
+                      <div>
+                        <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                          {submissionFile.name}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {(submissionFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                          Klik untuk upload file
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          PDF, DOC, DOCX, JPG, PNG (Max 10MB)
+                        </p>
+                      </div>
+                    )}
+                  </label>
                 </div>
               </div>
-            )}
-          </Card>
 
-          <Card className="p-5 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-            <h3 className="mb-2 text-base font-semibold text-foreground">
-              Petunjuk pengumpulan
-            </h3>
-            <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
-              <li>Pastikan jawaban Anda jelas dan mudah dipahami</li>
-              <li>Periksa kembali jawaban sebelum dikumpulkan</li>
-              <li>File yang diupload maksimal 10MB</li>
-              <li>Tugas yang dikumpulkan tidak dapat diedit setelah submit</li>
-            </ul>
-          </Card>
-        </div>
+              <div className="flex gap-3 pt-4">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={
+                    (!submissionText.trim() && !submissionFile) || isSubmitting
+                  }
+                  className="flex-1 text-base py-6"
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <svg
+                        className="animate-spin h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v8H4z"
+                        />
+                      </svg>
+                      Mengumpulkan...
+                    </span>
+                  ) : (
+                    <>
+                      <Upload className="h-5 w-5 mr-2" />
+                      Kumpulkan Tugas
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/class/${assignment.classId}`)}
+                  className="text-base py-6"
+                  disabled={isSubmitting}
+                >
+                  Batal
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-5 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <h3 className="mb-2 text-base font-semibold text-foreground">
+            Petunjuk pengumpulan
+          </h3>
+          <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+            <li>Pastikan jawaban Anda jelas dan mudah dipahami</li>
+            <li>Periksa kembali jawaban sebelum dikumpulkan</li>
+            <li>File yang diupload maksimal 10MB</li>
+            <li>Tugas yang dikumpulkan tidak dapat diedit setelah submit</li>
+          </ul>
+        </Card>
+      </div>
     </AppLayout>
   );
 }

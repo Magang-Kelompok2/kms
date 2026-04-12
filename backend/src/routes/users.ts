@@ -230,10 +230,14 @@ router.get("/", verifySupabaseToken, async (req: any, res) => {
   }
 
   try {
-    const { data, error } = await supabase
+    const limit = Math.min(Number(req.query.limit ?? 50), 100);
+    const offset = Number(req.query.offset ?? 0);
+
+    const { data, error, count } = await supabase
       .from("user")
-      .select("id_user, username, email, role, created_at")
-      .order("id_user", { ascending: true });
+      .select("id_user, username, email, role, created_at", { count: "exact" })
+      .order("id_user", { ascending: true })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
@@ -246,6 +250,9 @@ router.get("/", verifySupabaseToken, async (req: any, res) => {
         role: u.role ?? "user",
         created_at: u.created_at,
       })),
+      total: count ?? 0,
+      limit,
+      offset,
     });
   } catch (error) {
     console.error("Error fetching users:", error);

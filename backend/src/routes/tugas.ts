@@ -6,15 +6,33 @@ const router = Router();
 // GET /api/tugas
 router.get("/", async (_req, res) => {
   try {
-    const { data, error } = await supabase
+    const limit = Math.min(Number(_req.query.limit ?? 50), 100); // Default 50, max 100
+    const offset = Number(_req.query.offset ?? 0);
+    const classId = _req.query.classId;
+    const type = _req.query.type;
+
+    let query = supabase
       .from("tugas")
       .select(
         "id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas, pertemuan, deadline, durasi, created_at",
-      )
-      .order("id_tugas", { ascending: true });
+        { count: "exact" },
+      );
+
+    if (classId) query = query.eq("id_kelas", Number(classId));
+    if (type) query = query.eq("type", type);
+
+    const { data, error, count } = await query
+      .order("id_tugas", { ascending: true })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    res.json({ success: true, data: data ?? [] });
+    res.json({
+      success: true,
+      data: data ?? [],
+      total: count ?? 0,
+      limit,
+      offset,
+    });
   } catch (error) {
     console.error("Error fetching tugas:", error);
     res.status(500).json({ success: false, error: "Failed to fetch tugas" });

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useQueryCache, invalidateCache } from "./useQueryCache";
 
 export interface KelasData {
   id: number;
@@ -6,33 +7,50 @@ export interface KelasData {
   createdAt: string;
 }
 
+interface ClassesResponse {
+  success: boolean;
+  data: KelasData[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+
 export function useClasses() {
-  const [classes, setClasses] = useState<KelasData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [allClasses, setAllClasses] = useState<KelasData[]>([]);
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  const fetchClasses = useCallback(async (): Promise<ClassesResponse> => {
+    const res = await fetch(`${apiUrl}/api/kelas`);
+    if (!res.ok) throw new Error("Gagal mengambil data kelas");
+    return res.json();
+  }, [apiUrl]);
+
+  const {
+    data: response,
+    loading,
+    error,
+    refetch,
+  } = useQueryCache<ClassesResponse>(
+    "classes:all",
+    fetchClasses,
+    { ttl: 10 * 60 * 1000, enableCache: true }, // 10 min cache
+  );
 
   useEffect(() => {
-    const fetchClasses = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        console.log("Fetching classes from:", `${import.meta.env.VITE_API_URL}/api/kelas`);
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kelas`);
-        console.log("Response status:", res.status);
-        if (!res.ok) throw new Error("Gagal mengambil data kelas");
-        const json = await res.json();
-        console.log("Fetched classes:", json.data);
-        setClasses(json.data);
-      } catch (err) {
-        console.error("Error fetching classes:", err);
-        setError(err instanceof Error ? err.message : "Terjadi kesalahan");
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (response?.data) {
+      setAllClasses(response.data);
+    }
+  }, [response]);
 
-    fetchClasses();
+  const invalidate = useCallback(() => {
+    invalidateCache("classes:.*");
   }, []);
 
-  return { classes, loading, error };
+  return {
+    classes: allClasses,
+    loading,
+    error: error?.message ?? null,
+    refetch,
+    invalidate,
+  };
 }
