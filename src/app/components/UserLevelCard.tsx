@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "./ui/card";
-import { ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { ChevronDown, ChevronUp, Lock, BookOpen, ClipboardCheck, HelpCircle } from "lucide-react";
 import type { Assignment, Quiz, Material } from "../types";
 
 interface UserLevelCardProps {
@@ -24,54 +24,27 @@ export function UserLevelCard({
   activeMaterialId,
 }: UserLevelCardProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">(
-    "materi",
-  );
+  const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">("materi");
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (defaultOpen) {
-      setIsOpen(true);
-    }
+    if (defaultOpen) setIsOpen(true);
   }, [defaultOpen]);
 
   useEffect(() => {
     if (!activeMaterialId) return;
-    const found = materials.some(
-      (material) => material.id === activeMaterialId,
-    );
-    if (found) {
-      setIsOpen(true);
-    }
+    const found = materials.some((m) => m.id === activeMaterialId);
+    if (found) setIsOpen(true);
   }, [activeMaterialId, materials]);
 
   useEffect(() => {
     if (!isOpen || !activeMaterialId) return;
     const target = document.getElementById(activeMaterialId);
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [activeMaterialId, isOpen]);
 
   const totalItems = materials.length + assignments.length + quizzes.length;
 
-  const materialsByMeeting = materials.reduce(
-    (acc, material) => {
-      const meeting = material.meetingNumber;
-      if (!acc[meeting]) {
-        acc[meeting] = [];
-      }
-      acc[meeting].push(material);
-      return acc;
-    },
-    {} as Record<number, Material[]>,
-  );
-
-  const meetings = Object.keys(materialsByMeeting)
-    .map(Number)
-    .sort((a, b) => a - b);
-
-  // Format items untuk display (sama seperti AdminLevelCard)
   type TabItem = {
     id: string;
     type: "materi" | "tugas" | "kuis";
@@ -109,142 +82,179 @@ export function UserLevelCard({
     })),
   };
 
+  const tabs: { key: "materi" | "tugas" | "kuis"; label: string; count: number }[] = [
+    { key: "materi", label: "Materi", count: materials.length },
+    { key: "tugas", label: "Tugas", count: assignments.length },
+    { key: "kuis", label: "Kuis", count: quizzes.length },
+  ];
+
+  const typeIcon = {
+    materi: BookOpen,
+    tugas: ClipboardCheck,
+    kuis: HelpCircle,
+  };
+
+  const typeGradient = {
+    materi: "linear-gradient(135deg, #3b82f6, #0369a1)",
+    tugas: "linear-gradient(135deg, #0891b2, #1d4ed8)",
+    kuis: "linear-gradient(135deg, #4f46e5, #0e7490)",
+  };
+
   return (
-    <Card className={`overflow-hidden ${isLocked ? "opacity-60" : ""}`}>
-      {/* Header */}
+    <Card className={`overflow-hidden border-0 shadow-md transition-opacity ${isLocked ? "opacity-60" : ""}`}>
+      {/* ── Header ── */}
       <button
         onClick={() => !isLocked && setIsOpen(!isOpen)}
-        className={`cursor-pointer w-full p-6 flex items-center justify-between transition-colors ${
-          !isLocked && "hover:bg-gray-50 dark:hover:bg-gray-900"
+        className={`w-full px-6 py-5 flex items-center justify-between transition-colors ${
+          !isLocked ? "hover:bg-muted/40 cursor-pointer" : "cursor-not-allowed"
         }`}
         disabled={isLocked}
       >
         <div className="flex items-center gap-4">
+          {/* Level avatar */}
           <div
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-semibold text-lg ${
-              isLocked
-                ? "bg-gray-400 dark:bg-gray-600"
-                : "bg-linear-to-br from-[#0C4E8C] to-[#11C4D4]"
-            }`}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-base shadow-sm shrink-0"
+            style={{
+              background: isLocked
+                ? "linear-gradient(135deg, #9ca3af, #6b7280)"
+                : "linear-gradient(135deg, #3b82f6, #0369a1)",
+            }}
           >
-            {namaLevel.length <= 4
-              ? namaLevel
-              : namaLevel
-                  .split(" ")
-                  .map((segment) => segment[0]?.toUpperCase())
-                  .join("")}
+            {isLocked ? (
+              <Lock className="h-5 w-5" />
+            ) : namaLevel.length <= 4 ? (
+              namaLevel
+            ) : (
+              namaLevel
+                .split(" ")
+                .map((s) => s[0]?.toUpperCase())
+                .join("")
+            )}
           </div>
+
           <div className="text-left">
-            <h3 className="text-xl font-bold flex items-center gap-2">
+            <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
               {namaLevel}
-              {isLocked && <Lock className="h-5 w-5 text-gray-400" />}
+              {isLocked && (
+                <span className="text-xs font-semibold text-gray-400 border border-gray-300 dark:border-gray-600 rounded-full px-2.5 py-0.5">
+                  Terkunci
+                </span>
+              )}
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {totalItems} items ({materials.length} materi,{" "}
-              {assignments.length} tugas, {quizzes.length} kuis)
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {totalItems} item &middot; {materials.length} materi &middot;{" "}
+              {assignments.length} tugas &middot; {quizzes.length} kuis
             </p>
           </div>
         </div>
 
         {!isLocked && (
-          <div className="flex items-center gap-4">
-            {isOpen ? (
-              <ChevronUp className="h-5 w-5 text-gray-500" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-gray-500" />
-            )}
-          </div>
+          isOpen
+            ? <ChevronUp className="h-5 w-5 text-muted-foreground shrink-0" />
+            : <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
         )}
       </button>
 
-      {/* Content */}
-      {isOpen && !isLocked && (
-        <div className="border-t border-gray-200 dark:border-gray-800 p-6 space-y-6">
-          {/* Tabs - At top */}
-          <div className="flex justify-center">
-            <div className="inline-flex rounded-full border cursor-pointer border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-950 shadow-sm">
-              <button
-                onClick={() => setActiveTab("materi")}
-                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === "materi"
-                    ? "bg-primary text-white"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                }`}
-              >
-                Materi ({materials.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("tugas")}
-                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === "tugas"
-                    ? "bg-primary text-white"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                }`}
-              >
-                Tugas ({assignments.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("kuis")}
-                className={`px-5 py-2 text-sm font-medium cursor-pointer rounded-full transition-colors focus:outline-none ${
-                  activeTab === "kuis"
-                    ? "bg-primary text-white"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                }`}
-              >
-                Kuis ({quizzes.length})
-              </button>
-            </div>
+      {/* ── Locked State ── */}
+      {isLocked && (
+        <div className="border-t border-border px-6 py-8 text-center">
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+            style={{ background: "linear-gradient(135deg, #9ca3af, #6b7280)" }}
+          >
+            <Lock className="h-5 w-5 text-white" />
           </div>
-
-          {/* Content Area - Scrollable */}
-          <div className="max-h-96 overflow-y-auto">
-            <div className="space-y-3">
-              {itemsByTab[activeTab].length > 0 ? (
-                itemsByTab[activeTab].map((item) => (
-                  <div
-                    id={item.id}
-                    key={item.id}
-                    className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
-                    onClick={() => {
-                      if (item.type === "materi") navigate(`/material/${item.id}`);
-                      if (item.type === "tugas") navigate(`/assignment/${item.id}`);
-                      if (item.type === "kuis") navigate(`/quiz/${item.id}`);
-                    }}
-                  >
-                    <div className="w-full flex items-center justify-between gap-4 p-4 text-left">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] text-white grid place-items-center font-semibold">
-                          {item.number}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-lg">{item.title}</h4>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{item.subtitle}</p>
-                        </div>
-                      </div>
-                      <div className="text-right text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                        <div>{item.badge}</div>
-                        {item.extra ? <div>{item.extra}</div> : null}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-950 rounded-3xl border border-gray-200 dark:border-gray-800">
-                  Tidak ada konten di tab ini.
-                </div>
-              )}
-            </div>
-          </div>
+          <p className="text-sm font-medium text-muted-foreground">
+            Selesaikan tingkatan sebelumnya untuk membuka konten ini
+          </p>
         </div>
       )}
 
-      {/* Locked */}
-      {isLocked && (
-        <div className="border-t border-gray-200 dark:border-gray-800 p-6 text-center">
-          <Lock className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-          <p className="text-gray-600 dark:text-gray-400">
-            Complete previous level to unlock this content
-          </p>
+      {/* ── Content ── */}
+      {isOpen && !isLocked && (
+        <div className="border-t border-border">
+          {/* ── Underline Tabs ── */}
+          <div className="flex border-b border-border bg-muted/20">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`relative flex-1 py-3.5 text-sm font-semibold transition-colors focus:outline-none ${
+                  activeTab === tab.key
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label} ({tab.count})
+                {activeTab === tab.key && (
+                  <span
+                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                    style={{ background: "linear-gradient(90deg, #3b82f6, #0891b2)" }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Item List ── */}
+          <div className="p-6">
+            <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
+              {itemsByTab[activeTab].length > 0 ? (
+                itemsByTab[activeTab].map((item) => {
+                  const Icon = typeIcon[item.type];
+                  return (
+                    <div
+                      id={item.id}
+                      key={item.id}
+                      className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background p-4 hover:shadow-md transition-all cursor-pointer hover:border-blue-200 dark:hover:border-blue-900"
+                      onClick={() => {
+                        if (item.type === "materi") navigate(`/material/${item.id}`);
+                        if (item.type === "tugas") navigate(`/assignment/${item.id}`);
+                        if (item.type === "kuis") navigate(`/quiz/${item.id}`);
+                      }}
+                    >
+                      <div className="flex items-center gap-4">
+                        {/* Number badge */}
+                        <div
+                          className="w-10 h-10 rounded-xl text-white grid place-items-center font-bold text-sm shrink-0 shadow-sm"
+                          style={{ background: typeGradient[item.type] }}
+                        >
+                          {item.number}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-foreground leading-snug">
+                            {item.title}
+                          </h4>
+                          {item.subtitle && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                              {item.subtitle}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Badge */}
+                      <div className="shrink-0">
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 rounded-full px-3 py-1 whitespace-nowrap">
+                          {item.badge}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                (() => {
+                  const Icon = typeIcon[activeTab];
+                  return (
+                    <div className="py-10 text-center text-muted-foreground rounded-xl border border-dashed border-border bg-muted/30">
+                      <Icon className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Tidak ada konten di tab ini.</p>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          </div>
         </div>
       )}
     </Card>
