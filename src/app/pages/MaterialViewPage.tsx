@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
+import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -212,38 +212,29 @@ export function MaterialViewPage() {
   // ── Loading state ──────────────────────────────────────────────
   if (materialLoading || progressLoading) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <p className="text-gray-500">Memuat materi...</p>
-        </div>
-      </div>
+      <AppLayout>
+        <p className="text-sm text-muted-foreground">Memuat materi...</p>
+      </AppLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">{error}</p>
-          </Card>
-        </div>
-      </div>
+      <AppLayout>
+        <Card className="p-8 text-center shadow-sm">
+          <p className="text-destructive">{error}</p>
+        </Card>
+      </AppLayout>
     );
   }
 
   if (!material) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">Material tidak ditemukan</p>
-          </Card>
-        </div>
-      </div>
+      <AppLayout>
+        <Card className="p-8 text-center shadow-sm">
+          <p className="text-destructive">Material tidak ditemukan</p>
+        </Card>
+      </AppLayout>
     );
   }
 
@@ -258,22 +249,21 @@ export function MaterialViewPage() {
 
   if (!hasAccess) {
     return (
-      <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-12 text-center">
-            <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
-              materi ini. (Level materi: {materialLevel}, Level kamu:{" "}
-              {userLevel})
-            </p>
-            <Button onClick={() => navigate("/dashboard")} className="mt-4">
-              Kembali ke Dashboard
-            </Button>
-          </Card>
-        </div>
-      </div>
+      <AppLayout>
+        <Card className="p-12 text-center shadow-sm">
+          <h1 className="mb-4 text-xl font-semibold tracking-tight">
+            Akses Ditolak
+          </h1>
+          <p className="text-muted-foreground">
+            Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
+            materi ini. (Level materi: {materialLevel}, Level kamu:{" "}
+            {userLevel})
+          </p>
+          <Button onClick={() => navigate("/dashboard")} className="mt-4">
+            Kembali ke Dashboard
+          </Button>
+        </Card>
+      </AppLayout>
     );
   }
 
@@ -292,10 +282,7 @@ export function MaterialViewPage() {
   const selectedFileData = material.files.find((f) => f.id === selectedFile);
 
   return (
-    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-      <DashboardHeader />
-
-      <div className="container mx-auto px-4 md:px-6 py-6">
+    <AppLayout className="max-w-7xl py-6">
         <Button
           variant="ghost"
           onClick={() =>
@@ -313,9 +300,11 @@ export function MaterialViewPage() {
           {/* ── Left Sidebar ── */}
           <div className="w-full lg:w-96 shrink-0">
             <Card className="h-full overflow-y-auto">
-              <div className="p-5 border-b sticky top-0 bg-white dark:bg-gray-900 z-10">
-                <h2 className="text-xl font-bold mb-1">Daftar Materi</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="sticky top-0 z-10 border-b border-border bg-card/95 p-5 backdrop-blur supports-backdrop-filter:bg-card/80">
+                <h2 className="mb-1 text-lg font-semibold tracking-tight">
+                  Daftar Materi
+                </h2>
+                <p className="text-sm text-muted-foreground">
                   {material.files.length} file tersedia
                 </p>
               </div>
@@ -421,6 +410,66 @@ export function MaterialViewPage() {
           <div className="flex-1 min-w-0">
             <div className="h-full flex flex-col gap-6">
               {/* Header */}
+              
+
+              {/* Viewer */}
+              {selectedFile && selectedFileData && (
+                <Card className="flex-1 p-6 flex flex-col min-h-0">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                          selectedFileData.type === "video"
+                            ? "bg-red-100 dark:bg-red-900/20"
+                            : "bg-blue-100 dark:bg-blue-900/20"
+                        }`}
+                      >
+                        {selectedFileData.type === "video" ? (
+                          <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                        ) : (
+                          <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold">
+                          {selectedFileData.name}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                          {selectedFileData.type} •{" "}
+                          {selectedFileData.duration || "View Only"}
+                        </p>
+                      </div>
+                    </div>
+                    {!completedFiles.includes(selectedFile) && (
+                      <Button onClick={() => handleMarkComplete(selectedFile)}>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Tandai Selesai
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-h-0">
+                    {selectedFileData.type === "video" ? (
+                      <div className="h-full bg-black rounded-lg overflow-hidden">
+                        <video
+                          controls
+                          controlsList="nodownload"
+                          className="w-full h-full object-contain bg-black"
+                          src={selectedFileData.url}
+                          onContextMenu={(e) => e.preventDefault()}
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    ) : (
+                      <div className="h-full">
+                        <PDFViewer url={selectedFileData.url} />
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
               <Card className="p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -534,64 +583,6 @@ export function MaterialViewPage() {
                 )}
               </Card>
 
-              {/* Viewer */}
-              {selectedFile && selectedFileData && (
-                <Card className="flex-1 p-6 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                          selectedFileData.type === "video"
-                            ? "bg-red-100 dark:bg-red-900/20"
-                            : "bg-blue-100 dark:bg-blue-900/20"
-                        }`}
-                      >
-                        {selectedFileData.type === "video" ? (
-                          <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                        ) : (
-                          <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold">
-                          {selectedFileData.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                          {selectedFileData.type} •{" "}
-                          {selectedFileData.duration || "View Only"}
-                        </p>
-                      </div>
-                    </div>
-                    {!completedFiles.includes(selectedFile) && (
-                      <Button onClick={() => handleMarkComplete(selectedFile)}>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Tandai Selesai
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-h-0">
-                    {selectedFileData.type === "video" ? (
-                      <div className="h-full bg-black rounded-lg overflow-hidden">
-                        <video
-                          controls
-                          controlsList="nodownload"
-                          className="w-full h-full object-contain bg-black"
-                          src={selectedFileData.url}
-                          onContextMenu={(e) => e.preventDefault()}
-                        >
-                          Your browser does not support the video tag.
-                        </video>
-                      </div>
-                    ) : (
-                      <div className="h-full">
-                        <PDFViewer url={selectedFileData.url} />
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              )}
-
               {/* Completion banner */}
               {allFilesCompleted && !isCompleted && (
                 <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
@@ -618,7 +609,6 @@ export function MaterialViewPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </AppLayout>
   );
 }

@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
+import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -280,38 +280,36 @@ export function QuizViewPage() {
   // ── Loading ────────────────────────────────────────────────────
   if (quizLoading || progressLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-3xl px-4 py-16 flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
-          <p className="text-gray-500 font-medium">Memuat kuis...</p>
-        </div>
-      </div>
+      <AppLayout className="flex max-w-3xl flex-col items-center gap-4 py-16">
+        <div className="size-16 animate-spin rounded-full border-4 border-muted border-t-primary" />
+        <p className="text-sm font-medium text-muted-foreground">
+          Memuat kuis...
+        </p>
+      </AppLayout>
     );
   }
 
   // ── Error ──────────────────────────────────────────────────────
   if (error || !quiz) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-3xl px-4 py-16">
-          <Card className="p-10 text-center border-red-100 dark:border-red-900">
-            <AlertCircle className="h-14 w-14 text-red-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-red-600 mb-2">
-              Terjadi Kesalahan
-            </h2>
-            <p className="text-gray-500">{error ?? "Kuis tidak ditemukan"}</p>
-            <Button
-              onClick={() => navigate(-1)}
-              variant="outline"
-              className="mt-6"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" /> Kembali
-            </Button>
-          </Card>
-        </div>
-      </div>
+      <AppLayout className="max-w-3xl py-16">
+        <Card className="border-destructive/30 p-10 text-center shadow-sm">
+          <AlertCircle className="mx-auto mb-4 size-14 text-destructive" />
+          <h2 className="mb-2 text-lg font-semibold text-destructive">
+            Terjadi Kesalahan
+          </h2>
+          <p className="text-muted-foreground">
+            {error ?? "Kuis tidak ditemukan"}
+          </p>
+          <Button
+            onClick={() => navigate(-1)}
+            variant="outline"
+            className="mt-6"
+          >
+            <ArrowLeft className="mr-2 size-4" /> Kembali
+          </Button>
+        </Card>
+      </AppLayout>
     );
   }
 
@@ -322,23 +320,22 @@ export function QuizViewPage() {
   // ── Akses Ditolak ──────────────────────────────────────────────
   if (!hasAccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-3xl px-4 py-16">
-          <Card className="p-12 text-center">
-            <div className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center mx-auto mb-6">
-              <AlertCircle className="h-10 w-10 text-amber-500" />
-            </div>
-            <h1 className="text-2xl font-bold mb-3">Akses Ditolak</h1>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Selesaikan tingkatan sebelumnya untuk mengakses kuis ini.
-            </p>
-            <Button onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4 mr-2" /> Kembali ke Dashboard
-            </Button>
-          </Card>
-        </div>
-      </div>
+      <AppLayout className="max-w-3xl py-16">
+        <Card className="p-12 text-center shadow-sm">
+          <div className="mx-auto mb-6 flex size-20 items-center justify-center rounded-full bg-amber-500/15">
+            <AlertCircle className="size-10 text-amber-600 dark:text-amber-400" />
+          </div>
+          <h1 className="mb-3 text-xl font-semibold tracking-tight">
+            Akses Ditolak
+          </h1>
+          <p className="mb-6 text-muted-foreground">
+            Selesaikan tingkatan sebelumnya untuk mengakses kuis ini.
+          </p>
+          <Button onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="mr-2 size-4" /> Kembali ke Dashboard
+          </Button>
+        </Card>
+      </AppLayout>
     );
   }
 
@@ -351,9 +348,7 @@ export function QuizViewPage() {
   // ── TAHAP: MENGERJAKAN ─────────────────────────────────────────
   if (tahap === "mengerjakan") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-3xl px-4 py-6">
+      <AppLayout className="max-w-3xl py-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -509,8 +504,7 @@ export function QuizViewPage() {
               </Button>
             )}
           </div>
-        </div>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -520,10 +514,8 @@ export function QuizViewPage() {
     const salah = hasilSkor.total - hasilSkor.benar;
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-2xl px-4 py-10">
-          <Card className="overflow-hidden shadow-xl border-0">
+      <AppLayout className="max-w-2xl py-10">
+          <Card className="overflow-hidden border shadow-md">
             <div
               className={`h-3 w-full ${lulus ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-red-400 to-rose-500"}`}
             />
@@ -540,7 +532,7 @@ export function QuizViewPage() {
               </div>
 
               <h1 className="text-3xl font-extrabold mb-1">
-                {lulus ? "Selamat! 🎉" : "Belum Lulus"}
+                {lulus ? "Selamat" : "Belum Lulus"}
               </h1>
               <p className="text-gray-500 dark:text-gray-400 mb-8 text-sm">
                 {lulus
@@ -604,23 +596,21 @@ export function QuizViewPage() {
               <div className="max-w-sm mx-auto">
                 <Button
                   onClick={() => navigate(`/class/${quiz.classId}`)}
-                  className="w-full py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold"
+                  className="w-full py-6 font-semibold"
+                  size="lg"
                 >
                   Kembali ke Kelas
                 </Button>
               </div>
             </div>
           </Card>
-        </div>
-      </div>
+      </AppLayout>
     );
   }
 
   // ── TAHAP: INFO ────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-950 dark:to-gray-900">
-      <DashboardHeader />
-      <div className="container mx-auto px-4 md:px-6 py-8">
+    <AppLayout className="max-w-2xl py-8">
         <Button
           variant="ghost"
           onClick={() => navigate(`/class/${quiz.classId}`)}
@@ -629,8 +619,8 @@ export function QuizViewPage() {
           <ArrowLeft className="h-5 w-5 mr-2" /> Kembali ke Kelas
         </Button>
 
-        <div className="max-w-2xl mx-auto">
-          <Card className="overflow-hidden shadow-xl border-0">
+        <div className="mx-auto w-full max-w-2xl">
+          <Card className="overflow-hidden border shadow-md">
             <div className="h-2 bg-gradient-to-r from-blue-500 via-violet-500 to-blue-600" />
 
             <div className="p-8">
@@ -698,7 +688,7 @@ export function QuizViewPage() {
                     </p>
                     <p className="text-emerald-700 dark:text-emerald-300 text-sm">
                       Skor terakhir: <strong>{skorSebelumnya}/100</strong>
-                      {(skorSebelumnya ?? 0) >= 70 ? " ✅ Lulus" : ""}
+                      {(skorSebelumnya ?? 0) >= 70 ? " — Lulus" : ""}
                     </p>
                   </div>
                 </div>
@@ -706,8 +696,8 @@ export function QuizViewPage() {
 
               {/* Petunjuk */}
               <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-5 mb-6 border border-gray-100 dark:border-gray-800">
-                <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm mb-3">
-                  📋 Petunjuk Pengerjaan
+                <p className="mb-3 text-sm font-semibold text-foreground">
+                  Petunjuk pengerjaan
                 </p>
                 <ul className="space-y-2">
                   {[
@@ -762,7 +752,6 @@ export function QuizViewPage() {
             </div>
           </Card>
         </div>
-      </div>
-    </div>
+    </AppLayout>
   );
 }

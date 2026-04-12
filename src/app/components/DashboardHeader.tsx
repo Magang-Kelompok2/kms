@@ -1,5 +1,5 @@
 import { Bell, User, Moon, Sun, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
 import { Button } from "./ui/button";
@@ -18,9 +18,13 @@ export function DashboardHeader() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
   const toggleTheme = () => {
-    setIsDark(!isDark);
     document.documentElement.classList.toggle("dark");
+    setIsDark(document.documentElement.classList.contains("dark"));
   };
 
   const handleLogout = () => {
@@ -29,15 +33,24 @@ export function DashboardHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-backdrop-filter:bg-white/60 dark:bg-gray-950/95 dark:supports-backdrop-filter:bg-gray-950/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center cursor-pointer" onClick={() => navigate("/dashboard")}>
-            <img src="/LogoAlpha.svg" alt="Alpha" />
+          <div
+            className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-border bg-card shadow-sm"
+            onClick={() => navigate("/dashboard")}
+          >
+            <img src="/LogoAlpha.svg" alt="Alpha" className="size-6" />
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xl font-bold cursor-pointer" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }} onClick={() => navigate("/dashboard")}>TaxaCore</span>
+            <span
+              className="cursor-pointer text-xl font-semibold tracking-tight text-foreground"
+              style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
+              onClick={() => navigate("/dashboard")}
+            >
+              TaxaCore
+            </span>
             {user && (
               <Badge
                 variant="outline"
@@ -79,7 +92,7 @@ export function DashboardHeader() {
               <DropdownMenuLabel>
                 <div>
                   <p>{user?.name}</p>
-                  <p className="text-xs text-gray-500 font-normal">
+                  <p className="text-xs font-normal text-muted-foreground">
                     {user?.email}
                   </p>
                 </div>
@@ -89,7 +102,7 @@ export function DashboardHeader() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleLogout}
-                className="text-red-600 dark:text-red-400"
+                className="text-destructive focus:text-destructive"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Keluar

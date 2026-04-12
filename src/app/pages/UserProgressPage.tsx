@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
+import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -168,10 +168,7 @@ export function UserProgressPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <DashboardHeader />
-
-      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
+    <AppLayout>
         <Button
           variant="ghost"
           onClick={() => navigate("/users")}
@@ -397,7 +394,6 @@ export function UserProgressPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </AppLayout>
   );
 }

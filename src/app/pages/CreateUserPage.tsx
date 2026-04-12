@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
+import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -165,10 +165,7 @@ export function CreateUserPage() {
   };
 
   return (
-    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-      <DashboardHeader />
-
-      <div className="container mx-auto px-4 md:px-6 py-8 max-w-2xl">
+    <AppLayout className="max-w-2xl">
         <Button
           variant="ghost"
           onClick={() => navigate("/users")}
@@ -178,14 +175,16 @@ export function CreateUserPage() {
           Kembali ke Laman Pengguna
         </Button>
 
-        <Card className="p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-lg flex items-center justify-center">
-              <UserPlus className="h-6 w-6 text-white" />
+        <Card className="p-8 shadow-sm">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex size-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <UserPlus className="size-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-normal">Buat Akun Baru</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Buat Akun Baru
+              </h1>
+              <p className="text-sm text-muted-foreground">
                 Buat Akun untuk Pengguna Baru
               </p>
             </div>
@@ -368,7 +367,6 @@ export function CreateUserPage() {
             </div>
           </form>
         </Card>
-      </div>
-    </div>
+    </AppLayout>
   );
 }

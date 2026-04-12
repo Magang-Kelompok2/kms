@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
+import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -175,38 +175,29 @@ export function AssignmentViewPage() {
 
   if (assignmentLoading || progressLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <p className="text-gray-500">Memuat tugas...</p>
-        </div>
-      </div>
+      <AppLayout>
+        <p className="text-sm text-muted-foreground">Memuat tugas...</p>
+      </AppLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">{error}</p>
-          </Card>
-        </div>
-      </div>
+      <AppLayout>
+        <Card className="p-8 text-center shadow-sm">
+          <p className="text-destructive">{error}</p>
+        </Card>
+      </AppLayout>
     );
   }
 
   if (!assignment) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">Tugas tidak ditemukan</p>
-          </Card>
-        </div>
-      </div>
+      <AppLayout>
+        <Card className="p-8 text-center shadow-sm">
+          <p className="text-destructive">Tugas tidak ditemukan</p>
+        </Card>
+      </AppLayout>
     );
   }
 
@@ -220,22 +211,21 @@ export function AssignmentViewPage() {
 
   if (!hasAccess) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-12 text-center">
-            <h1 className="text-2xl font-bold mb-4">Akses Ditolak</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
-              tugas ini. (Level tugas: {assignmentLevel}, Level kamu:{" "}
-              {userLevel})
-            </p>
-            <Button onClick={() => navigate("/dashboard")} className="mt-4">
-              Kembali ke Dashboard
-            </Button>
-          </Card>
-        </div>
-      </div>
+      <AppLayout>
+        <Card className="p-12 text-center shadow-sm">
+          <h1 className="mb-4 text-xl font-semibold tracking-tight">
+            Akses Ditolak
+          </h1>
+          <p className="text-muted-foreground">
+            Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
+            tugas ini. (Level tugas: {assignmentLevel}, Level kamu:{" "}
+            {userLevel})
+          </p>
+          <Button onClick={() => navigate("/dashboard")} className="mt-4">
+            Kembali ke Dashboard
+          </Button>
+        </Card>
+      </AppLayout>
     );
   }
 
@@ -304,10 +294,7 @@ export function AssignmentViewPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <DashboardHeader />
-
-      <div className="container mx-auto px-4 md:px-6 py-6">
+    <AppLayout className="py-6">
         <Button
           variant="ghost"
           onClick={() => navigate(`/class/${assignment.classId}`)}
@@ -666,8 +653,8 @@ export function AssignmentViewPage() {
           </Card>
 
           <Card className="p-5 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-            <h3 className="text-base font-bold text-blue-900 dark:text-blue-100 mb-2">
-              📋 Petunjuk Pengumpulan
+            <h3 className="mb-2 text-base font-semibold text-foreground">
+              Petunjuk pengumpulan
             </h3>
             <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
               <li>Pastikan jawaban Anda jelas dan mudah dipahami</li>
@@ -677,7 +664,6 @@ export function AssignmentViewPage() {
             </ul>
           </Card>
         </div>
-      </div>
-    </div>
+    </AppLayout>
   );
 }

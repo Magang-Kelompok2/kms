@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "./ui/card";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import type { Assignment, Quiz, Material } from "../types";
 
@@ -73,6 +71,44 @@ export function UserLevelCard({
     .map(Number)
     .sort((a, b) => a - b);
 
+  // Format items untuk display (sama seperti AdminLevelCard)
+  type TabItem = {
+    id: string;
+    type: "materi" | "tugas" | "kuis";
+    title: string;
+    subtitle: string;
+    badge: string;
+    number: number;
+    extra?: string;
+  };
+
+  const itemsByTab: Record<"materi" | "tugas" | "kuis", TabItem[]> = {
+    materi: materials.map((material) => ({
+      id: material.id,
+      type: "materi",
+      title: material.title,
+      subtitle: material.description ?? "",
+      badge: `${material.files?.length || 0} files`,
+      number: material.meetingNumber,
+    })),
+    tugas: assignments.map((assignment) => ({
+      id: assignment.id,
+      type: "tugas",
+      title: assignment.title,
+      subtitle: assignment.description ?? "",
+      badge: `Pertemuan ${assignment.meetingNumber}`,
+      number: assignment.meetingNumber,
+    })),
+    kuis: quizzes.map((quiz) => ({
+      id: quiz.id,
+      type: "kuis",
+      title: quiz.title,
+      subtitle: quiz.description ?? "",
+      badge: `Durasi ${quiz.duration ?? (quiz as any).durasi ?? 0}m`,
+      number: quiz.meetingNumber,
+    })),
+  };
+
   return (
     <Card className={`overflow-hidden ${isLocked ? "opacity-60" : ""}`}>
       {/* Header */}
@@ -123,9 +159,9 @@ export function UserLevelCard({
 
       {/* Content */}
       {isOpen && !isLocked && (
-        <div className="border-t border-gray-200 dark:border-gray-800">
-          {/* Tabs */}
-          <div className="flex justify-center p-6">
+        <div className="border-t border-gray-200 dark:border-gray-800 p-6 space-y-6">
+          {/* Tabs - At top */}
+          <div className="flex justify-center">
             <div className="inline-flex rounded-full border cursor-pointer border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-950 shadow-sm">
               <button
                 onClick={() => setActiveTab("materi")}
@@ -160,128 +196,44 @@ export function UserLevelCard({
             </div>
           </div>
 
-          {/* Tab Content */}
-          <div className="p-6">
-            {/* Materi */}
-            {activeTab === "materi" && (
-              <div>
-                {meetings.length > 0 ? (
-                  <div className="space-y-3">
-                    {meetings.map((meeting) => (
-                      <div key={meeting}>
-                        <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                          Pertemuan {meeting}
+          {/* Content Area - Scrollable */}
+          <div className="max-h-96 overflow-y-auto">
+            <div className="space-y-3">
+              {itemsByTab[activeTab].length > 0 ? (
+                itemsByTab[activeTab].map((item) => (
+                  <div
+                    id={item.id}
+                    key={item.id}
+                    className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => {
+                      if (item.type === "materi") navigate(`/material/${item.id}`);
+                      if (item.type === "tugas") navigate(`/assignment/${item.id}`);
+                      if (item.type === "kuis") navigate(`/quiz/${item.id}`);
+                    }}
+                  >
+                    <div className="w-full flex items-center justify-between gap-4 p-4 text-left">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] text-white grid place-items-center font-semibold">
+                          {item.number}
                         </div>
-                        {materialsByMeeting[meeting].map((material) => (
-                          <div
-                            id={material.id}
-                            key={material.id}
-                            className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all duration-200 ease-out hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
-                            onClick={() => navigate(`/material/${material.id}`)}
-                          >
-                            <div className="p-4">
-                              <h5 className="font-semibold mb-1">
-                                {material.title}
-                              </h5>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                {material.description}
-                              </p>
-                              <div className="flex items-center justify-between">
-                                <Badge variant="outline" className="text-xs">
-                                  {material.files?.length || 0} files
-                                </Badge>
-                                <Button size="sm" variant="outline">
-                                  Lihat Materi
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500 py-4">
-                    Tidak ada materi di tingkatan ini
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Tugas */}
-            {activeTab === "tugas" && (
-              <div>
-                {assignments.length > 0 ? (
-                  <div className="space-y-3">
-                    {assignments.map((assignment) => (
-                      <div
-                        key={assignment.id}
-                        className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
-                        onClick={() => navigate(`/assignment/${assignment.id}`)}
-                      >
-                        <div className="p-4">
-                          <h5 className="font-semibold mb-1">
-                            {assignment.title}
-                          </h5>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            {assignment.description}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <Badge variant="outline" className="text-xs">
-                              Pertemuan {assignment.meetingNumber}
-                            </Badge>
-                            <Button size="sm" variant="outline">
-                              Kerjakan
-                            </Button>
-                          </div>
+                        <div>
+                          <h4 className="font-bold text-lg">{item.title}</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{item.subtitle}</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500 py-4">
-                    Tidak ada tugas di tingkatan ini
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Kuis */}
-            {activeTab === "kuis" && (
-              <div>
-                {quizzes.length > 0 ? (
-                  <div className="space-y-3">
-                    {quizzes.map((quiz) => (
-                      <div
-                        key={quiz.id}
-                        className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
-                        onClick={() => navigate(`/quiz/${quiz.id}`)}
-                      >
-                        <div className="p-4">
-                          <h5 className="font-semibold mb-1">{quiz.title}</h5>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            {quiz.description}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <Badge variant="outline" className="text-xs">
-                              Durasi{" "}
-                              {quiz.duration ?? (quiz as any).durasi ?? 0}m
-                            </Badge>
-                            <Button size="sm" variant="outline">
-                              Mulai Kuis
-                            </Button>
-                          </div>
-                        </div>
+                      <div className="text-right text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                        <div>{item.badge}</div>
+                        {item.extra ? <div>{item.extra}</div> : null}
                       </div>
-                    ))}
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-center text-gray-500 py-4">
-                    Tidak ada kuis di tingkatan ini
-                  </p>
-                )}
-              </div>
-            )}
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-950 rounded-3xl border border-gray-200 dark:border-gray-800">
+                  Tidak ada konten di tab ini.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

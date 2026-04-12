@@ -20,12 +20,12 @@
   --accent-foreground: #030213;
   --destructive: #d4183d;
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
+  --border: oklch(0.922 0 0);
   --input: transparent;
   --input-background: #f3f3f5;
   --switch-background: #cbced4;
-  --font-weight-medium: 300;
-  --font-weight-normal: 200;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
   --ring: oklch(0.708 0 0);
   --chart-1: #0C4E8C;
   --chart-2: #0C81E4;

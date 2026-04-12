@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
+import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -23,10 +23,7 @@ export function UserManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-      <DashboardHeader />
-
-      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
+    <AppLayout>
         <Button
           variant="ghost"
           onClick={() => navigate("/dashboard")}
@@ -36,10 +33,12 @@ export function UserManagementPage() {
           Kembali ke Dashboard
         </Button>
 
-        <div className="flex items-center justify-between mb-8">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Kelola Pengguna</h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <h1 className="mb-2 text-3xl font-semibold tracking-tight">
+              Kelola Pengguna
+            </h1>
+            <p className="text-muted-foreground">
               Tambahkan, edit, atau hapus pengguna di platform
             </p>
           </div>
@@ -139,7 +138,6 @@ export function UserManagementPage() {
             </Card>
           )}
         </div>
-      </div>
-    </div>
+    </AppLayout>
   );
 }

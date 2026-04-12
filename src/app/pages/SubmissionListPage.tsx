@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
+import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -128,35 +128,29 @@ export function SubmissionListPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8 flex justify-center">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-2" />
-            <p className="text-gray-500">Memuat data...</p>
-          </div>
+      <AppLayout className="flex justify-center py-16">
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-2 size-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Memuat data...</p>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (error || !tugas) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <DashboardHeader />
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-          <Card className="p-8 text-center">
-            <p className="text-red-500">{error ?? "Data tidak ditemukan"}</p>
-            <Button
-              variant="outline"
-              onClick={() => navigate(-1)}
-              className="mt-4"
-            >
-              Kembali
-            </Button>
-          </Card>
-        </div>
-      </div>
+      <AppLayout>
+        <Card className="p-8 text-center shadow-sm">
+          <p className="text-destructive">{error ?? "Data tidak ditemukan"}</p>
+          <Button
+            variant="outline"
+            onClick={() => navigate(-1)}
+            className="mt-4"
+          >
+            Kembali
+          </Button>
+        </Card>
+      </AppLayout>
     );
   }
 
@@ -166,9 +160,7 @@ export function SubmissionListPage() {
     : pengumpulanList.length;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <DashboardHeader />
-      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
+    <AppLayout>
         <Button
           variant="ghost"
           onClick={() => navigate(`/class/${tugas.classId}`)}
@@ -425,7 +417,6 @@ export function SubmissionListPage() {
             ))
           )}
         </div>
-      </div>
-    </div>
+    </AppLayout>
   );
 }

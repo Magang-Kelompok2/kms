@@ -122,36 +122,8 @@ export function AdminLevelCard({
         {/* Content */}
         {isOpen && (
           <div className="border-t border-gray-200 dark:border-gray-800 p-6 space-y-6">
-            {/* Add Buttons */}
-            <div className="grid grid-cols-3 gap-3">
-              <Button
-                onClick={() => setShowMaterialModal(true)}
-                variant="outline"
-                className="w-full bg-secondary hover:bg-primary hover:text-white text-white cursor-pointer"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Materi
-              </Button>
-              <Button
-                onClick={() => setShowAssignmentModal(true)}
-                variant="outline"
-                className="w-full bg-secondary hover:bg-primary hover:text-white text-white cursor-pointer"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Tugas
-              </Button>
-              <Button
-                onClick={() => setShowQuizModal(true)}
-                variant="outline"
-                className="w-full bg-secondary hover:bg-primary hover:text-white text-white cursor-pointer"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Kuis
-              </Button>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex justify-center p-6">
+            {/* Tabs - At top */}
+            <div className="flex justify-center">
               <div className="inline-flex rounded-full border cursor-pointer border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-950 shadow-sm">
                 <button
                   onClick={() => setActiveTab("materi")}
@@ -186,52 +158,72 @@ export function AdminLevelCard({
               </div>
             </div>
 
-            <div className="space-y-3">
-              {itemsByTab[activeTab].length > 0 ? (
-                itemsByTab[activeTab].map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
-                    onClick={() => {
-                      if (item.type === "materi") navigate(`/material/${item.id}`);
-                      if (item.type === "tugas") navigate(`/assignment/${item.id}`);
-                      if (item.type === "kuis") navigate(`/quiz/${item.id}`);
-                    }}
-                  >
-                    <div className="w-full flex items-center justify-between gap-4 p-4 text-left">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] text-white grid place-items-center font-semibold">
-                          {item.number}
+            {/* Content Area - Scrollable */}
+            <div className="max-h-96 overflow-y-auto">
+              <div className="space-y-3">
+                {itemsByTab[activeTab].length > 0 ? (
+                  itemsByTab[activeTab].map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-3xl bg-white dark:bg-slate-950 border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-all cursor-pointer"
+                      onClick={() => {
+                        if (item.type === "materi") navigate(`/material/${item.id}`);
+                        if (item.type === "tugas") navigate(`/assignment/${item.id}`);
+                        if (item.type === "kuis") navigate(`/quiz/${item.id}`);
+                      }}
+                    >
+                      <div className="w-full flex items-center justify-between gap-4 p-4 text-left">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] text-white grid place-items-center font-semibold">
+                            {item.number}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-lg">{item.title}</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{item.subtitle}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-bold text-lg">{item.title}</h4>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{item.subtitle}</p>
+                        <div className="text-right text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                          <div>{item.badge}</div>
+                          {item.extra ? <div>{item.extra}</div> : null}
                         </div>
-                      </div>
-                      <div className="text-right text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                        <div>{item.badge}</div>
-                        {item.extra ? <div>{item.extra}</div> : null}
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-950 rounded-3xl border border-gray-200 dark:border-gray-800">
+                    Tidak ada konten di tab ini.
                   </div>
-                ))
-              ) : (
-                <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-950 rounded-3xl border border-gray-200 dark:border-gray-800">
-                  Tidak ada konten di tab ini.
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
-            {materials.length === 0 &&
-              assignments.length === 0 &&
-              quizzes.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="mb-4">Belum ada konten di tingkatan ini</p>
-                  <p className="text-sm">
-                    Klik tombol di atas untuk menambah konten
-                  </p>
-                </div>
-              )}
+            {/* Add Buttons - At bottom */}
+            <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+              <Button
+                onClick={() => setShowMaterialModal(true)}
+                variant="outline"
+                className="w-full bg-secondary hover:bg-primary hover:text-white text-white cursor-pointer"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Materi
+              </Button>
+              <Button
+                onClick={() => setShowAssignmentModal(true)}
+                variant="outline"
+                className="w-full bg-secondary hover:bg-primary hover:text-white text-white cursor-pointer"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Tugas
+              </Button>
+              <Button
+                onClick={() => setShowQuizModal(true)}
+                variant="outline"
+                className="w-full bg-secondary hover:bg-primary hover:text-white text-white cursor-pointer"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Kuis
+              </Button>
+            </div>
           </div>
         )}
       </Card>

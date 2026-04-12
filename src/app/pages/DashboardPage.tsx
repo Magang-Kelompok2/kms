@@ -1,6 +1,6 @@
 import { useAuth } from "../context/AuthContext";
-import { DashboardHeader } from "../components/DashboardHeader";
-import { Card } from "../components/ui/card";
+import { AppLayout } from "../components/AppLayout";
+import { Card, CardContent } from "../components/ui/card";
 import {
   BookOpen,
   FileText,
@@ -10,6 +10,7 @@ import {
   Plus,
   Eye,
   Search,
+  Layers,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Badge } from "../components/ui/badge";
@@ -21,6 +22,66 @@ import { useMateri } from "../hooks/useMateri";
 import { useTugas } from "../hooks/useTugas";
 import { useUsers } from "../hooks/useUsers";
 
+// ─── Gradient KPI Card ─────────────────────────────────────────────────────────
+interface GradientStatCardProps {
+  title: string;
+  value: number;
+  footnote: string;
+  icon: React.ElementType;
+  from: string;
+  to: string;
+  loading?: boolean;
+}
+
+function GradientStatCard({
+  title,
+  value,
+  footnote,
+  icon: Icon,
+  from,
+  to,
+  loading,
+}: GradientStatCardProps) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-xl p-5 text-white shadow-md"
+      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+    >
+      {/* Decorative circles */}
+      <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-white/10" />
+      <div className="absolute -bottom-6 -right-6 h-20 w-20 rounded-full bg-white/5" />
+
+      <div className="relative flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-white/75">{title}</p>
+          {loading ? (
+            <div className="mt-1 h-10 w-16 animate-pulse rounded-md bg-white/20" />
+          ) : (
+            <p className="mt-1 text-4xl font-bold tracking-tight">{value}</p>
+          )}
+          <p className="mt-1 text-xs text-white/55">{footnote}</p>
+        </div>
+        <div className="rounded-xl bg-white/20 p-2.5">
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shared image map ──────────────────────────────────────────────────────────
+const classImageMap: Record<string, string> = {
+  akuntansi: "/akuntansi.jpg",
+  audit: "/audit.jpg",
+  perpajakan: "/perpajakan.jpg",
+};
+
+const getClassImage = (className: string): string =>
+  Object.entries(classImageMap).find(([key]) =>
+    className.toLowerCase().includes(key),
+  )?.[1] ?? "/akuntansi.jpg";
+
+// ─── Dashboard Page ────────────────────────────────────────────────────────────
 export function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -39,12 +100,12 @@ export function DashboardPage() {
 
   const handleDeleteUser = async (userId: number, role: string) => {
     if (role === "superadmin") {
-      alert("Cannot delete superadmin account!");
+      alert("Tidak bisa menghapus akun superadmin!");
       return;
     }
-    if (confirm("Are you sure you want to delete this user?")) {
+    if (confirm("Apakah Anda yakin ingin menghapus pengguna ini?")) {
       const success = await deleteUser(userId);
-      if (success) alert("User deleted successfully!");
+      if (success) alert("Pengguna berhasil dihapus!");
       else alert("Gagal menghapus pengguna.");
     }
   };
@@ -61,339 +122,339 @@ export function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-blue-50 dark:bg-gray-950">
-      <DashboardHeader />
+    <AppLayout>
+      {/* ── Welcome ── */}
+      <div className="mb-8 space-y-2">
+        <h1 className="text-4xl font-semibold tracking-tight text-foreground">
+          Selamat datang kembali,
+        </h1>
+        <h1 className="text-primary font-bold text-5xl mb-4">{user?.name}!</h1>
+        <p className="text-muted-foreground">
+          {user?.role === "superadmin"
+            ? "Kelola kelas, materi, dan akses siswa Anda"
+            : "Lanjutkan perjalanan pembelajaran Anda"}
+        </p>
+      </div>
 
-      <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            Selamat datang kembali, {user?.name}!
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            {user?.role === "superadmin"
-              ? "Kelola kelas, materi, dan akses siswa Anda"
-              : "Lanjutkan perjalanan pembelajaran Anda"}
-          </p>
-        </div>
+      {/* ── KPI Cards ── */}
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <GradientStatCard
+          title="Total Kelas"
+          value={classes.length}
+          footnote="Semua kelas aktif"
+          icon={BookOpen}
+          from="#3b82f6"
+          to="#0369a1"
+          loading={classesLoading}
+        />
+        <GradientStatCard
+          title="Materi"
+          value={materi.length}
+          footnote="Total materi tersedia"
+          icon={FileText}
+          from="#0891b2"
+          to="#1d4ed8"
+          loading={materiLoading}
+        />
+        <GradientStatCard
+          title="Penugasan"
+          value={penugasan.length}
+          footnote="Tugas non-kuis"
+          icon={ClipboardCheck}
+          from="#4f46e5"
+          to="#0e7490"
+          loading={tugasLoading}
+        />
+        <GradientStatCard
+          title="Kuis"
+          value={kuis.length}
+          footnote="Evaluasi & latihan"
+          icon={Calendar}
+          from="#1e3a5f"
+          to="#0f2540"
+          loading={tugasLoading}
+        />
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 max-w-6xl mx-auto">
-          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_35%)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
-                  Total Kelas
-                </p>
-                <p className="text-4xl font-semibold">
-                  {classesLoading ? "-" : classes.length}
-                </p>
-              </div>
-              <div className="rounded-3xl bg-white/15 p-3">
-                <BookOpen className="h-10 w-10 text-white opacity-90" />
-              </div>
-            </div>
-            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
-              <span>Semua kelas aktif</span>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                Overview
-              </span>
-            </div>
-          </Card>
+      {/* ── Kelas Anda ── */}
+      <div className="mb-8">
+        <h2 className="mb-6 text-2xl font-bold tracking-tight text-black dark:text-white">
+          Kelas Anda
+        </h2>
 
-          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-violet-600 via-fuchsia-500 to-sky-500">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
-                  Materi
-                </p>
-                <p className="text-4xl font-semibold">
-                  {materiLoading ? "-" : materi.length}
-                </p>
-              </div>
-              <div className="rounded-3xl bg-white/15 p-3">
-                <FileText className="h-10 w-10 text-white opacity-90" />
-              </div>
-            </div>
-            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
-              <span>Total materi</span>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                Pelajari sekarang
-              </span>
-            </div>
-          </Card>
+        {classesLoading ? (
+          <p className="text-sm text-muted-foreground">Memuat kelas...</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {classes.map((cls) => {
+              const kelasMateri = materi.filter((m) => m.id_kelas === cls.id);
+              const kelasTugas = tugas.filter(
+                (t) => t.id_kelas === cls.id && t.type === "Tugas",
+              );
+              const kelasKuis = tugas.filter(
+                (t) => t.id_kelas === cls.id && t.type === "Kuis",
+              );
 
-          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-emerald-500 via-teal-500 to-cyan-500">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
-                  Penugasan
-                </p>
-                <p className="text-4xl font-semibold">
-                  {tugasLoading ? "-" : penugasan.length}
-                </p>
-              </div>
-              <div className="rounded-3xl bg-white/15 p-3">
-                <ClipboardCheck className="h-10 w-10 text-white opacity-90" />
-              </div>
-            </div>
-            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
-              <span>Task progress</span>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                Fokus kerja
-              </span>
-            </div>
-          </Card>
+              const userProgress =
+                user?.role !== "superadmin"
+                  ? Math.floor(Math.random() * 100)
+                  : 0;
 
-          <Card className="relative overflow-hidden rounded-4xl p-6 text-white shadow-xl bg-linear-to-br from-orange-500 via-rose-500 to-pink-500">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%)]" />
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-white/80 mb-2">
-                  Kuis
-                </p>
-                <p className="text-4xl font-semibold">
-                  {tugasLoading ? "-" : kuis.length}
-                </p>
-              </div>
-              <div className="rounded-3xl bg-white/15 p-3">
-                <Calendar className="h-10 w-10 text-white opacity-90" />
-              </div>
-            </div>
-            <div className="relative mt-6 flex items-center justify-between text-sm text-white/80">
-              <span>Persiapan ujian</span>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">
-                Review
-              </span>
-            </div>
-          </Card>
-        </div>
+              const classImage = getClassImage(cls.name);
 
-        {/* Classes Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Kelas Anda</h2>
-          </div>
-
-          {classesLoading ? (
-            <p className="text-gray-500">Memuat kelas...</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {classes.map((cls) => {
-                const kelasMateri = materi.filter((m) => m.id_kelas === cls.id);
-                const kelasTugas = tugas.filter(
-                  (t) => t.id_kelas === cls.id && t.type === "Kuis",
-                );
-
-                return (
-                  <Card
-                    key={cls.id}
-                    className="group cursor-pointer hover:shadow-2xl transition-all duration-300 overflow-hidden rounded-4xl"
-                    onClick={() => navigate(`/class/${cls.id}`)}
-                  >
-                    <div className="relative h-50 overflow-hidden bg-linear-to-br from-slate-800 via-indigo-600 to-sky-500">
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.25),transparent_40%)]" />
-                      <div className="absolute left-6 top-6 rounded-full bg-white/20 w-14 h-14 blur-2xl" />
-                      <div className="absolute right-4 top-8 rounded-full bg-white/10 w-24 h-24" />
-                      <div className="absolute inset-0 flex items-center justify-center px-4">
-                        <h3
-                          className="text-4xl font-bold text-white text-center"
-                          style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
-                        >
-                          {cls.name}
-                        </h3>
-                      </div>
+              return (
+                <Card
+                  key={cls.id}
+                  className="cursor-pointer overflow-hidden transition-all hover:shadow-xl hover:scale-105 border-0 shadow-lg"
+                  onClick={() => navigate(`/class/${cls.id}`)}
+                >
+                  {/* ── Area Gambar dengan Overlay Gradient ── */}
+                  <div className="relative h-52 w-full overflow-hidden">
+                    <img
+                      src={classImage}
+                      alt={cls.name}
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-blue-700/90 via-blue-500/30 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 pt-8">
+                      <h3
+                        className="text-xl font-bold tracking-tight text-white drop-shadow-md"
+                        style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                      >
+                        {cls.name}
+                      </h3>
                     </div>
-                    <div className="p-6">
-                      <div className="flex gap-4 text-sm text-gray-500 mb-2">
-                        <span className="font-bold text-base">{kelasMateri.length} Materi</span>
-                        <span className="font-bold text-base">{kelasTugas.length} Kuis</span>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        Dibuat:{" "}
-                        {new Date(cls.createdAt).toLocaleDateString("id-ID")}
-                      </p>
+                  </div>
+
+                  <CardContent className="pt-4">
+                    <div className="mb-4 flex gap-3 text-sm flex-wrap">
+                      <span className="text-sm font-semibold text-foreground border border-border rounded-full px-3 py-1">
+                        {kelasMateri.length} Materi
+                      </span>
+                      <span className="text-sm font-semibold text-foreground border border-border rounded-full px-3 py-1">
+                        {kelasTugas.length} Tugas
+                      </span>
+                      <span className="text-sm font-semibold text-foreground border border-border rounded-full px-3 py-1">
+                        {kelasKuis.length} Kuis
+                      </span>
                     </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                    <p className="mb-4 text-xs text-muted-foreground">
+                      Dibuat:{" "}
+                      {new Date(cls.createdAt).toLocaleDateString("id-ID")}
+                    </p>
 
-        {/* User Management for Superadmin */}
-        {user?.role === "superadmin" && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Manajemen Pengguna</h2>
-              <Button className="bg-secondary cursor-pointer" onClick={() => navigate("/users/create")}>
-                <Plus className="h-4 w-4 mr-2" />
-                Buat Pengguna Baru
-              </Button>
-            </div>
-
-            <div className="mb-4">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Cari pengguna..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <Card>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Nama
-                      </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Email
-                      </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Role
-                      </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">
-                        Dibuat Pada
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">
-                        Aksi
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {usersLoading ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-6 py-8 text-center text-gray-500"
-                        >
-                          Memuat pengguna...
-                        </td>
-                      </tr>
-                    ) : (
-                      currentUsers.map((u) => (
-                        <tr
-                          key={u.id}
-                          className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-linear-to-br from-[#0C4E8C] to-[#11C4D4] rounded-full flex items-center justify-center text-white font-bold">
-                                {u.username.charAt(0).toUpperCase()}
-                              </div>
-                              <span className="font-medium">{u.username}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                            {u.email}
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge
-                              variant={
-                                u.role === "superadmin"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                            {new Date(u.created_at).toLocaleDateString("id-ID")}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  navigate(`/users/${u.id}/progress`)
-                                }
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                Lihat
-                              </Button>
-                              {u.role !== "superadmin" && (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteUser(u.id, u.role);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                    {user?.role !== "superadmin" && (
+                      <div className="pt-4 border-t border-border">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-semibold text-foreground">
+                            Progress
+                          </span>
+                          <span className="text-xs font-bold text-blue-600">
+                            {userProgress}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${userProgress}%` }}
+                          />
+                        </div>
+                      </div>
                     )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-gray-900">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
-                >
-                  Sebelumnya
-                </Button>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Halaman {currentPage} dari {Math.max(totalPages, 1)}
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages || totalPages === 0}
-                >
-                  Selanjutnya
-                </Button>
-              </div>
-            </Card>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
+      </div>
 
-        {/* Materi Terbaru untuk user non-superadmin */}
-        {user?.role !== "superadmin" && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Materi Terbaru</h2>
+      {/* ── Manajemen Pengguna (Superadmin) ── */}
+      {user?.role === "superadmin" && (
+        <div>
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-semibold tracking-tight">
+              Manajemen Pengguna
+            </h2>
+            <Button onClick={() => navigate("/users/create")}>
+              <Plus className="mr-2 size-4" />
+              Buat Pengguna Baru
+            </Button>
+          </div>
+
+          <div className="mb-4 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Cari pengguna..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9"
+              />
             </div>
+          </div>
 
-            <div className="grid gap-4">
-              {materi.slice(0, 5).map((m) => {
-                const cls = classes.find((c) => c.id === m.id_kelas);
-                return (
-                  <Card
-                    key={m.id_materi}
-                    className="p-6 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => navigate(`/class/${m.id_kelas}`)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+          <Card className="overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/50">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-medium">Nama</th>
+                    <th className="px-6 py-3 text-left font-medium">Email</th>
+                    <th className="px-6 py-3 text-left font-medium">Role</th>
+                    <th className="px-6 py-3 text-left font-medium">
+                      Dibuat Pada
+                    </th>
+                    <th className="px-6 py-3 text-center font-medium">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {usersLoading ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-8 text-center text-muted-foreground"
+                      >
+                        Memuat pengguna...
+                      </td>
+                    </tr>
+                  ) : (
+                    currentUsers.map((u) => (
+                      <tr
+                        key={u.id}
+                        className="transition-colors hover:bg-muted/40"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                              {u.username.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-medium">{u.username}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-muted-foreground">
+                          {u.email}
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge
+                            variant={
+                              u.role === "superadmin" ? "default" : "secondary"
+                            }
+                          >
+                            {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 text-muted-foreground">
+                          {new Date(u.created_at).toLocaleDateString("id-ID")}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                navigate(`/users/${u.id}/progress`)
+                              }
+                            >
+                              <Eye className="mr-1 size-4" />
+                              Lihat
+                            </Button>
+                            {u.role !== "superadmin" && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteUser(u.id, u.role);
+                                }}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between border-t border-border bg-muted/30 px-6 py-4">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Sebelumnya
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Halaman {currentPage} dari {Math.max(totalPages, 1)}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                }
+                disabled={currentPage === totalPages || totalPages === 0}
+              >
+                Selanjutnya
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Materi Terbaru (User) ── */}
+      {user?.role !== "superadmin" && (
+        <div>
+          <h2 className="mb-6 text-xl font-semibold tracking-tight">
+            Materi Terbaru
+          </h2>
+
+          <div className="grid gap-3">
+            {materi.slice(0, 5).map((m) => {
+              const cls = classes.find((c) => c.id === m.id_kelas);
+              const classImage = cls ? getClassImage(cls.name) : "/akuntansi.jpg";
+
+              return (
+                <Card
+                  key={m.id_materi}
+                  className="cursor-pointer overflow-hidden shadow-sm transition-all hover:shadow-md hover:scale-[1.01] border border-border"
+                  onClick={() => navigate(`/class/${m.id_kelas}`)}
+                >
+                  <div className="flex items-stretch">
+                    {/* ── Gambar kiri dengan gradient kiri→kanan ── */}
+                    <div className="relative w-36 shrink-0 overflow-hidden sm:w-44">
+                      <img
+                        src={classImage}
+                        alt={cls?.name ?? "Kelas"}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                      {/* Gradient: biru solid di kiri → transparan ke kanan */}
+                      <div className="absolute inset-0 bg-linear-to-r from-blue-700/90 via-blue-500/40 to-transparent" />
+                      {/* Nama kelas vertikal di atas gradient */}
+                      <div className="absolute inset-0 flex items-center justify-center p-3">
+                        <span
+                          className="text-sm font-bold leading-tight text-white drop-shadow-md"
+                          style={{
+                            fontFamily: "Plus Jakarta Sans, sans-serif",
+                          }}
+                        >
+                          {cls?.name ?? "—"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ── Konten kanan ── */}
+                    <div className="flex flex-1 items-center justify-between gap-4 px-5 py-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
                           <Badge variant="outline" className="text-xs">
                             {cls?.name}
                           </Badge>
@@ -401,17 +462,19 @@ export function DashboardPage() {
                             Pertemuan {m.pertemuan}
                           </Badge>
                         </div>
-                        <h3 className="font-bold mb-1">{m.title_materi}</h3>
+                        <h3 className="font-semibold text-foreground leading-snug">
+                          {m.title_materi}
+                        </h3>
                       </div>
-                      <FileText className="h-10 w-10 text-gray-300 dark:text-gray-700 ml-4" />
+                      <FileText className="size-8 shrink-0 text-muted-foreground/30" />
                     </div>
-                  </Card>
-                );
-              })}
-            </div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </AppLayout>
   );
 }
