@@ -91,6 +91,7 @@ export function QuizViewPage() {
   } | null>(null);
   const [sudahMengerjakan, setSudahMengerjakan] = useState(false);
   const [skorSebelumnya, setSkorSebelumnya] = useState<number | null>(null);
+  const [jumlahPercobaan, setJumlahPercobaan] = useState(0);
 
   // State soal yang sudah diacak (soal & opsi) — dibuat saat klik Mulai Kuis
   const [soalAcakList, setSoalAcakList] = useState<SoalAcak[]>([]);
@@ -164,6 +165,7 @@ export function QuizViewPage() {
             if (json.sudahMengerjakan) {
               setSudahMengerjakan(true);
               setSkorSebelumnya(json.data.skor);
+              setJumlahPercobaan(json.jumlahPercobaan ?? 1);
             }
           }
         } catch {}
@@ -232,6 +234,9 @@ export function QuizViewPage() {
       }
 
       setHasilSkor(json.data);
+      setSudahMengerjakan(true);
+      setSkorSebelumnya(json.data.skor);
+      setJumlahPercobaan(json.data.jumlahPercobaan ?? jumlahPercobaan + 1);
       setTahap("selesai");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Gagal mengumpulkan jawaban");
@@ -243,6 +248,7 @@ export function QuizViewPage() {
     quizId,
     jawaban,
     isSubmitting,
+    jumlahPercobaan,
     token,
     quiz?.classId,
     quiz?.level,
@@ -338,6 +344,15 @@ export function QuizViewPage() {
       </AppLayout>
     );
   }
+
+  const MAX_PERCOBAAN = 5;
+  const SKOR_LULUS_ULANG = 80;
+
+  // Bisa mengerjakan ulang jika skor < 80 dan belum mencapai batas percobaan
+  const bisaUlang =
+    sudahMengerjakan &&
+    (skorSebelumnya ?? 0) < SKOR_LULUS_ULANG &&
+    jumlahPercobaan < MAX_PERCOBAAN;
 
   // Gunakan soalAcakList saat mengerjakan, fallback ke soalList
   const soalAktifData = soalAcakList[soalAktif] ?? soalList[soalAktif];
@@ -512,6 +527,8 @@ export function QuizViewPage() {
   if (tahap === "selesai" && hasilSkor) {
     const lulus = hasilSkor.skor >= 70;
     const salah = hasilSkor.total - hasilSkor.benar;
+    const bolehUlang = hasilSkor.skor < SKOR_LULUS_ULANG && jumlahPercobaan < MAX_PERCOBAAN;
+    const sisaPercobaan = MAX_PERCOBAAN - jumlahPercobaan;
 
     return (
       <AppLayout className="max-w-2xl py-10">
@@ -534,10 +551,13 @@ export function QuizViewPage() {
               <h1 className="text-3xl font-extrabold mb-1">
                 {lulus ? "Selamat" : "Belum Lulus"}
               </h1>
-              <p className="text-gray-500 dark:text-gray-400 mb-8 text-sm">
+              <p className="text-gray-500 dark:text-gray-400 mb-2 text-sm">
                 {lulus
                   ? "Kamu berhasil menyelesaikan kuis ini dengan baik."
                   : "Sayang sekali, kamu belum mencapai nilai minimum."}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-8">
+                Percobaan ke-{jumlahPercobaan} dari {MAX_PERCOBAAN}
               </p>
 
               {/* Skor */}
@@ -593,10 +613,21 @@ export function QuizViewPage() {
                 )}
               </div>
 
-              <div className="max-w-sm mx-auto">
+              <div className="max-w-sm mx-auto space-y-3">
+                {bolehUlang && (
+                  <Button
+                    onClick={handleMulaiKuis}
+                    className="w-full py-6 font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                    size="lg"
+                  >
+                    <Trophy className="h-5 w-5 mr-2" />
+                    Kerjakan Ulang ({sisaPercobaan} kesempatan tersisa)
+                  </Button>
+                )}
                 <Button
                   onClick={() => navigate(`/class/${quiz.classId}`)}
                   className="w-full py-6 font-semibold"
+                  variant={bolehUlang ? "outline" : "default"}
                   size="lg"
                 >
                   Kembali ke Kelas
@@ -678,17 +709,45 @@ export function QuizViewPage() {
 
               {/* Info sudah mengerjakan */}
               {sudahMengerjakan && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 mb-5">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                <div
+                  className={`flex items-center gap-3 p-4 rounded-xl border mb-5 ${
+                    bisaUlang
+                      ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                      : "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+                  }`}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                      bisaUlang
+                        ? "bg-amber-100 dark:bg-amber-900/40"
+                        : "bg-emerald-100 dark:bg-emerald-900/40"
+                    }`}
+                  >
+                    {bisaUlang ? (
+                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    ) : (
+                      <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    )}
                   </div>
                   <div>
-                    <p className="font-semibold text-emerald-900 dark:text-emerald-100 text-sm">
-                      Sudah Dikerjakan
+                    <p
+                      className={`font-semibold text-sm ${
+                        bisaUlang
+                          ? "text-amber-900 dark:text-amber-100"
+                          : "text-emerald-900 dark:text-emerald-100"
+                      }`}
+                    >
+                      {bisaUlang ? "Belum Mencapai Nilai 80" : "Sudah Dikerjakan"}
                     </p>
-                    <p className="text-emerald-700 dark:text-emerald-300 text-sm">
+                    <p
+                      className={`text-sm ${
+                        bisaUlang
+                          ? "text-amber-700 dark:text-amber-300"
+                          : "text-emerald-700 dark:text-emerald-300"
+                      }`}
+                    >
                       Skor terakhir: <strong>{skorSebelumnya}/100</strong>
-                      {(skorSebelumnya ?? 0) >= 70 ? " — Lulus" : ""}
+                      {" · "}Percobaan {jumlahPercobaan}/{MAX_PERCOBAAN}
                     </p>
                   </div>
                 </div>
@@ -705,7 +764,7 @@ export function QuizViewPage() {
                     "Timer mulai berjalan saat kamu klik Mulai Kuis",
                     "Urutan soal dan pilihan jawaban diacak setiap sesi",
                     "Kuis otomatis dikumpulkan saat waktu habis",
-                    "Kamu hanya bisa mengerjakan kuis ini satu kali",
+                    `Kuis bisa dikerjakan ulang maksimal ${MAX_PERCOBAAN}× jika nilai di bawah ${SKOR_LULUS_ULANG}`,
                   ].map((item, i) => (
                     <li
                       key={i}
@@ -720,25 +779,37 @@ export function QuizViewPage() {
                 </ul>
               </div>
 
-              {/* Tombol mulai / info sudah dikerjakan */}
+              {/* Tombol mulai / coba ulang / selesai */}
               {soalList.length > 0 ? (
-                sudahMengerjakan ? (
-                  <div className="w-full py-4 px-6 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-center">
-                    <CheckCircle className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
-                    <p className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">
-                      Kuis sudah dikerjakan
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Kamu hanya bisa mengerjakan kuis ini satu kali
-                    </p>
-                  </div>
-                ) : (
+                !sudahMengerjakan ? (
                   <Button
                     onClick={handleMulaiKuis}
                     className="w-full py-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white shadow-lg shadow-blue-200 dark:shadow-none"
                   >
                     <Trophy className="h-5 w-5 mr-2" /> Mulai Kuis
                   </Button>
+                ) : bisaUlang ? (
+                  <Button
+                    onClick={handleMulaiKuis}
+                    className="w-full py-6 text-base font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-200 dark:shadow-none"
+                  >
+                    <Trophy className="h-5 w-5 mr-2" />
+                    Kerjakan Ulang ({MAX_PERCOBAAN - jumlahPercobaan} kesempatan tersisa)
+                  </Button>
+                ) : (
+                  <div className="w-full py-4 px-6 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-center">
+                    <CheckCircle className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
+                    <p className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">
+                      {(skorSebelumnya ?? 0) >= SKOR_LULUS_ULANG
+                        ? `Kuis selesai — Nilai ${skorSebelumnya}/100`
+                        : `Percobaan habis (${MAX_PERCOBAAN}/${MAX_PERCOBAAN})`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {(skorSebelumnya ?? 0) >= SKOR_LULUS_ULANG
+                        ? "Kamu sudah mencapai nilai minimum pengerjaan ulang"
+                        : "Kamu telah menggunakan semua kesempatan pengerjaan ulang"}
+                    </p>
+                  </div>
                 )
               ) : (
                 <Button

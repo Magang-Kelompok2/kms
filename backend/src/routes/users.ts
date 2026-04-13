@@ -6,6 +6,133 @@ import { verifySupabaseToken } from "../middleware/auth";
 const router = Router();
 const SALT_ROUNDS = 10;
 
+const isMissingColumnError = (error: any, columnName: string) => {
+  const message = String(error?.message ?? error?.details ?? "").toLowerCase();
+  const normalizedColumn = columnName.toLowerCase();
+  return (
+    error?.code === "42703" ||
+    message.includes(`column '${normalizedColumn}'`) ||
+    message.includes(`column "${normalizedColumn}"`) ||
+    message.includes(normalizedColumn)
+  );
+};
+
+const extractProgressLevel = (row: any) => {
+  const value = row?.id_tingkatan ?? row?.tingkatan_saat_ini ?? 1;
+  return typeof value === "number" && value >= 1 ? value : 1;
+};
+
+const canAccessUserScopedData = (requestUser: any, targetUserId: number) =>
+  requestUser?.role === "superadmin" ||
+  Number(requestUser?.id_user) === targetUserId;
+
+async function insertUserProgressRows(
+  userId: number,
+  rows: Array<{ id_kelas: number; id_tingkatan: number }>,
+  updatedAt: string,
+) {
+  if (rows.length === 0) return;
+
+  const nextRows = rows.map((item) => ({
+    id_user: userId,
+    id_kelas: item.id_kelas,
+    id_tingkatan: item.id_tingkatan,
+    updated_at: updatedAt,
+  }));
+
+  const { error } = await supabase.from("user_progress").insert(nextRows);
+  if (!error) return;
+  if (!isMissingColumnError(error, "id_tingkatan")) throw error;
+
+  const legacyRows = rows.map((item) => ({
+    id_user: userId,
+    id_kelas: item.id_kelas,
+    tingkatan_saat_ini: item.id_tingkatan,
+    updated_at: updatedAt,
+  }));
+
+  const { error: legacyError } = await supabase
+    .from("user_progress")
+    .insert(legacyRows);
+
+  if (legacyError) throw legacyError;
+}
+
+async function getUserProgressRows(userId: number) {
+  const { data, error } = await supabase
+    .from("user_progress")
+    .select("id_progress, id_kelas, id_tingkatan, updated_at")
+    .eq("id_user", userId)
+    .order("updated_at", { ascending: false });
+
+  if (!error) return data ?? [];
+  if (!isMissingColumnError(error, "id_tingkatan")) throw error;
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("user_progress")
+    .select("id_progress, id_kelas, tingkatan_saat_ini, updated_at")
+    .eq("id_user", userId)
+    .order("updated_at", { ascending: false });
+
+  if (legacyError) throw legacyError;
+  return legacyData ?? [];
+}
+
+async function getUserProgressByClass(userId: number, classId: number) {
+  const { data, error } = await supabase
+    .from("user_progress")
+    .select("id_progress, id_tingkatan")
+    .eq("id_user", userId)
+    .eq("id_kelas", classId)
+    .maybeSingle();
+
+  if (!error || error?.code === "PGRST116") return data;
+  if (!isMissingColumnError(error, "id_tingkatan")) throw error;
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("user_progress")
+    .select("id_progress, tingkatan_saat_ini")
+    .eq("id_user", userId)
+    .eq("id_kelas", classId)
+    .maybeSingle();
+
+  if (legacyError && legacyError.code !== "PGRST116") throw legacyError;
+  return legacyData;
+}
+
+async function saveUserProgress(
+  userId: number,
+  classId: number,
+  level: number,
+  updatedAt: string,
+) {
+  const existingRow = await getUserProgressByClass(userId, classId);
+
+  if (existingRow?.id_progress) {
+    const { error } = await supabase
+      .from("user_progress")
+      .update({ id_tingkatan: level, updated_at: updatedAt })
+      .eq("id_progress", existingRow.id_progress);
+
+    if (!error) return;
+    if (!isMissingColumnError(error, "id_tingkatan")) throw error;
+
+    const { error: legacyError } = await supabase
+      .from("user_progress")
+      .update({ tingkatan_saat_ini: level, updated_at: updatedAt })
+      .eq("id_progress", existingRow.id_progress);
+
+    if (legacyError) throw legacyError;
+    return;
+  }
+
+  await insertUserProgressRows(
+    userId,
+    [{ id_kelas: classId, id_tingkatan: level }],
+    updatedAt,
+  );
+}
+
 type RequestedAccess = {
   id_kelas: number;
   id_tingkatan: number;
@@ -147,7 +274,6 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
       });
     }
 
-    const primaryAccess = uniqueByClass[0] ?? null;
     const hashedPassword = await bcrypt.hash(normalizedPassword, SALT_ROUNDS);
 
     const { data: createdUser, error: createUserError } = await supabase
@@ -157,9 +283,8 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
         email: normalizedEmail,
         password: hashedPassword,
         role,
-        id_kelas: primaryAccess?.id_kelas ?? null,
       })
-      .select("id_user, username, email, role, id_kelas, created_at")
+      .select("id_user, username, email, role, created_at")
       .single();
 
     if (createUserError || !createdUser) throw createUserError;
@@ -184,18 +309,7 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
 
         if (enrollmentError) throw enrollmentError;
 
-        const { error: progressError } = await supabase
-          .from("user_progress")
-          .insert(
-            progressRows.map((item) => ({
-              id_user: createdUser.id_user,
-              id_kelas: item.id_kelas,
-              id_tingkatan: item.id_tingkatan,
-              updated_at: now,
-            })),
-          );
-
-        if (progressError) throw progressError;
+        await insertUserProgressRows(createdUser.id_user, progressRows, now);
       }
     } catch (nestedError) {
       await supabase.from("user").delete().eq("id_user", createdUser.id_user);
@@ -209,7 +323,6 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
         username: createdUser.username,
         email: createdUser.email,
         role: createdUser.role ?? "user",
-        id_kelas: createdUser.id_kelas,
         accesses: uniqueByClass,
         created_at: createdUser.created_at,
       },
@@ -272,7 +385,7 @@ router.get("/:userId", verifySupabaseToken, async (req: any, res) => {
   }
 
   try {
-    if (req.user.role !== "superadmin") {
+    if (!canAccessUserScopedData(req.user, userId)) {
       return res.status(403).json({ success: false, error: "Akses ditolak" });
     }
 
@@ -316,18 +429,12 @@ router.get("/:userId/progress", verifySupabaseToken, async (req: any, res) => {
       .status(400)
       .json({ success: false, error: "Parameter tidak valid" });
 
-  if (req.user.role !== "superadmin") {
+  if (!canAccessUserScopedData(req.user, userId)) {
     return res.status(403).json({ success: false, error: "Akses ditolak" });
   }
 
   try {
-    const { data: progressRows, error } = await supabase
-      .from("user_progress")
-      .select("id_progress, id_kelas, id_tingkatan, updated_at")
-      .eq("id_user", userId)
-      .order("updated_at", { ascending: false });
-
-    if (error) throw error;
+    const progressRows = await getUserProgressRows(userId);
 
     const kelasIds = [
       ...new Set((progressRows ?? []).map((row: any) => row.id_kelas)),
@@ -352,7 +459,7 @@ router.get("/:userId/progress", verifySupabaseToken, async (req: any, res) => {
         id: row.id_progress,
         classId: String(row.id_kelas),
         className: kelasMap[row.id_kelas] ?? "Tidak diketahui",
-        currentLevel: row.id_tingkatan,
+        currentLevel: extractProgressLevel(row),
         updatedAt: row.updated_at,
       })),
     });
@@ -401,19 +508,12 @@ router.get(
         .json({ success: false, error: "Parameter tidak valid" });
 
     try {
-      const { data, error } = await supabase
-        .from("user_progress")
-        .select("id_tingkatan")
-        .eq("id_user", userId)
-        .eq("id_kelas", classId)
-        .single();
+      const data = await getUserProgressByClass(userId, classId);
 
       // PGRST116 = row not found, berarti user belum ada progress → default 1
-      if (error && error.code !== "PGRST116") throw error;
-
       res.json({
         success: true,
-        data: { tingkatanSaatIni: data?.id_tingkatan ?? 1 },
+        data: { tingkatanSaatIni: extractProgressLevel(data) },
       });
     } catch (error) {
       console.error("Error fetching progress:", error);
@@ -436,7 +536,7 @@ router.get(
         .status(400)
         .json({ success: false, error: "Parameter tidak valid" });
 
-    if (req.user.role !== "superadmin") {
+    if (!canAccessUserScopedData(req.user, userId)) {
       return res.status(403).json({ success: false, error: "Akses ditolak" });
     }
 
@@ -484,6 +584,140 @@ router.get(
   },
 );
 
+// GET /api/users/:userId/recent-activity
+router.get(
+  "/:userId/recent-activity",
+  verifySupabaseToken,
+  async (req: any, res) => {
+    const userId = Number(req.params.userId);
+
+    if (isNaN(userId))
+      return res
+        .status(400)
+        .json({ success: false, error: "Parameter tidak valid" });
+
+    if (!canAccessUserScopedData(req.user, userId)) {
+      return res.status(403).json({ success: false, error: "Akses ditolak" });
+    }
+
+    try {
+      const [submissionResult, quizResult] = await Promise.all([
+        supabase
+          .from("user_pengumpulan")
+          .select(
+            `created_at,
+             pengumpulan(id_pengumpulan, created_at, id_tugas,
+               tugas(id_tugas, nama_tugas, type, id_kelas)
+             )`,
+          )
+          .eq("id_user", userId)
+          .order("created_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("hasil_kuis")
+          .select("id_hasil, id_tugas, skor, created_at")
+          .eq("id_user", userId)
+          .order("created_at", { ascending: false })
+          .limit(10),
+      ]);
+
+      if (submissionResult.error) throw submissionResult.error;
+      if (quizResult.error) throw quizResult.error;
+
+      const submissionActivities = (submissionResult.data ?? []).map((item: any) => {
+        const pengumpulan = item.pengumpulan ?? {};
+        const tugas = pengumpulan.tugas ?? {};
+
+        return {
+          id: `submission-${pengumpulan.id_pengumpulan}`,
+          type: "tugas",
+          title: tugas.nama_tugas ?? "Tugas",
+          classId: tugas.id_kelas ? String(tugas.id_kelas) : "",
+          createdAt: pengumpulan.created_at ?? item.created_at,
+          status: "completed",
+          score: null,
+        };
+      });
+
+      const quizRows = quizResult.data ?? [];
+      const quizTaskIds = [
+        ...new Set(
+          quizRows
+            .map((item: any) => Number(item.id_tugas))
+            .filter((value) => Number.isFinite(value)),
+        ),
+      ];
+
+      let quizTaskMap: Record<number, any> = {};
+      if (quizTaskIds.length > 0) {
+        const { data: taskRows, error: taskError } = await supabase
+          .from("tugas")
+          .select("id_tugas, nama_tugas, type, id_kelas")
+          .in("id_tugas", quizTaskIds);
+
+        if (taskError) throw taskError;
+        quizTaskMap = Object.fromEntries(
+          (taskRows ?? []).map((task: any) => [task.id_tugas, task]),
+        );
+      }
+
+      const quizActivities = quizRows.map((item: any) => {
+        const tugas = quizTaskMap[item.id_tugas] ?? {};
+
+        return {
+          id: `quiz-${item.id_hasil}`,
+          type: "kuis",
+          title: tugas.nama_tugas ?? "Kuis",
+          classId: tugas.id_kelas ? String(tugas.id_kelas) : "",
+          createdAt: item.created_at,
+          status: item.skor >= 70 ? "passed" : "submitted",
+          score: item.skor ?? null,
+        };
+      });
+
+      const classIds = [
+        ...new Set(
+          [...submissionActivities, ...quizActivities]
+            .map((item) => Number(item.classId))
+            .filter((value) => Number.isFinite(value) && value > 0),
+        ),
+      ];
+
+      let classMap: Record<number, string> = {};
+      if (classIds.length > 0) {
+        const { data: classRows, error: classError } = await supabase
+          .from("kelas")
+          .select("id_kelas, nama_kelas")
+          .in("id_kelas", classIds);
+
+        if (classError) throw classError;
+        classMap = Object.fromEntries(
+          (classRows ?? []).map((kelas: any) => [kelas.id_kelas, kelas.nama_kelas]),
+        );
+      }
+
+      const data = [...submissionActivities, ...quizActivities]
+        .map((item) => ({
+          ...item,
+          className: classMap[Number(item.classId)] ?? "Kelas tidak diketahui",
+        }))
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
+        .slice(0, 8);
+
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error("Error fetching recent activity:", error);
+      res.status(500).json({
+        success: false,
+        error: "Gagal mengambil aktivitas terbaru",
+      });
+    }
+  },
+);
+
 // PUT /api/users/:userId/progress/:classId
 // Update atau buat progress user
 router.put(
@@ -500,17 +734,12 @@ router.put(
         .json({ success: false, error: "Parameter tidak valid" });
 
     try {
-      const { error } = await supabase.from("user_progress").upsert(
-        {
-          id_user: userId,
-          id_kelas: classId,
-          id_tingkatan: tingkatanSaatIni,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id_user,id_kelas" },
+      await saveUserProgress(
+        userId,
+        classId,
+        Number(tingkatanSaatIni),
+        new Date().toISOString(),
       );
-
-      if (error) throw error;
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating progress:", error);

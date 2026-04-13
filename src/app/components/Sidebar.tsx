@@ -119,7 +119,7 @@ export function Sidebar() {
                       variant={isItemActive ? "secondary" : "ghost"}
                       className={cn(
                         "h-10 w-full justify-start gap-3 px-3 font-medium",
-                        isItemActive && "bg-primary/10 text-primary hover:bg-primary/20"
+                        isItemActive && "bg-secondary text-secondary-foreground"
                       )}
                       onClick={() => {
                         navigate(itemPath);

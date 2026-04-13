@@ -3,6 +3,67 @@ import { supabase } from "../lib/supabase";
 import { verifySupabaseToken, AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
+const MAX_PERCOBAAN_KUIS = 5;
+
+const isMissingColumnError = (error: any, columnName: string) => {
+  const message = String(error?.message ?? error?.details ?? "").toLowerCase();
+  const normalizedColumn = columnName.toLowerCase();
+  return (
+    error?.code === "42703" ||
+    message.includes(`column '${normalizedColumn}'`) ||
+    message.includes(`column "${normalizedColumn}"`) ||
+    message.includes(normalizedColumn)
+  );
+};
+
+const isDuplicateKeyError = (error: any) => {
+  const message = String(error?.message ?? error?.details ?? "").toLowerCase();
+  return error?.code === "23505" || message.includes("duplicate key");
+};
+
+async function getQuizAttemptState(tugasId: number, userId: number) {
+  const { data, error } = await supabase
+    .from("hasil_kuis")
+    .select("id_hasil, skor, benar, total, created_at, jumlah_percobaan")
+    .eq("id_tugas", tugasId)
+    .eq("id_user", userId)
+    .order("created_at", { ascending: false });
+
+  if (!error) {
+    const rows = data ?? [];
+    const latest = rows[0] ?? null;
+    const totalAttempts =
+      rows.length > 1
+        ? rows.length
+        : Number(latest?.jumlah_percobaan ?? (latest ? 1 : 0));
+
+    return {
+      rows,
+      latest,
+      totalAttempts,
+      hasAttemptCounterColumn: true,
+    };
+  }
+
+  if (!isMissingColumnError(error, "jumlah_percobaan")) throw error;
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("hasil_kuis")
+    .select("id_hasil, skor, benar, total, created_at")
+    .eq("id_tugas", tugasId)
+    .eq("id_user", userId)
+    .order("created_at", { ascending: false });
+
+  if (legacyError) throw legacyError;
+
+  const rows = legacyData ?? [];
+  return {
+    rows,
+    latest: rows[0] ?? null,
+    totalAttempts: rows.length,
+    hasAttemptCounterColumn: false,
+  };
+}
 
 // ── POST /api/kuis/:tugasId/soal ───────────────────────────────────────────
 router.post("/:tugasId/soal", async (req, res) => {
@@ -100,28 +161,26 @@ router.get("/:tugasId/hasil/:userId", async (req, res) => {
       .json({ success: false, error: "Parameter tidak valid" });
 
   try {
-    const { data, error } = await supabase
-      .from("hasil_kuis")
-      .select("id_hasil, skor, benar, total, created_at")
-      .eq("id_tugas", tugasId)
-      .eq("id_user", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const state = await getQuizAttemptState(tugasId, userId);
 
-    if (error) throw error;
+    if (!state.latest)
+      return res.json({
+        success: true,
+        sudahMengerjakan: false,
+        jumlahPercobaan: 0,
+        data: null,
+      });
 
-    if (!data)
-      return res.json({ success: true, sudahMengerjakan: false, data: null });
-
+    const latest = state.latest;
     res.json({
       success: true,
       sudahMengerjakan: true,
+      jumlahPercobaan: state.totalAttempts,
       data: {
-        skor: data.skor,
-        benar: data.benar,
-        total: data.total,
-        createdAt: data.created_at,
+        skor: latest.skor,
+        benar: latest.benar,
+        total: latest.total,
+        createdAt: latest.created_at,
       },
     });
   } catch (error: any) {
@@ -170,39 +229,92 @@ router.post("/:tugasId/submit", async (req, res) => {
 
     const skor = Math.round((benar / total) * 100);
 
-    // 3. Cek apakah sudah pernah submit
-    const { data: existing } = await supabase
-      .from("hasil_kuis")
-      .select("id_hasil")
-      .eq("id_user", Number(id_user))
-      .eq("id_tugas", tugasId)
-      .maybeSingle();
-
-    let hasilError;
-
-    if (existing) {
-      // Update hasil lama
-      const { error } = await supabase
-        .from("hasil_kuis")
-        .update({ skor, benar, total, jawaban: JSON.stringify(jawaban) })
-        .eq("id_hasil", existing.id_hasil);
-      hasilError = error;
-    } else {
-      // Insert baru
-      const { error } = await supabase.from("hasil_kuis").insert({
-        id_tugas: tugasId,
-        id_user: Number(id_user),
-        skor,
-        benar,
-        total,
-        jawaban: JSON.stringify(jawaban),
+    // 3. Selalu insert percobaan baru (mendukung pengerjaan ulang maks. 5×)
+    const numericUserId = Number(id_user);
+    const currentState = await getQuizAttemptState(tugasId, numericUserId);
+    if (currentState.totalAttempts >= MAX_PERCOBAAN_KUIS) {
+      return res.status(400).json({
+        success: false,
+        error: `Kuis hanya dapat dikerjakan maksimal ${MAX_PERCOBAAN_KUIS} kali`,
       });
-      hasilError = error;
     }
 
-    if (hasilError) throw hasilError;
+    const nextAttemptCount = currentState.totalAttempts + 1;
+    const submittedAt = new Date().toISOString();
+    const basePayload = {
+      id_tugas: tugasId,
+      id_user: numericUserId,
+      skor,
+      benar,
+      total,
+      jawaban: JSON.stringify(jawaban),
+      created_at: submittedAt,
+    };
 
-    res.json({ success: true, data: { skor, benar, total } });
+    let persistedAttempts = nextAttemptCount;
+
+    const { error: hasilError } = await supabase.from("hasil_kuis").insert({
+      ...basePayload,
+      jumlah_percobaan: 1,
+    });
+
+    if (hasilError) {
+      if (isMissingColumnError(hasilError, "jumlah_percobaan")) {
+        const { error: legacyInsertError } = await supabase
+          .from("hasil_kuis")
+          .insert(basePayload);
+
+        if (legacyInsertError && !isDuplicateKeyError(legacyInsertError)) {
+          throw legacyInsertError;
+        }
+
+        if (legacyInsertError && isDuplicateKeyError(legacyInsertError)) {
+          const latestRowId = currentState.latest?.id_hasil;
+          if (!latestRowId) throw legacyInsertError;
+
+          const { error: legacyUpdateError } = await supabase
+            .from("hasil_kuis")
+            .update(basePayload)
+            .eq("id_hasil", latestRowId);
+
+          if (legacyUpdateError) throw legacyUpdateError;
+        }
+      } else if (isDuplicateKeyError(hasilError)) {
+        const latestRowId = currentState.latest?.id_hasil;
+        if (!latestRowId) throw hasilError;
+
+        const { error: updateError } = await supabase
+          .from("hasil_kuis")
+          .update({
+            ...basePayload,
+            jumlah_percobaan: nextAttemptCount,
+          })
+          .eq("id_hasil", latestRowId);
+
+        if (updateError) {
+          if (!isMissingColumnError(updateError, "jumlah_percobaan")) {
+            throw updateError;
+          }
+
+          const { error: legacyUpdateError } = await supabase
+            .from("hasil_kuis")
+            .update(basePayload)
+            .eq("id_hasil", latestRowId);
+
+          if (legacyUpdateError) throw legacyUpdateError;
+        }
+      } else {
+        throw hasilError;
+      }
+    } else {
+      persistedAttempts =
+        currentState.totalAttempts > 0 ? nextAttemptCount : 1;
+    }
+
+    res.json({
+      success: true,
+      data: { skor, benar, total, jumlahPercobaan: persistedAttempts },
+    });
   } catch (error: any) {
     console.error("Error submitting kuis:", error);
     res.status(500).json({

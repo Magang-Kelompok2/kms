@@ -148,7 +148,10 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
       .status(400)
       .json({ success: false, error: "userId tidak valid" });
 
-  if (req.user.role !== "superadmin") {
+  if (
+    req.user.role !== "superadmin" &&
+    Number(req.user.id_user) !== userId
+  ) {
     return res.status(403).json({ success: false, error: "Akses ditolak" });
   }
 
