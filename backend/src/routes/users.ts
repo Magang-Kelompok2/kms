@@ -262,6 +262,108 @@ router.get("/", verifySupabaseToken, async (req: any, res) => {
   }
 });
 
+// GET /api/users/:userId
+router.get("/:userId", verifySupabaseToken, async (req: any, res) => {
+  const userId = Number(req.params.userId);
+  if (isNaN(userId)) {
+    return res
+      .status(400)
+      .json({ success: false, error: "userId harus berupa angka" });
+  }
+
+  try {
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({ success: false, error: "Akses ditolak" });
+    }
+
+    const { data, error } = await supabase
+      .from("user")
+      .select("id_user, username, email, role, created_at")
+      .eq("id_user", userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
+      return res
+        .status(404)
+        .json({ success: false, error: "User tidak ditemukan" });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: data.id_user,
+        username: data.username,
+        email: data.email,
+        role: data.role ?? "user",
+        createdAt: data.created_at,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "Gagal mengambil data user" });
+  }
+});
+
+// GET /api/users/:userId/progress
+router.get("/:userId/progress", verifySupabaseToken, async (req: any, res) => {
+  const userId = Number(req.params.userId);
+
+  if (isNaN(userId))
+    return res
+      .status(400)
+      .json({ success: false, error: "Parameter tidak valid" });
+
+  if (req.user.role !== "superadmin") {
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+  }
+
+  try {
+    const { data: progressRows, error } = await supabase
+      .from("user_progress")
+      .select("id_progress, id_kelas, id_tingkatan, updated_at")
+      .eq("id_user", userId)
+      .order("updated_at", { ascending: false });
+
+    if (error) throw error;
+
+    const kelasIds = [
+      ...new Set((progressRows ?? []).map((row: any) => row.id_kelas)),
+    ];
+
+    let kelasMap: Record<number, string> = {};
+    if (kelasIds.length > 0) {
+      const { data: kelasRows, error: kelasError } = await supabase
+        .from("kelas")
+        .select("id_kelas, nama_kelas")
+        .in("id_kelas", kelasIds);
+
+      if (kelasError) throw kelasError;
+      kelasMap = Object.fromEntries(
+        (kelasRows ?? []).map((k: any) => [k.id_kelas, k.nama_kelas]),
+      );
+    }
+
+    res.json({
+      success: true,
+      data: (progressRows ?? []).map((row: any) => ({
+        id: row.id_progress,
+        classId: String(row.id_kelas),
+        className: kelasMap[row.id_kelas] ?? "Tidak diketahui",
+        currentLevel: row.id_tingkatan,
+        updatedAt: row.updated_at,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching user progress:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "Gagal mengambil progress user" });
+  }
+});
+
 // DELETE /api/users/:userId
 router.delete("/:userId", verifySupabaseToken, async (req: any, res) => {
   const userId = Number(req.params.userId);
@@ -318,6 +420,66 @@ router.get(
       res
         .status(500)
         .json({ success: false, error: "Failed to fetch progress" });
+    }
+  },
+);
+
+// GET /api/users/:userId/enrollments
+router.get(
+  "/:userId/enrollments",
+  verifySupabaseToken,
+  async (req: any, res) => {
+    const userId = Number(req.params.userId);
+
+    if (isNaN(userId))
+      return res
+        .status(400)
+        .json({ success: false, error: "Parameter tidak valid" });
+
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({ success: false, error: "Akses ditolak" });
+    }
+
+    try {
+      const { data: enrollmentRows, error } = await supabase
+        .from("user_enrollment")
+        .select("id_kelas, id_tingkatan, status")
+        .eq("id_user", userId)
+        .eq("status", "approved");
+
+      if (error) throw error;
+
+      const kelasIds = [
+        ...new Set((enrollmentRows ?? []).map((row: any) => row.id_kelas)),
+      ];
+
+      let kelasMap: Record<number, string> = {};
+      if (kelasIds.length > 0) {
+        const { data: kelasRows, error: kelasError } = await supabase
+          .from("kelas")
+          .select("id_kelas, nama_kelas")
+          .in("id_kelas", kelasIds);
+
+        if (kelasError) throw kelasError;
+        kelasMap = Object.fromEntries(
+          (kelasRows ?? []).map((k: any) => [k.id_kelas, k.nama_kelas]),
+        );
+      }
+
+      res.json({
+        success: true,
+        data: (enrollmentRows ?? []).map((row: any) => ({
+          classId: String(row.id_kelas),
+          className: kelasMap[row.id_kelas] ?? "Tidak diketahui",
+          level: row.id_tingkatan,
+          status: row.status,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching user enrollments:", error);
+      res
+        .status(500)
+        .json({ success: false, error: "Gagal mengambil enrollments user" });
     }
   },
 );

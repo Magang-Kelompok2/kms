@@ -140,4 +140,62 @@ router.get("/user/:userId/tugas/:tugasId", async (req: any, res) => {
   }
 });
 
+// GET /api/pengumpulan/user/:userId
+router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
+  const userId = Number(req.params.userId);
+  if (isNaN(userId))
+    return res
+      .status(400)
+      .json({ success: false, error: "userId tidak valid" });
+
+  if (req.user.role !== "superadmin") {
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("user_pengumpulan")
+      .select(
+        `id_pengumpulan, created_at,
+         pengumpulan(id_pengumpulan, answer, created_at, id_file, id_tugas,
+           tugas(id_tugas, nama_tugas, id_kelas, type),
+           file_pengumpulan(original_filename, ukuran_file, object_key)
+         )`,
+      )
+      .eq("id_user", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const submissions = (data ?? []).map((item: any) => {
+      const pengumpulan = item.pengumpulan || {};
+      const tugas = pengumpulan.tugas || {};
+      const file = pengumpulan.file_pengumpulan || null;
+
+      return {
+        id: pengumpulan.id_pengumpulan,
+        classId: tugas.id_kelas ? String(tugas.id_kelas) : "",
+        title: tugas.nama_tugas ?? "Pengumpulan Tugas",
+        answer: pengumpulan.answer ?? null,
+        createdAt: pengumpulan.created_at,
+        file: file
+          ? {
+              name: file.original_filename,
+              objectKey: file.object_key,
+              size: file.ukuran_file,
+            }
+          : null,
+        status: "pending",
+      };
+    });
+
+    res.json({ success: true, data: submissions });
+  } catch (error: any) {
+    console.error("Error fetching user pengumpulan:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch user pengumpulan" });
+  }
+});
+
 export default router;
