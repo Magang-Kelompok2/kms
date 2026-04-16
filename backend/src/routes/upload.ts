@@ -28,7 +28,6 @@ async function uploadToMinio(
     "Content-Type": mimetype,
   });
 
-  // Buat presigned URL yang berlaku 7 hari (untuk akses user)
   const url = await minioClient.presignedGetObject(
     BUCKET,
     objectKey,
@@ -39,8 +38,6 @@ async function uploadToMinio(
 }
 
 // ── POST /api/upload/materi-file ──────────────────────────────────────────
-// Upload PDF atau video untuk materi, simpan metadata ke tabel pdf/video
-// Body (multipart): file, type ("pdf"|"video"), id_materi, title
 router.post(
   "/materi-file",
   upload.single("file"),
@@ -59,7 +56,25 @@ router.post(
     }
 
     try {
-      const folder = type === "video" ? "videos" : "pdfs";
+      //  Ambil data materi + nama kelas + nama tingkatan
+    const { data: materiData, error: materiError } = await supabase
+      .from("materi")
+      .select(`
+        title_materi,
+        kelas ( nama_kelas ),
+        tingkatan ( nama_tingkatan )
+      `)
+      .eq("id_materi", Number(id_materi))
+      .single();
+
+    if (materiError) throw materiError;
+
+    // Sanitize nama jadi folder-friendly
+    const namaKelas = (materiData.kelas as any)?.nama_kelas ?? "unknown-kelas";
+    const namaTingkatan = (materiData.tingkatan as any)?.nama_tingkatan ?? "unknown-tingkatan";
+    const safeMateri = (materiData.title_materi ?? "materi").replace(/\s+/g, "-");
+    const folder = `${namaKelas}/${namaTingkatan}/${safeMateri}`;
+
       const { objectKey, url } = await uploadToMinio(
         file.buffer,
         file.originalname,
@@ -67,7 +82,6 @@ router.post(
         file.mimetype,
       );
 
-      // Simpan metadata ke DB
       if (type === "pdf") {
         const { data, error } = await supabase
           .from("pdf")
@@ -78,6 +92,7 @@ router.post(
           })
           .select()
           .single();
+
         if (error) throw error;
         return res.json({ success: true, data: { ...data, objectKey } });
       } else {
@@ -90,6 +105,7 @@ router.post(
           })
           .select()
           .single();
+
         if (error) throw error;
         return res.json({ success: true, data: { ...data, objectKey } });
       }
@@ -103,9 +119,6 @@ router.post(
 );
 
 // ── POST /api/upload/tugas-file ───────────────────────────────────────────
-// Upload file pengumpulan tugas oleh user
-// Body (multipart): file
-// Returns: id_file + url (untuk disimpan saat submit pengumpulan)
 router.post(
   "/tugas-file",
   upload.single("file"),
@@ -124,7 +137,6 @@ router.post(
         file.mimetype,
       );
 
-      // Simpan metadata ke tabel file_pengumpulan
       const { data, error } = await supabase
         .from("file_pengumpulan")
         .insert({
@@ -149,8 +161,6 @@ router.post(
 );
 
 // ── GET /api/upload/signed-url ────────────────────────────────────────────
-// Generate fresh presigned URL dari objectKey (untuk refresh URL yang expired)
-// Query: ?key=pdfs/xxx.pdf
 router.get("/signed-url", async (req: Request, res: Response) => {
   const { key } = req.query;
   if (!key || typeof key !== "string") {
