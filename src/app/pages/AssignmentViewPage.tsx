@@ -360,7 +360,7 @@ export function AssignmentViewPage() {
         Kembali ke Kelas
       </Button>
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <Card className="p-6">
           {!isEditing ? (

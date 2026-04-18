@@ -231,7 +231,7 @@ export function ProfilePage() {
       </Button>
 
       <Card className="mb-6 overflow-hidden shadow-sm">
-        <CardHeader className="gap-6 bg-gradient-to-br from-slate-900 via-sky-900 to-cyan-700 py-8 text-white sm:flex-row sm:items-start sm:justify-between">
+        <CardHeader className="gap-6 bg-linear-to-br from-slate-900 via-sky-900 to-cyan-700 py-8 text-white sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-5">
             <div className="flex size-24 shrink-0 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur">
               <User className="size-12" />
