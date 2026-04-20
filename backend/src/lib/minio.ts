@@ -22,7 +22,7 @@ export async function getPresignedUrl(resourcePath: string): Promise<string> {
   if (!resourcePath) return resourcePath;
   const normalized = resourcePath.trim();
 
-  const minioEndpoint = process.env.MINIO_ENDPOINT ?? "127.0.0.1";
+  const minioEndpoint = process.env.MINIO_ENDPOINT ?? "192.168.101.143";
   const minioPort = process.env.MINIO_PORT ?? "9000";
   const minioBase = `http://${minioEndpoint}:${minioPort}/`;
 

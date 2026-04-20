@@ -367,7 +367,11 @@ export function AssignmentViewPage() {
                         <span
                           className={`ml-1 font-medium ${isOverdue ? "text-red-500" : "text-green-600"}`}
                         >
-                          ({isOverdue ? "Terlambat" : `${daysUntilDue} hari lagi`})
+                          (
+                          {isOverdue
+                            ? "Terlambat"
+                            : `${daysUntilDue} hari lagi`}
+                          )
                         </span>
                       </div>
                     </div>
@@ -493,11 +497,9 @@ export function AssignmentViewPage() {
             </Card>
 
             {/* File Penugasan dari file_path */}
-            {assignmentFileUrl && (
-              <Card className="p-6">
-                <h2 className="text-base font-semibold mb-3">
-                  File Penugasan
-                </h2>
+            <Card className="p-6">
+              <h2 className="text-base font-semibold mb-3">File Penugasan</h2>
+              {assignmentFileUrl ? (
                 <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-100 dark:bg-red-900/20">
@@ -536,8 +538,15 @@ export function AssignmentViewPage() {
                     </Button>
                   </div>
                 </div>
-              </Card>
-            )}
+              ) : (
+                <div className="text-center py-6">
+                  <File className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    Belum ada file penugasan yang diunggah
+                  </p>
+                </div>
+              )}
+            </Card>
 
             {/* Attachments lama (jika ada) */}
             {assignment.attachments && assignment.attachments.length > 0 && (
@@ -595,9 +604,7 @@ export function AssignmentViewPage() {
                 </p>
                 <Button
                   className="w-full"
-                  onClick={() =>
-                    navigate(`/submissions/tugas/${assignmentId}`)
-                  }
+                  onClick={() => navigate(`/submissions/tugas/${assignmentId}`)}
                 >
                   Lihat Semua Pengumpulan
                 </Button>

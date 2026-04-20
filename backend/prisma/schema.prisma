@@ -99,6 +99,8 @@ model Tugas {
   type        String?   @db.VarChar(256)
   id_materi   Int
   id_kelas    Int
+  pertemuan   Int       @default(1)
+  deadline    DateTime?
   created_at  DateTime  @default(now())
   
   // Relations

@@ -52,7 +52,7 @@ router.get("/:tugasId", async (req, res) => {
       .from("tugas")
       .select(
         `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
-         pertemuan, deadline, durasi, created_at,
+         pertemuan, deadline, durasi, path_tugas, created_at,
          materi(id_tingkatan, pertemuan)`,
       )
       .eq("id_tugas", tugasId)
@@ -60,26 +60,24 @@ router.get("/:tugasId", async (req, res) => {
 
     if (error) throw error;
 
-    // Fetch file_path separately (kolom opsional, mungkin belum ada di semua env)
-    let rawFilePath: string | null = null;
-    try {
-      const { data: fp } = await supabase
-        .from("tugas")
-        .select("file_path")
-        .eq("id_tugas", tugasId)
-        .single();
-      rawFilePath = (fp as any)?.file_path ?? null;
-    } catch {
-      // kolom belum ada, abaikan
-    }
-
     const level = (data.materi as any)?.id_tingkatan ?? 1;
     const apiBase =
       process.env.VITE_API_URL ??
       `http://localhost:${process.env.PORT ?? 4000}`;
-    const filePath = rawFilePath
-      ? `${apiBase}/api/files/proxy?path=${encodeURIComponent(rawFilePath)}`
-      : null;
+
+    // Convert path_tugas to file attachment (similar to materials)
+    const attachments = (data as any).path_tugas
+      ? [
+          {
+            id: String(data.id_tugas),
+            name:
+              ((data as any).path_tugas as string).split("/").pop() ||
+              "File Tugas",
+            url: `${apiBase}/api/files/proxy?path=${encodeURIComponent((data as any).path_tugas)}`,
+            type: "pdf" as const,
+          },
+        ]
+      : [];
 
     res.json({
       success: true,
@@ -92,11 +90,14 @@ router.get("/:tugasId", async (req, res) => {
         meetingNumber: data.pertemuan,
         type: data.type ?? "",
         level,
-        durasi: data.durasi ?? 60,
+        durasi: (data as any).durasi ?? 60,
         materialId: String(data.id_materi),
         isPublished: true,
-        file_path: filePath,
-        attachments: [],
+        file_path:
+          attachments.length > 0
+            ? `${apiBase}/api/files/proxy?path=${encodeURIComponent((data as any).path_tugas)}`
+            : null,
+        attachments: attachments,
       },
     });
   } catch (error) {
@@ -137,7 +138,7 @@ router.post("/", async (req, res) => {
         id_kelas: Number(id_kelas),
         pertemuan: pertemuan ? Number(pertemuan) : 1,
         deadline: deadline ?? null,
-        durasi: durasi ? Number(durasi) : 60, // ← tambah
+        durasi: durasi ? Number(durasi) : 60,
       })
       .select()
       .single();
@@ -179,12 +180,31 @@ router.put("/:tugasId", async (req, res) => {
       .eq("id_tugas", tugasId)
       .select(
         `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
-         pertemuan, deadline, created_at,
+         pertemuan, deadline, durasi, path_tugas, created_at,
          materi!inner(id_tingkatan, pertemuan)`,
       )
       .single();
 
     if (error) throw error;
+
+    const level = (data.materi as any)?.id_tingkatan ?? 1;
+    const apiBase =
+      process.env.VITE_API_URL ??
+      `http://localhost:${process.env.PORT ?? 4000}`;
+
+    // Convert path_tugas to file attachment (similar to materials)
+    const attachments = (data as any).path_tugas
+      ? [
+          {
+            id: String(data.id_tugas),
+            name:
+              ((data as any).path_tugas as string).split("/").pop() ||
+              "File Tugas",
+            url: `${apiBase}/api/files/proxy?path=${encodeURIComponent((data as any).path_tugas)}`,
+            type: "pdf" as const,
+          },
+        ]
+      : [];
 
     res.json({
       success: true,
@@ -194,21 +214,22 @@ router.put("/:tugasId", async (req, res) => {
         description: data.deskripsi ?? "",
         dueDate: data.deadline ?? data.created_at,
         classId: String(data.id_kelas),
-        level: (data.materi as any)?.id_tingkatan ?? 1,
+        level,
         meetingNumber: data.pertemuan,
         type: data.type ?? "",
         materialId: String(data.id_materi),
+        durasi: (data as any).durasi ?? 60,
         isPublished: true,
-        attachments: [],
+        file_path:
+          attachments.length > 0
+            ? `${apiBase}/api/files/proxy?path=${encodeURIComponent((data as any).path_tugas)}`
+            : null,
+        attachments: attachments,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating tugas:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to update tugas",
-      detail: error.message,
-    });
+    res.status(500).json({ success: false, error: "Failed to update tugas" });
   }
 });
 
