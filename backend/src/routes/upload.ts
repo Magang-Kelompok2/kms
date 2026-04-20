@@ -8,13 +8,11 @@ import path from "path";
 
 const router = Router();
 
-// Multer — simpan di memory, bukan disk
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+  limits: { fileSize: 100 * 1024 * 1024 },
 });
 
-// ── Helper: upload buffer ke MinIO ────────────────────────────────────────
 async function uploadToMinio(
   buffer: Buffer,
   originalName: string,
@@ -56,24 +54,29 @@ router.post(
     }
 
     try {
-      //  Ambil data materi + nama kelas + nama tingkatan
-    const { data: materiData, error: materiError } = await supabase
-      .from("materi")
-      .select(`
-        title_materi,
-        kelas ( nama_kelas ),
-        tingkatan ( nama_tingkatan )
-      `)
-      .eq("id_materi", Number(id_materi))
-      .single();
+      const { data: materiData, error: materiError } = await supabase
+        .from("materi")
+        .select(
+          `
+          title_materi,
+          kelas ( nama_kelas ),
+          tingkatan ( nama_tingkatan )
+        `,
+        )
+        .eq("id_materi", Number(id_materi))
+        .single();
 
-    if (materiError) throw materiError;
+      if (materiError) throw materiError;
 
-    // Sanitize nama jadi folder-friendly
-    const namaKelas = (materiData.kelas as any)?.nama_kelas ?? "unknown-kelas";
-    const namaTingkatan = (materiData.tingkatan as any)?.nama_tingkatan ?? "unknown-tingkatan";
-    const safeMateri = (materiData.title_materi ?? "materi").replace(/\s+/g, "-");
-    const folder = `${namaKelas}/${namaTingkatan}/${safeMateri}`;
+      const namaKelas =
+        (materiData.kelas as any)?.nama_kelas ?? "unknown-kelas";
+      const namaTingkatan =
+        (materiData.tingkatan as any)?.nama_tingkatan ?? "unknown-tingkatan";
+      const safeMateri = (materiData.title_materi ?? "materi").replace(
+        /\s+/g,
+        "-",
+      );
+      const folder = `${namaKelas}/${namaTingkatan}/${safeMateri}`;
 
       const { objectKey, url } = await uploadToMinio(
         file.buffer,
@@ -161,7 +164,6 @@ router.post(
 );
 
 // ── POST /api/upload/assignment-file ─────────────────────────────────────
-// Upload file penugasan (untuk superadmin), simpan objectKey ke tugas.file_path
 router.post(
   "/assignment-file",
   upload.single("file"),
@@ -180,16 +182,29 @@ router.post(
     }
 
     try {
+      // Ambil nama tugas untuk folder yang rapi
+      const { data: tugasData, error: tugasError } = await supabase
+        .from("tugas")
+        .select("nama_tugas")
+        .eq("id_tugas", Number(id_tugas))
+        .single();
+
+      if (tugasError) throw tugasError;
+
+      const safeName = (tugasData.nama_tugas ?? "tugas").replace(/\s+/g, "-");
+      const folder = `alpha/tugas/${safeName}`;
+
       const { objectKey, url } = await uploadToMinio(
         file.buffer,
         file.originalname,
-        "tugas-files",
+        folder,
         file.mimetype,
       );
 
+      // ✅ Fix: pakai path_tugas bukan file_path
       const { error } = await supabase
         .from("tugas")
-        .update({ file_path: objectKey })
+        .update({ path_tugas: objectKey })
         .eq("id_tugas", Number(id_tugas));
 
       if (error) throw error;

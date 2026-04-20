@@ -40,7 +40,6 @@ export function AddAssignmentModal({
 
   const { addTugas, loading, error } = useAddTugas();
 
-  // Fetch daftar materi berdasarkan classId & level (id_tingkatan)
   useEffect(() => {
     if (!isOpen || !classId) return;
     const fetchMateri = async () => {
@@ -77,8 +76,9 @@ export function AddAssignmentModal({
         name: file.name,
         file,
       }));
-      setFiles([...files, ...newFiles]);
+      setFiles((prev) => [...prev, ...newFiles]);
     }
+    e.target.value = "";
   };
 
   const removeFile = (id: string) => {
@@ -95,7 +95,7 @@ export function AddAssignmentModal({
       return;
     }
 
-    await addTugas({
+    const id_tugas = await addTugas({
       nama_tugas: title,
       deskripsi: description,
       type: "Tugas",
@@ -103,10 +103,13 @@ export function AddAssignmentModal({
       id_kelas: Number(classId),
       pertemuan: parseInt(meetingNumber),
       deadline: dueDate ? new Date(dueDate).toISOString() : undefined,
+      file: files[0]?.file, // upload file pertama kalau ada
     });
 
+    if (!id_tugas) return; // gagal, error sudah ditangani hook
+
     onAdd({
-      id: `assign-${Date.now()}`,
+      id: String(id_tugas), // ← pakai id asli dari DB
       title,
       description,
       dueDate,
@@ -224,15 +227,12 @@ export function AddAssignmentModal({
                 (opsional)
               </span>
             </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
-              />
-              {/* <Calendar className="absolute right-4.25 top-1/2 -translate-y-1/2 h-5 w-5 text-black pointer-events-none" /> */}
-            </div>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900"
+            />
           </div>
 
           {/* File Upload */}
@@ -245,7 +245,6 @@ export function AddAssignmentModal({
                 type="file"
                 id="assignment-pdf-upload"
                 accept=".pdf"
-                multiple
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -254,7 +253,9 @@ export function AddAssignmentModal({
                 className="flex items-center justify-center gap-2 w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-blue-400 dark:hover:border-blue-600 transition-colors cursor-pointer"
               >
                 <Upload className="h-5 w-5 text-gray-400" />
-                <span className="text-sm font-medium">Upload File PDF</span>
+                <span className="text-sm font-medium">
+                  {files.length > 0 ? "Ganti File PDF" : "Upload File PDF"}
+                </span>
               </label>
             </div>
             {files.length > 0 && (

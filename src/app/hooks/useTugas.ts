@@ -1,3 +1,4 @@
+// src/hooks/useTugas.ts
 import { useState, useEffect, useCallback } from "react";
 import { useQueryCache, invalidateCache } from "./useQueryCache";
 
@@ -11,6 +12,7 @@ export interface TugasData {
   pertemuan: number;
   deadline?: string;
   durasi?: number;
+  path_tugas?: string | null; // ← tambah field ini
   created_at: string;
 }
 
@@ -51,11 +53,10 @@ export function useTugas(
     loading,
     error,
     refetch,
-  } = useQueryCache<TugasResponse>(
-    cacheKey,
-    fetchTugas,
-    { ttl: 5 * 60 * 1000, enableCache: true }, // 5 min cache
-  );
+  } = useQueryCache<TugasResponse>(cacheKey, fetchTugas, {
+    ttl: 5 * 60 * 1000,
+    enableCache: true,
+  });
 
   useEffect(() => {
     if (response?.data) {
