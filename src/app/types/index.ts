@@ -39,6 +39,7 @@ export interface Assignment {
   level: number;
   materialId?: string;
   isPublished: boolean;
+  file_path?: string;
   attachments?: AssignmentFile[];
 }
 

@@ -60,7 +60,26 @@ router.get("/:tugasId", async (req, res) => {
 
     if (error) throw error;
 
+    // Fetch file_path separately (kolom opsional, mungkin belum ada di semua env)
+    let rawFilePath: string | null = null;
+    try {
+      const { data: fp } = await supabase
+        .from("tugas")
+        .select("file_path")
+        .eq("id_tugas", tugasId)
+        .single();
+      rawFilePath = (fp as any)?.file_path ?? null;
+    } catch {
+      // kolom belum ada, abaikan
+    }
+
     const level = (data.materi as any)?.id_tingkatan ?? 1;
+    const apiBase =
+      process.env.VITE_API_URL ??
+      `http://localhost:${process.env.PORT ?? 4000}`;
+    const filePath = rawFilePath
+      ? `${apiBase}/api/files/proxy?path=${encodeURIComponent(rawFilePath)}`
+      : null;
 
     res.json({
       success: true,
@@ -73,9 +92,10 @@ router.get("/:tugasId", async (req, res) => {
         meetingNumber: data.pertemuan,
         type: data.type ?? "",
         level,
-        durasi: data.durasi ?? 60, // ← tambah
+        durasi: data.durasi ?? 60,
         materialId: String(data.id_materi),
         isPublished: true,
+        file_path: filePath,
         attachments: [],
       },
     });

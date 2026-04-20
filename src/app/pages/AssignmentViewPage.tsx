@@ -13,6 +13,8 @@ import {
   File,
   Edit3,
   Trash2,
+  X,
+  Download,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Assignment as AssignmentType } from "../types";
@@ -21,11 +23,10 @@ export function AssignmentViewPage() {
   const { assignmentId } = useParams();
   const { user, token } = useAuth();
   const navigate = useNavigate();
-  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
-  const [submissionText, setSubmissionText] = useState("");
+  const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionData, setSubmissionData] = useState<any>(null); // State untuk menyimpan data submission
+  const [submissionData, setSubmissionData] = useState<any>(null);
 
   const [assignment, setAssignment] = useState<AssignmentType | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(true);
@@ -84,11 +85,7 @@ export function AssignmentViewPage() {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${assignment.classId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         if (!res.ok) {
@@ -109,54 +106,30 @@ export function AssignmentViewPage() {
     fetchProgress();
   }, [assignment, user?.id, user?.role, token]);
 
-  // ── 3. Check apakah user sudah submit sebelumnya ─────────────────
   useEffect(() => {
-    if (!user?.id || !assignmentId || user.role === "superadmin") {
-      return;
-    }
+    if (!user?.id || !assignmentId || user.role === "superadmin") return;
 
     const checkSubmission = async () => {
       try {
-        console.log(
-          "Checking submission for user:",
-          user.id,
-          "task:",
-          assignmentId,
-        );
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/pengumpulan/user/${user.id}/tugas/${assignmentId}`,
         );
-
         if (res.ok) {
           const json = await res.json();
-          console.log("Submission check response:", json);
-
           if (json.sudahMengumpulkan) {
             setIsSubmitted(true);
-            // Ambil submission data
-            const submissionInfo =
-              json.submission || json.data?.pengumpulan || null;
-            if (submissionInfo) {
-              setSubmissionData(submissionInfo);
-            }
+            const info = json.submission || json.data?.pengumpulan || null;
+            if (info) setSubmissionData(info);
           }
-        } else {
-          console.error(
-            "Submission check failed:",
-            res.status,
-            await res.text(),
-          );
         }
-      } catch (err) {
-        console.error("Error checking submission:", err);
+      } catch {
+        // silent
       }
     };
 
-    // Check segera tanpa delay untuk UX yang lebih baik
     checkSubmission();
   }, [user?.id, assignmentId, user?.role]);
 
-  // Initialize edit draft
   useEffect(() => {
     if (assignment && isEditing) {
       setEditDraft({
@@ -167,10 +140,6 @@ export function AssignmentViewPage() {
       });
     }
   }, [assignment, isEditing]);
-
-  const handleEdit = () => {
-    setIsEditing(true);
-  };
 
   const handleSaveEdit = async () => {
     if (!assignment) return;
@@ -207,12 +176,7 @@ export function AssignmentViewPage() {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/tugas/${assignment.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error("Gagal menghapus tugas");
       navigate(`/class/${assignment.classId}`);
@@ -249,12 +213,10 @@ export function AssignmentViewPage() {
     );
   }
 
-  // ── Cek akses ──────────────────────────────────────────────────
   const assignmentLevel =
     typeof assignment.level === "number" && assignment.level >= 1
       ? assignment.level
       : 1;
-
   const hasAccess = user?.role === "superadmin" || assignmentLevel <= userLevel;
 
   if (!hasAccess) {
@@ -276,61 +238,59 @@ export function AssignmentViewPage() {
     );
   }
 
-  // ── Submit handler ─────────────────────────────────────────────
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSubmissionFile(e.target.files[0]);
+  const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selected = Array.from(e.target.files);
+      setSubmissionFiles((prev) => {
+        const existingNames = new Set(prev.map((f) => f.name));
+        const deduped = selected.filter((f) => !existingNames.has(f.name));
+        return [...prev, ...deduped];
+      });
     }
+    e.target.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    setSubmissionFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
-    if (!submissionText.trim() && !submissionFile) return;
+    if (submissionFiles.length === 0) return;
     setIsSubmitting(true);
 
     try {
-      let id_file: number | null = null;
-
-      // Upload file jika ada
-      if (submissionFile) {
+      for (const file of submissionFiles) {
         const formData = new FormData();
-        formData.append("file", submissionFile);
+        formData.append("file", file);
 
         const uploadRes = await fetch(
           `${import.meta.env.VITE_API_URL}/api/upload/tugas-file`,
           { method: "POST", body: formData },
         );
         const uploadJson = await uploadRes.json();
-        if (!uploadJson.success) throw new Error("Gagal upload file");
-        id_file = uploadJson.data.id_file;
+        if (!uploadJson.success) throw new Error(`Gagal upload: ${file.name}`);
+        const id_file = uploadJson.data.id_file;
+
+        const submitRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/pengumpulan`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id_tugas: Number(assignmentId),
+              id_user: Number(user?.id),
+              answer: null,
+              id_file,
+            }),
+          },
+        );
+        const submitJson = await submitRes.json();
+        if (!submitJson.success) throw new Error("Gagal mengumpulkan tugas");
       }
 
-      // Submit pengumpulan
-      const submitRes = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/pengumpulan`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id_tugas: Number(assignmentId),
-            id_user: Number(user?.id),
-            answer: submissionText.trim() || null,
-            id_file,
-          }),
-        },
-      );
-      const submitJson = await submitRes.json();
-      if (!submitJson.success) throw new Error("Gagal mengumpulkan tugas");
-
-      // Set submission state dan data
       setIsSubmitted(true);
-      setSubmissionData({
-        id_pengumpulan: submitJson.data?.id_pengumpulan,
-        answer: submissionText.trim() || null,
-        created_at: submitJson.data?.created_at || new Date().toISOString(),
-        id_file: id_file,
-      });
-      setSubmissionText(""); // Clear form
-      setSubmissionFile(null);
+      setSubmissionData({ created_at: new Date().toISOString() });
+      setSubmissionFiles([]);
     } catch (err) {
       alert(
         err instanceof Error
@@ -349,6 +309,12 @@ export function AssignmentViewPage() {
     (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
   );
 
+  const assignmentFileUrl = assignment.file_path
+    ? assignment.file_path.startsWith("http")
+      ? assignment.file_path
+      : `${import.meta.env.VITE_API_URL}/${assignment.file_path}`
+    : null;
+
   return (
     <AppLayout className="py-6">
       <Button
@@ -360,187 +326,189 @@ export function AssignmentViewPage() {
         Kembali ke Kelas
       </Button>
 
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
-        <Card className="p-6">
-          {!isEditing ? (
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-3">
-                  <Badge variant="secondary" className="text-sm">
-                    Pertemuan {assignment.meetingNumber}
-                  </Badge>
-                  <Badge variant="outline" className="text-sm">
-                    Level {assignment.level}
-                  </Badge>
-                  {isSubmitted && (
-                    <Badge variant="default" className="text-sm bg-green-600">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Sudah Dikumpulkan
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* ── Kolom Kiri: Detail Penugasan ── */}
+          <div className="space-y-6">
+            <Card className="p-6">
+              {!isEditing ? (
+                <>
+                  <div className="flex items-center gap-2 mb-4 flex-wrap">
+                    <Badge variant="secondary">
+                      Pertemuan {assignment.meetingNumber}
                     </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-purple-100 dark:bg-purple-900/20">
-                    <FileText className="h-7 w-7 text-purple-600 dark:text-purple-400" />
+                    <Badge variant="outline">Level {assignment.level}</Badge>
+                    {isSubmitted && (
+                      <Badge className="bg-green-600 text-white">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Sudah Dikumpulkan
+                      </Badge>
+                    )}
                   </div>
-                  <div>
-                    <h1 className="text-3xl font-bold mb-1">
-                      {assignment.title}
-                    </h1>
-                    <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center gap-1">
+
+                  <div className="flex items-start gap-3 mb-5">
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-purple-100 dark:bg-purple-900/20 shrink-0">
+                      <FileText className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <h1 className="text-2xl font-bold leading-tight mb-1">
+                        {assignment.title}
+                      </h1>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
                         <span>
                           Deadline:{" "}
-                          {new Date(assignment.dueDate).toLocaleDateString(
-                            "id-ID",
-                          )}
+                          {dueDate.toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </span>
+                        <span
+                          className={`ml-1 font-medium ${isOverdue ? "text-red-500" : "text-green-600"}`}
+                        >
+                          ({isOverdue ? "Terlambat" : `${daysUntilDue} hari lagi`})
                         </span>
                       </div>
-                      <div>
-                        {isOverdue
-                          ? "Status: Terlambat"
-                          : `${daysUntilDue} hari tersisa`}
-                      </div>
                     </div>
                   </div>
-                </div>
-                {user?.role === "superadmin" && (
-                  <div className="flex gap-3 mt-4">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() =>
-                        navigate(`/submissions/tugas/${assignmentId}`)
+
+                  <div className="border-t pt-4">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Deskripsi
+                    </h2>
+                    <p className="text-base text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
+                      {assignment.description}
+                    </p>
+                  </div>
+
+                  {user?.role === "superadmin" && (
+                    <div className="flex gap-2 mt-5 pt-4 border-t flex-wrap">
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          navigate(`/submissions/tugas/${assignmentId}`)
+                        }
+                      >
+                        Lihat Pengumpulan
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        <Edit3 className="h-4 w-4 mr-1.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleDelete}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1.5" />
+                        Hapus
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">
+                      Judul Tugas
+                    </label>
+                    <input
+                      type="text"
+                      value={editDraft.title}
+                      onChange={(e) =>
+                        setEditDraft({ ...editDraft, title: e.target.value })
                       }
-                    >
-                      Lihat Pengumpulan
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleEdit}>
-                      <Edit3 className="h-4 w-4 mr-2" />
-                      Edit
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">
+                      Deskripsi
+                    </label>
+                    <textarea
+                      value={editDraft.description}
+                      onChange={(e) =>
+                        setEditDraft({
+                          ...editDraft,
+                          description: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 h-28 resize-none"
+                    />
+                  </div>
+                  <div className="grid gap-3 grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">
+                        Deadline
+                      </label>
+                      <input
+                        type="date"
+                        value={editDraft.dueDate}
+                        onChange={(e) =>
+                          setEditDraft({
+                            ...editDraft,
+                            dueDate: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">
+                        Pertemuan Ke-
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editDraft.meetingNumber}
+                        onChange={(e) =>
+                          setEditDraft({
+                            ...editDraft,
+                            meetingNumber: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button size="sm" onClick={handleSaveEdit}>
+                      Simpan
                     </Button>
                     <Button
                       size="sm"
-                      variant="destructive"
-                      onClick={handleDelete}
+                      variant="outline"
+                      onClick={() => setIsEditing(false)}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Hapus
+                      Batal
                     </Button>
                   </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Judul Tugas
-                </label>
-                <input
-                  type="text"
-                  value={editDraft.title}
-                  onChange={(e) =>
-                    setEditDraft({ ...editDraft, title: e.target.value })
-                  }
-                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Deskripsi
-                </label>
-                <textarea
-                  value={editDraft.description}
-                  onChange={(e) =>
-                    setEditDraft({
-                      ...editDraft,
-                      description: e.target.value,
-                    })
-                  }
-                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 h-28 resize-none"
-                />
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Deadline
-                  </label>
-                  <input
-                    type="date"
-                    value={editDraft.dueDate}
-                    onChange={(e) =>
-                      setEditDraft({ ...editDraft, dueDate: e.target.value })
-                    }
-                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Pertemuan Ke-
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={editDraft.meetingNumber}
-                    onChange={(e) =>
-                      setEditDraft({
-                        ...editDraft,
-                        meetingNumber: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <Button size="sm" onClick={handleSaveEdit}>
-                  Simpan
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsEditing(false)}
-                >
-                  Batal
-                </Button>
-              </div>
-            </div>
-          )}
+              )}
+            </Card>
 
-          <div className="border-t pt-4">
-            <h2 className="text-lg font-bold mb-2">Deskripsi Tugas</h2>
-            <p className="text-base text-gray-700 dark:text-gray-300 leading-relaxed">
-              {assignment.description}
-            </p>
-          </div>
-        </Card>
-
-        {/* Attachments dari superadmin */}
-        {assignment.attachments && assignment.attachments.length > 0 && (
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4">
-              📎 File Tugas dari Superadmin
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Silakan baca dan download file berikut sebelum mengerjakan tugas:
-            </p>
-            <div className="space-y-3">
-              {assignment.attachments.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-red-100 dark:bg-red-900/20">
-                      <File className="h-6 w-6 text-red-600 dark:text-red-400" />
+            {/* File Penugasan dari file_path */}
+            {assignmentFileUrl && (
+              <Card className="p-6">
+                <h2 className="text-base font-semibold mb-3">
+                  File Penugasan
+                </h2>
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-100 dark:bg-red-900/20">
+                      <File className="h-5 w-5 text-red-600 dark:text-red-400" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-base">{file.name}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        PDF Document
+                    <div>
+                      <p className="font-medium text-sm">
+                        {assignment.file_path!.split("/").pop() || "File Tugas"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Dokumen Penugasan
                       </p>
                     </div>
                   </div>
@@ -548,7 +516,7 @@ export function AssignmentViewPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => window.open(file.url, "_blank")}
+                      onClick={() => window.open(assignmentFileUrl, "_blank")}
                     >
                       Lihat
                     </Button>
@@ -556,112 +524,183 @@ export function AssignmentViewPage() {
                       size="sm"
                       onClick={() => {
                         const link = document.createElement("a");
-                        link.href = file.url;
-                        link.download = file.name;
+                        link.href = assignmentFileUrl;
+                        link.download =
+                          assignment.file_path!.split("/").pop() ||
+                          "file-tugas";
                         link.click();
                       }}
                     >
+                      <Download className="h-4 w-4 mr-1.5" />
                       Download
                     </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          </Card>
-        )}
+              </Card>
+            )}
 
-        {/* Form Pengumpulan */}
-        <Card className="p-6">
-          <h2 className="text-xl font-bold mb-4">Pengumpulan Tugas</h2>
-
-          {isSubmitted ? (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 text-center">
-              <CheckCircle className="h-16 w-16 text-green-600 dark:text-green-400 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-green-900 dark:text-green-100 mb-2">
-                ✅ Anda Sudah Mengerjakan Tugas Ini
-              </h3>
-              <p className="text-sm text-green-700 dark:text-green-300 mb-4">
-                Tugas Anda telah dikumpulkan dan sedang dalam proses review.
-                Anda tidak dapat mengumpulkan tugas ini lagi.
-              </p>
-              {submissionData && (
-                <div className="bg-white dark:bg-gray-900 rounded-lg p-4 mb-4 text-left">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Waktu Pengumpulan:</strong>{" "}
-                    {new Date(submissionData.created_at).toLocaleString(
-                      "id-ID",
-                    )}
-                  </p>
+            {/* Attachments lama (jika ada) */}
+            {assignment.attachments && assignment.attachments.length > 0 && (
+              <Card className="p-6">
+                <h2 className="text-base font-semibold mb-3">
+                  File Lampiran Tambahan
+                </h2>
+                <div className="space-y-2">
+                  {assignment.attachments.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
+                    >
+                      <div className="flex items-center gap-3">
+                        <File className="h-5 w-5 text-red-600" />
+                        <span className="text-sm font-medium">{file.name}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(file.url, "_blank")}
+                        >
+                          Lihat
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const link = document.createElement("a");
+                            link.href = file.url;
+                            link.download = file.name;
+                            link.click();
+                          }}
+                        >
+                          Download
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-              <Button
-                onClick={() => navigate(`/class/${assignment.classId}`)}
-                className="w-full"
-              >
-                Kembali ke Kelas
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold mb-2">
-                  Jawaban (Teks)
-                </label>
-                <textarea
-                  value={submissionText}
-                  onChange={(e) => setSubmissionText(e.target.value)}
-                  placeholder="Ketik jawaban Anda di sini..."
-                  className="w-full h-48 px-4 py-3 text-base border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 resize-none"
-                />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {submissionText.length} karakter
-                </p>
-              </div>
+              </Card>
+            )}
+          </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2">
-                  Upload File (Opsional)
-                </label>
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center hover:border-blue-400 dark:hover:border-blue-600 transition-colors">
+          {/* ── Kolom Kanan: Pengumpulan / Admin Info ── */}
+          <div className="space-y-6">
+            {user?.role === "superadmin" ? (
+              <Card className="p-6">
+                <h2 className="text-base font-semibold mb-3">
+                  Panel Superadmin
+                </h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Anda masuk sebagai superadmin. Gunakan tombol di kolom kiri
+                  untuk mengelola tugas ini.
+                </p>
+                <Button
+                  className="w-full"
+                  onClick={() =>
+                    navigate(`/submissions/tugas/${assignmentId}`)
+                  }
+                >
+                  Lihat Semua Pengumpulan
+                </Button>
+              </Card>
+            ) : isSubmitted ? (
+              <Card className="p-6">
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-green-900 dark:text-green-100 mb-2">
+                    Tugas Berhasil Dikumpulkan
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Pengumpulan tugas Anda sedang dalam proses review oleh
+                    instruktur. Anda tidak dapat mengubah atau membatalkan
+                    pengumpulan ini.
+                  </p>
+                  {submissionData?.created_at && (
+                    <p className="text-xs text-muted-foreground mb-6">
+                      Dikumpulkan pada:{" "}
+                      {new Date(submissionData.created_at).toLocaleString(
+                        "id-ID",
+                      )}
+                    </p>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate(`/class/${assignment.classId}`)}
+                  >
+                    Kembali ke Kelas
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <Card className="p-6">
+                <h2 className="text-base font-semibold mb-1">
+                  Pengumpulan Tugas
+                </h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload satu atau lebih file sebagai jawaban tugas Anda.
+                  Setelah dikumpulkan, tidak dapat dibatalkan.
+                </p>
+
+                {/* Drop zone */}
+                <div className="mb-4">
                   <input
                     type="file"
-                    id="file-upload"
-                    onChange={handleFileChange}
+                    id="submission-files"
+                    multiple
+                    onChange={handleFilesChange}
                     className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip,.rar"
                   />
-                  <label htmlFor="file-upload" className="cursor-pointer">
-                    <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    {submissionFile ? (
-                      <div>
-                        <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                          {submissionFile.name}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {(submissionFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                          Klik untuk upload file
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          PDF, DOC, DOCX, JPG, PNG (Max 10MB)
-                        </p>
-                      </div>
-                    )}
+                  <label
+                    htmlFor="submission-files"
+                    className="flex flex-col items-center justify-center gap-2 w-full p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-blue-400 dark:hover:border-blue-600 transition-colors cursor-pointer"
+                  >
+                    <Upload className="h-8 w-8 text-gray-400" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Klik untuk memilih file
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      PDF, DOC, DOCX, JPG, PNG, ZIP (Maks 10MB per file)
+                    </span>
                   </label>
                 </div>
-              </div>
 
-              <div className="flex gap-3 pt-4">
+                {/* File list */}
+                {submissionFiles.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {submissionFiles.length} file dipilih
+                    </p>
+                    {submissionFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                          <span className="text-sm truncate">{file.name}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            ({(file.size / 1024 / 1024).toFixed(1)} MB)
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="ml-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded shrink-0"
+                          disabled={isSubmitting}
+                        >
+                          <X className="h-4 w-4 text-gray-500" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <Button
                   onClick={handleSubmit}
-                  disabled={
-                    (!submissionText.trim() && !submissionFile) || isSubmitting
-                  }
-                  className="flex-1 text-base py-6"
+                  disabled={submissionFiles.length === 0 || isSubmitting}
+                  className="w-full"
                 >
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
@@ -688,35 +727,23 @@ export function AssignmentViewPage() {
                     </span>
                   ) : (
                     <>
-                      <Upload className="h-5 w-5 mr-2" />
+                      <Upload className="h-4 w-4 mr-2" />
                       Kumpulkan Tugas
                     </>
                   )}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/class/${assignment.classId}`)}
-                  className="text-base py-6"
-                  disabled={isSubmitting}
-                >
-                  Batal
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
 
-        <Card className="p-5 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-          <h3 className="mb-2 text-base font-semibold text-foreground">
-            Petunjuk pengumpulan
-          </h3>
-          <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
-            <li>Pastikan jawaban Anda jelas dan mudah dipahami</li>
-            <li>Periksa kembali jawaban sebelum dikumpulkan</li>
-            <li>File yang diupload maksimal 10MB</li>
-            <li>Tugas yang dikumpulkan tidak dapat diedit setelah submit</li>
-          </ul>
-        </Card>
+                <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-0.5 list-disc list-inside">
+                    <li>Periksa kembali file sebelum mengumpulkan</li>
+                    <li>Pengumpulan tidak dapat dibatalkan atau diedit</li>
+                    <li>Pastikan semua file lengkap sebelum submit</li>
+                  </ul>
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </AppLayout>
   );

@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
+const API_BASE =
+  process.env.VITE_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
 import { verifySupabaseToken, AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
@@ -79,7 +81,20 @@ router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
 
     if (error) throw error;
 
-    res.json({ success: true, data: data ?? [] });
+    const enriched = (data ?? []).map((row: any) => {
+      const file = row.file_pengumpulan;
+      return {
+        ...row,
+        file_pengumpulan: file
+          ? {
+              ...file,
+              url: `${API_BASE}/api/files/proxy?path=${encodeURIComponent(file.object_key)}`,
+            }
+          : null,
+      };
+    });
+
+    res.json({ success: true, data: enriched });
   } catch (error: any) {
     console.error("Error fetching pengumpulan:", error);
     res
@@ -170,27 +185,30 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
 
     if (error) throw error;
 
-    const submissions = (data ?? []).map((item: any) => {
-      const pengumpulan = item.pengumpulan || {};
-      const tugas = pengumpulan.tugas || {};
-      const file = pengumpulan.file_pengumpulan || null;
+    const submissions = await Promise.all(
+      (data ?? []).map(async (item: any) => {
+        const pengumpulan = item.pengumpulan || {};
+        const tugas = pengumpulan.tugas || {};
+        const file = pengumpulan.file_pengumpulan || null;
 
-      return {
-        id: pengumpulan.id_pengumpulan,
-        classId: tugas.id_kelas ? String(tugas.id_kelas) : "",
-        title: tugas.nama_tugas ?? "Pengumpulan Tugas",
-        answer: pengumpulan.answer ?? null,
-        createdAt: pengumpulan.created_at,
-        file: file
-          ? {
-              name: file.original_filename,
-              objectKey: file.object_key,
-              size: file.ukuran_file,
-            }
-          : null,
-        status: "pending",
-      };
-    });
+        return {
+          id: pengumpulan.id_pengumpulan,
+          classId: tugas.id_kelas ? String(tugas.id_kelas) : "",
+          title: tugas.nama_tugas ?? "Pengumpulan Tugas",
+          answer: pengumpulan.answer ?? null,
+          createdAt: pengumpulan.created_at,
+          file: file
+            ? {
+                name: file.original_filename,
+                objectKey: file.object_key,
+                url: `${API_BASE}/api/files/proxy?path=${encodeURIComponent(file.object_key)}`,
+                size: file.ukuran_file,
+              }
+            : null,
+          status: "pending",
+        };
+      }),
+    );
 
     res.json({ success: true, data: submissions });
   } catch (error: any) {

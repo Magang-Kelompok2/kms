@@ -88,26 +88,26 @@ router.post(
           .insert({
             id_materi: Number(id_materi),
             title_pdf: title ?? file.originalname,
-            pdf_path: url,
+            pdf_path: objectKey,
           })
           .select()
           .single();
 
         if (error) throw error;
-        return res.json({ success: true, data: { ...data, objectKey } });
+        return res.json({ success: true, data: { ...data, url, objectKey } });
       } else {
         const { data, error } = await supabase
           .from("video")
           .insert({
             id_materi: Number(id_materi),
             title_video: title ?? file.originalname,
-            video_path: url,
+            video_path: objectKey,
           })
           .select()
           .single();
 
         if (error) throw error;
-        return res.json({ success: true, data: { ...data, objectKey } });
+        return res.json({ success: true, data: { ...data, url, objectKey } });
       }
     } catch (err: any) {
       console.error("Error uploading materi file:", err);
@@ -153,6 +153,50 @@ router.post(
       return res.json({ success: true, data: { ...data, url } });
     } catch (err: any) {
       console.error("Error uploading tugas file:", err);
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message ?? "Upload gagal" });
+    }
+  },
+);
+
+// ── POST /api/upload/assignment-file ─────────────────────────────────────
+// Upload file penugasan (untuk superadmin), simpan objectKey ke tugas.file_path
+router.post(
+  "/assignment-file",
+  upload.single("file"),
+  async (req: Request, res: Response) => {
+    const file = req.file;
+    if (!file)
+      return res
+        .status(400)
+        .json({ success: false, error: "File tidak ditemukan" });
+
+    const { id_tugas } = req.body;
+    if (!id_tugas) {
+      return res
+        .status(400)
+        .json({ success: false, error: "id_tugas wajib diisi" });
+    }
+
+    try {
+      const { objectKey, url } = await uploadToMinio(
+        file.buffer,
+        file.originalname,
+        "tugas-files",
+        file.mimetype,
+      );
+
+      const { error } = await supabase
+        .from("tugas")
+        .update({ file_path: objectKey })
+        .eq("id_tugas", Number(id_tugas));
+
+      if (error) throw error;
+
+      return res.json({ success: true, data: { objectKey, url } });
+    } catch (err: any) {
+      console.error("Error uploading assignment file:", err);
       return res
         .status(500)
         .json({ success: false, error: err?.message ?? "Upload gagal" });
