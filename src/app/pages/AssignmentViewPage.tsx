@@ -14,10 +14,11 @@ import {
   Edit3,
   Trash2,
   X,
-  Download,
+  Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Assignment as AssignmentType } from "../types";
+import { PdfViewerModal } from "../components/PdfViewerModal";
 
 export function AssignmentViewPage() {
   const { assignmentId } = useParams();
@@ -27,6 +28,9 @@ export function AssignmentViewPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionData, setSubmissionData] = useState<any>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>("");
+  const [previewDownloadPath, setPreviewDownloadPath] = useState<string | null>(null);
 
   const [assignment, setAssignment] = useState<AssignmentType | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(true);
@@ -496,7 +500,7 @@ export function AssignmentViewPage() {
               )}
             </Card>
 
-            {/* File Penugasan dari file_path */}
+            {/* File Penugasan dari path_tugas */}
             <Card className="p-6">
               <h2 className="text-base font-semibold mb-3">File Penugasan</h2>
               {assignmentFileUrl ? (
@@ -507,7 +511,7 @@ export function AssignmentViewPage() {
                     </div>
                     <div>
                       <p className="font-medium text-sm">
-                        {assignment.file_path!.split("/").pop() || "File Tugas"}
+                        {assignment.file_path!.split("/").pop()?.split("?")[0] || "File Tugas"}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Dokumen Penugasan
@@ -518,23 +522,15 @@ export function AssignmentViewPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => window.open(assignmentFileUrl, "_blank")}
-                    >
-                      Lihat
-                    </Button>
-                    <Button
-                      size="sm"
                       onClick={() => {
-                        const link = document.createElement("a");
-                        link.href = assignmentFileUrl;
-                        link.download =
-                          assignment.file_path!.split("/").pop() ||
-                          "file-tugas";
-                        link.click();
+                        const fileName = assignment.file_path!.split("/").pop()?.split("?")[0] || "File Tugas";
+                        setPreviewFileName(fileName);
+                        setPreviewUrl(assignmentFileUrl);
+                        setPreviewDownloadPath(assignment.file_path ?? null);
                       }}
                     >
-                      <Download className="h-4 w-4 mr-1.5" />
-                      Download
+                      <Eye className="h-4 w-4 mr-1.5" />
+                      Lihat
                     </Button>
                   </div>
                 </div>
@@ -548,47 +544,7 @@ export function AssignmentViewPage() {
               )}
             </Card>
 
-            {/* Attachments lama (jika ada) */}
-            {assignment.attachments && assignment.attachments.length > 0 && (
-              <Card className="p-6">
-                <h2 className="text-base font-semibold mb-3">
-                  File Lampiran Tambahan
-                </h2>
-                <div className="space-y-2">
-                  {assignment.attachments.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800"
-                    >
-                      <div className="flex items-center gap-3">
-                        <File className="h-5 w-5 text-red-600" />
-                        <span className="text-sm font-medium">{file.name}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => window.open(file.url, "_blank")}
-                        >
-                          Lihat
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            const link = document.createElement("a");
-                            link.href = file.url;
-                            link.download = file.name;
-                            link.click();
-                          }}
-                        >
-                          Download
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
+            {/* Attachments section intentionally hidden — same file as path_tugas */}
           </div>
 
           {/* ── Kolom Kanan: Pengumpulan / Admin Info ── */}
@@ -752,6 +708,19 @@ export function AssignmentViewPage() {
           </div>
         </div>
       </div>
+      {/* ── PDF Preview Modal ── */}
+      {previewUrl && (
+        <PdfViewerModal
+          url={previewUrl}
+          fileName={previewFileName}
+          onClose={() => {
+            setPreviewUrl(null);
+            setPreviewFileName("");
+          }}
+        />
+      )}
     </AppLayout>
   );
 }
+
+
