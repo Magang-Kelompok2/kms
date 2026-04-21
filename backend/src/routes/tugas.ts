@@ -52,8 +52,8 @@ router.get("/:tugasId", async (req, res) => {
       .from("tugas")
       .select(
         `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
-         pertemuan, deadline, durasi, path_tugas, created_at,
-         materi(id_tingkatan, pertemuan)`,
+        pertemuan, deadline, durasi, path_tugas, created_at,
+        materi(id_tingkatan, pertemuan)`,
       )
       .eq("id_tugas", tugasId)
       .single();

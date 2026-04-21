@@ -68,15 +68,10 @@ router.post(
 
       if (materiError) throw materiError;
 
-      const namaKelas =
-        (materiData.kelas as any)?.nama_kelas ?? "unknown-kelas";
-      const namaTingkatan =
-        (materiData.tingkatan as any)?.nama_tingkatan ?? "unknown-tingkatan";
-      const safeMateri = (materiData.title_materi ?? "materi").replace(
-        /\s+/g,
-        "-",
-      );
-      const folder = `${namaKelas}/${namaTingkatan}/${safeMateri}`;
+      const namaKelas = ((materiData.kelas as any)?.nama_kelas ?? "unknown").replace(/\s+/g, "_");
+      const namaTingkatan = ((materiData.tingkatan as any)?.nama_tingkatan ?? "unknown").replace(/\s+/g, "_");
+      const safeMateri = materiData.title_materi ?? "materi";
+      const folder = `${namaKelas}/${namaTingkatan}/${safeMateri}/pdf`;
 
       const { objectKey, url } = await uploadToMinio(
         file.buffer,
@@ -185,14 +180,23 @@ router.post(
       // Ambil nama tugas untuk folder yang rapi
       const { data: tugasData, error: tugasError } = await supabase
         .from("tugas")
-        .select("nama_tugas")
+        .select(`
+          nama_tugas,
+          materi (
+            title_materi,
+            kelas ( nama_kelas ),
+            tingkatan ( nama_tingkatan )
+          )
+        `)
         .eq("id_tugas", Number(id_tugas))
         .single();
 
       if (tugasError) throw tugasError;
 
-      const safeName = (tugasData.nama_tugas ?? "tugas").replace(/\s+/g, "-");
-      const folder = `alpha/tugas/${safeName}`;
+      const namaKelas = ((tugasData.materi as any)?.kelas?.nama_kelas ?? "unknown").replace(/\s+/g, "_");
+      const namaTingkatan = ((tugasData.materi as any)?.tingkatan?.nama_tingkatan ?? "unknown").replace(/\s+/g, "_");
+      const namaMateri = (tugasData.materi as any)?.title_materi ?? "materi";
+      const folder = `${namaKelas}/${namaTingkatan}/${namaMateri}/Assignment`;
 
       const { objectKey, url } = await uploadToMinio(
         file.buffer,
@@ -201,7 +205,7 @@ router.post(
         file.mimetype,
       );
 
-      // ✅ Fix: pakai path_tugas bukan file_path
+      // Fix: pakai path_tugas bukan file_path
       const { error } = await supabase
         .from("tugas")
         .update({ path_tugas: objectKey })
