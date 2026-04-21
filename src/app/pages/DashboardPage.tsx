@@ -16,7 +16,7 @@ import { useNavigate } from "react-router";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useClasses } from "../hooks/useClasses";
 import { useMateri } from "../hooks/useMateri";
 import { useTugas } from "../hooks/useTugas";
@@ -83,7 +83,7 @@ const getClassImage = (className: string): string =>
 
 // ─── Dashboard Page ────────────────────────────────────────────────────────────
 export function DashboardPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const { classes, loading: classesLoading } = useClasses();
@@ -97,6 +97,28 @@ export function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+
+  const [progressByClass, setProgressByClass] = useState<
+    Record<string, number>
+  >({});
+
+  useEffect(() => {
+    if (!user?.id || user.role === "superadmin" || !token) return;
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success) return;
+        const map: Record<string, number> = {};
+        for (const item of json.data ?? []) {
+          map[item.classId] = item.progressPercent ?? 0;
+        }
+        setProgressByClass(map);
+      })
+      .catch(() => {});
+  }, [user?.id, user?.role, token]);
 
   const handleDeleteUser = async (userId: number, role: string) => {
     if (role === "superadmin") {
@@ -197,7 +219,7 @@ export function DashboardPage() {
 
               const userProgress =
                 user?.role !== "superadmin"
-                  ? Math.floor(Math.random() * 100)
+                  ? (progressByClass[String(cls.id)] ?? 0)
                   : 0;
 
               const classImage = getClassImage(cls.name);

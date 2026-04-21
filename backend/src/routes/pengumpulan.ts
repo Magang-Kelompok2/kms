@@ -82,15 +82,21 @@ router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
     if (error) throw error;
 
     const enriched = (data ?? []).map((row: any) => {
-      const file = row.file_pengumpulan;
+      const filePengumpulan = row.file_pengumpulan;
+      const enrichedFile = filePengumpulan
+        ? {
+            ...filePengumpulan,
+            url: `${API_BASE}/api/files/proxy?path=${encodeURIComponent(filePengumpulan.object_key)}`,
+          }
+        : null;
+      const userRelation = Array.isArray(row.user_pengumpulan)
+        ? row.user_pengumpulan[0]
+        : row.user_pengumpulan;
       return {
         ...row,
-        file_pengumpulan: file
-          ? {
-              ...file,
-              url: `${API_BASE}/api/files/proxy?path=${encodeURIComponent(file.object_key)}`,
-            }
-          : null,
+        user: userRelation?.user ?? null,
+        file: enrichedFile,
+        file_pengumpulan: enrichedFile,
       };
     });
 

@@ -74,9 +74,9 @@ router.get("/:classId/levels", async (req, res) => {
     ] = await Promise.all([
       supabase
         .from("tingkatan")
-        .select("id_tingkatan, nama_tingkatan")
+        .select("id_tingkatan, nama_tingkatan, level_urutan")
         .eq("id_kelas", classId)
-        .order("id_tingkatan", { ascending: true }),
+        .order("level_urutan", { ascending: true }),
 
       supabase
         .from("materi")
@@ -106,6 +106,8 @@ router.get("/:classId/levels", async (req, res) => {
         (m) => m.id_tingkatan === tingkatan.id_tingkatan,
       );
 
+      const levelUrutan = tingkatan.level_urutan ?? tingkatan.id_tingkatan;
+
       const materials = materiDiTingkatan.map((m) => ({
         id: String(m.id_materi),
         title: m.title_materi,
@@ -113,7 +115,7 @@ router.get("/:classId/levels", async (req, res) => {
         content: m.deskripsi ?? "",
         classId: String(classId),
         meetingNumber: m.pertemuan,
-        level: tingkatan.id_tingkatan,
+        level: levelUrutan,
         createdAt: new Date().toISOString(),
         isPublished: true,
         files: [
@@ -143,7 +145,7 @@ router.get("/:classId/levels", async (req, res) => {
           dueDate: t.deadline ?? t.created_at,
           classId: String(classId),
           meetingNumber: t.pertemuan,
-          level: tingkatan.id_tingkatan,
+          level: levelUrutan,
           materialId: String(t.id_materi),
           isPublished: true,
           type: t.type ?? "",
@@ -158,7 +160,7 @@ router.get("/:classId/levels", async (req, res) => {
           dueDate: t.deadline ?? t.created_at,
           classId: String(classId),
           meetingNumber: t.pertemuan,
-          level: tingkatan.id_tingkatan,
+          level: levelUrutan,
           materialId: String(t.id_materi),
           isPublished: true,
           type: t.type ?? "",
@@ -166,7 +168,7 @@ router.get("/:classId/levels", async (req, res) => {
 
       return {
         id: String(tingkatan.id_tingkatan),
-        level: tingkatan.id_tingkatan,
+        level: levelUrutan,
         namaLevel: tingkatan.nama_tingkatan,
         materials,
         assignments,

@@ -53,14 +53,17 @@ router.get("/:tugasId", async (req, res) => {
       .select(
         `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
         pertemuan, deadline, durasi, path_tugas, created_at,
-        materi(id_tingkatan, pertemuan)`,
+        materi(id_tingkatan, pertemuan, tingkatan(level_urutan))`,
       )
       .eq("id_tugas", tugasId)
       .single();
 
     if (error) throw error;
 
-    const level = (data.materi as any)?.id_tingkatan ?? 1;
+    const level =
+      (data.materi as any)?.tingkatan?.level_urutan ??
+      (data.materi as any)?.id_tingkatan ??
+      1;
     const apiBase =
       process.env.VITE_API_URL ??
       `http://localhost:${process.env.PORT ?? 4000}`;
@@ -181,13 +184,16 @@ router.put("/:tugasId", async (req, res) => {
       .select(
         `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
          pertemuan, deadline, durasi, path_tugas, created_at,
-         materi!inner(id_tingkatan, pertemuan)`,
+         materi!inner(id_tingkatan, pertemuan, tingkatan(level_urutan))`,
       )
       .single();
 
     if (error) throw error;
 
-    const level = (data.materi as any)?.id_tingkatan ?? 1;
+    const level =
+      (data.materi as any)?.tingkatan?.level_urutan ??
+      (data.materi as any)?.id_tingkatan ??
+      1;
     const apiBase =
       process.env.VITE_API_URL ??
       `http://localhost:${process.env.PORT ?? 4000}`;

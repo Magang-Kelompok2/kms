@@ -16,6 +16,7 @@ type EnrollmentSummary = {
   classId: string;
   className: string;
   level: number;
+  namaTingkatan: string;
 };
 
 type ProgressSummary = {
@@ -203,13 +204,55 @@ export function UserManagementPage() {
                       <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                         Kelas yang Diikuti
                       </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <div className="mt-1.5 flex flex-col gap-2">
                         {profile.enrollments.length > 0 ? (
-                          profile.enrollments.map((enrollment) => (
-                            <Badge key={enrollment.classId} variant="secondary">
-                              {enrollment.className} • Lv {enrollment.level}
-                            </Badge>
-                          ))
+                          (() => {
+                            const CLASS_GRADIENTS = [
+                              "from-blue-600 to-cyan-400",
+                              "from-cyan-500 to-teal-400",
+                              "from-indigo-600 to-purple-500",
+                              "from-blue-700 to-indigo-500",
+                            ];
+                            const grouped = profile.enrollments.reduce(
+                              (acc, e) => {
+                                if (!acc[e.classId])
+                                  acc[e.classId] = {
+                                    className: e.className,
+                                    tingkatans: [],
+                                  };
+                                acc[e.classId].tingkatans.push(
+                                  e.namaTingkatan || `Lv ${e.level}`,
+                                );
+                                return acc;
+                              },
+                              {} as Record<
+                                string,
+                                { className: string; tingkatans: string[] }
+                              >,
+                            );
+                            return Object.entries(grouped).map(
+                              ([classId, { className, tingkatans }], idx) => (
+                                <div
+                                  key={classId}
+                                  className={`rounded-xl bg-linear-to-r ${CLASS_GRADIENTS[idx % CLASS_GRADIENTS.length]} px-3 py-2 text-white`}
+                                >
+                                  <p className="text-xs font-bold mb-1.5 tracking-wide">
+                                    {className}
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {tingkatans.map((t) => (
+                                      <span
+                                        key={t}
+                                        className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-medium"
+                                      >
+                                        {t}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ),
+                            );
+                          })()
                         ) : (
                           <span className="text-sm text-slate-400 dark:text-slate-500">
                             Belum mengikuti kelas

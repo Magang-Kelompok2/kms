@@ -440,28 +440,68 @@ router.get("/:userId/progress", verifySupabaseToken, async (req: any, res) => {
       ...new Set((progressRows ?? []).map((row: any) => row.id_kelas)),
     ];
 
-    let kelasMap: Record<number, string> = {};
-    if (kelasIds.length > 0) {
-      const { data: kelasRows, error: kelasError } = await supabase
-        .from("kelas")
-        .select("id_kelas, nama_kelas")
-        .in("id_kelas", kelasIds);
+    const idTingkatanList = [
+      ...new Set(
+        (progressRows ?? [])
+          .map((row: any) => extractProgressLevel(row))
+          .filter(Boolean),
+      ),
+    ];
 
-      if (kelasError) throw kelasError;
-      kelasMap = Object.fromEntries(
-        (kelasRows ?? []).map((k: any) => [k.id_kelas, k.nama_kelas]),
-      );
+    let kelasMap: Record<number, string> = {};
+    let tingkatanMap: Record<number, number> = {};
+    let classTingkatanCount: Record<number, number> = {};
+
+    const [kelasResult, tingkatanResult] = await Promise.all([
+      kelasIds.length > 0
+        ? supabase
+            .from("kelas")
+            .select("id_kelas, nama_kelas")
+            .in("id_kelas", kelasIds)
+        : Promise.resolve({ data: [], error: null }),
+      kelasIds.length > 0
+        ? supabase
+            .from("tingkatan")
+            .select("id_tingkatan, id_kelas, level_urutan")
+            .in("id_kelas", kelasIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (kelasResult.error) throw kelasResult.error;
+    if (tingkatanResult.error) throw tingkatanResult.error;
+
+    kelasMap = Object.fromEntries(
+      ((kelasResult.data as any[]) ?? []).map((k: any) => [
+        k.id_kelas,
+        k.nama_kelas,
+      ]),
+    );
+
+    for (const t of (tingkatanResult.data as any[]) ?? []) {
+      tingkatanMap[t.id_tingkatan] = t.level_urutan ?? t.id_tingkatan;
+      classTingkatanCount[t.id_kelas] =
+        (classTingkatanCount[t.id_kelas] ?? 0) + 1;
     }
 
     res.json({
       success: true,
-      data: (progressRows ?? []).map((row: any) => ({
-        id: row.id_progress,
-        classId: String(row.id_kelas),
-        className: kelasMap[row.id_kelas] ?? "Tidak diketahui",
-        currentLevel: extractProgressLevel(row),
-        updatedAt: row.updated_at,
-      })),
+      data: (progressRows ?? []).map((row: any) => {
+        const rawLevel = extractProgressLevel(row);
+        const currentLevel = tingkatanMap[rawLevel] ?? rawLevel;
+        const totalLevels = classTingkatanCount[row.id_kelas] ?? 1;
+        return {
+          id: row.id_progress,
+          classId: String(row.id_kelas),
+          className: kelasMap[row.id_kelas] ?? "Tidak diketahui",
+          currentLevel,
+          totalLevels,
+          progressPercent: Math.min(
+            Math.round((currentLevel / totalLevels) * 100),
+            100,
+          ),
+          updatedAt: row.updated_at,
+        };
+      }),
     });
   } catch (error) {
     console.error("Error fetching user progress:", error);
@@ -509,11 +549,21 @@ router.get(
 
     try {
       const data = await getUserProgressByClass(userId, classId);
+      const rawLevel = extractProgressLevel(data);
+
+      // Convert id_tingkatan to level_urutan for consistent display
+      const { data: tingkatanData } = await supabase
+        .from("tingkatan")
+        .select("level_urutan")
+        .eq("id_tingkatan", rawLevel)
+        .maybeSingle();
+
+      const levelUrutan = tingkatanData?.level_urutan ?? rawLevel;
 
       // PGRST116 = row not found, berarti user belum ada progress → default 1
       res.json({
         success: true,
-        data: { tingkatanSaatIni: extractProgressLevel(data) },
+        data: { tingkatanSaatIni: levelUrutan },
       });
     } catch (error) {
       console.error("Error fetching progress:", error);
@@ -552,26 +602,57 @@ router.get(
       const kelasIds = [
         ...new Set((enrollmentRows ?? []).map((row: any) => row.id_kelas)),
       ];
+      const tingkatanIds = [
+        ...new Set((enrollmentRows ?? []).map((row: any) => row.id_tingkatan)),
+      ];
 
       let kelasMap: Record<number, string> = {};
-      if (kelasIds.length > 0) {
-        const { data: kelasRows, error: kelasError } = await supabase
-          .from("kelas")
-          .select("id_kelas, nama_kelas")
-          .in("id_kelas", kelasIds);
+      let tingkatanLevelMap: Record<number, number> = {};
+      let tingkatanNamaMap: Record<number, string> = {};
 
-        if (kelasError) throw kelasError;
-        kelasMap = Object.fromEntries(
-          (kelasRows ?? []).map((k: any) => [k.id_kelas, k.nama_kelas]),
-        );
-      }
+      await Promise.all([
+        kelasIds.length > 0
+          ? supabase
+              .from("kelas")
+              .select("id_kelas, nama_kelas")
+              .in("id_kelas", kelasIds)
+              .then(({ data, error: e }) => {
+                if (e) throw e;
+                kelasMap = Object.fromEntries(
+                  (data ?? []).map((k: any) => [k.id_kelas, k.nama_kelas]),
+                );
+              })
+          : Promise.resolve(),
+        tingkatanIds.length > 0
+          ? supabase
+              .from("tingkatan")
+              .select("id_tingkatan, level_urutan, nama_tingkatan")
+              .in("id_tingkatan", tingkatanIds)
+              .then(({ data, error: e }) => {
+                if (e) throw e;
+                tingkatanLevelMap = Object.fromEntries(
+                  (data ?? []).map((t: any) => [
+                    t.id_tingkatan,
+                    t.level_urutan ?? t.id_tingkatan,
+                  ]),
+                );
+                tingkatanNamaMap = Object.fromEntries(
+                  (data ?? []).map((t: any) => [
+                    t.id_tingkatan,
+                    t.nama_tingkatan ?? "",
+                  ]),
+                );
+              })
+          : Promise.resolve(),
+      ]);
 
       res.json({
         success: true,
         data: (enrollmentRows ?? []).map((row: any) => ({
           classId: String(row.id_kelas),
           className: kelasMap[row.id_kelas] ?? "Tidak diketahui",
-          level: row.id_tingkatan,
+          level: tingkatanLevelMap[row.id_tingkatan] ?? row.id_tingkatan,
+          namaTingkatan: tingkatanNamaMap[row.id_tingkatan] ?? "",
           status: row.status,
         })),
       });
@@ -734,10 +815,23 @@ router.put(
         .json({ success: false, error: "Parameter tidak valid" });
 
     try {
+      // tingkatanSaatIni is level_urutan — look up the corresponding id_tingkatan
+      const { data: nextTingkatan } = await supabase
+        .from("tingkatan")
+        .select("id_tingkatan")
+        .eq("id_kelas", classId)
+        .eq("level_urutan", Number(tingkatanSaatIni))
+        .maybeSingle();
+
+      if (!nextTingkatan?.id_tingkatan) {
+        // level_urutan doesn't exist (e.g. user finished last level) — keep current progress
+        return res.json({ success: true });
+      }
+
       await saveUserProgress(
         userId,
         classId,
-        Number(tingkatanSaatIni),
+        nextTingkatan.id_tingkatan,
         new Date().toISOString(),
       );
       res.json({ success: true });

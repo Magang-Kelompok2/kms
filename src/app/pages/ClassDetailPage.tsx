@@ -309,10 +309,10 @@ export function ClassDetailPage() {
   );
   const totalQuizzes = levels.reduce((acc, lvl) => acc + lvl.quizzes.length, 0);
 
-  const totalItems = totalMaterials + totalAssignments + totalQuizzes;
-  const completedItems = Math.floor(totalItems * 0.4);
   const userProgress =
-    totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+    levels.length > 0
+      ? Math.min(Math.round((userLevel / levels.length) * 100), 100)
+      : 0;
 
   const classImage = getClassImage(currentClass.name);
 
