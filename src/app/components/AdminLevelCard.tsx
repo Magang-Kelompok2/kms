@@ -174,7 +174,6 @@ export function AdminLevelCard({
               <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
                 {itemsByTab[activeTab].length > 0 ? (
                   itemsByTab[activeTab].map((item) => {
-                    const Icon = typeIcon[item.type];
                     return (
                       <div
                         key={item.id}
@@ -186,7 +185,6 @@ export function AdminLevelCard({
                         }}
                       >
                         <div className="flex items-center gap-4">
-                          {/* Number badge with gradient */}
                           <div
                             className="w-10 h-10 rounded-xl text-white grid place-items-center font-bold text-sm shrink-0 shadow-sm"
                             style={{ background: typeGradient[item.type] }}
@@ -212,12 +210,15 @@ export function AdminLevelCard({
                       </div>
                     );
                   })
-                ) : (
-                  <div className="py-10 text-center text-muted-foreground rounded-xl border border-dashed border-border bg-muted/30">
-                    <Icon className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">Tidak ada konten di tab ini.</p>
-                  </div>
-                )}
+                ) : (() => {
+                  const EmptyIcon = typeIcon[activeTab as keyof typeof typeIcon];
+                  return (
+                    <div className="py-10 text-center text-muted-foreground rounded-xl border border-dashed border-border bg-muted/30">
+                      <EmptyIcon className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Tidak ada konten di tab ini.</p>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* ── Add Buttons ── */}
