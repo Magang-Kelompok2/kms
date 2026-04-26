@@ -4,13 +4,13 @@ import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { PdfViewerModal } from "../components/PdfViewerModal";
 import {
   ArrowLeft,
   CheckCircle,
   Clock,
   Calendar,
   FileText,
-  Download,
   Loader2,
   Trophy,
 } from "lucide-react";
@@ -60,6 +60,35 @@ export function SubmissionListPage() {
   const [hasilKuisList, setHasilKuisList] = useState<HasilKuisItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string } | null>(null);
+
+  const isPdfFile = (fileName: string) => fileName.toLowerCase().endsWith(".pdf");
+
+  const openSubmissionFile = async (file: NonNullable<PengumpulanItem["file"]>) => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/upload/signed-url?key=${encodeURIComponent(file.object_key)}`,
+      );
+      const json = await res.json();
+
+      if (!json.success || !json.url) {
+        throw new Error("URL file tidak tersedia");
+      }
+
+      if (isPdfFile(file.original_filename)) {
+        setPreviewFile({
+          url: json.url,
+          name: file.original_filename,
+        });
+        return;
+      }
+
+      window.open(json.url, "_blank", "noopener,noreferrer");
+    } catch {
+      alert("Gagal membuka file");
+    }
+  };
+
 
   useEffect(() => {
     if (user && user.role !== "superadmin") navigate("/dashboard");
@@ -366,40 +395,31 @@ export function SubmissionListPage() {
                       </div>
                     )}
 
-                    {item.file && (
-                      <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <FileText className="h-5 w-5 text-blue-600 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {item.file.original_filename}
-                          </p>
-                          {item.file.ukuran_file && (
-                            <p className="text-xs text-gray-500">
-                              {(item.file.ukuran_file / 1024 / 1024).toFixed(2)}{" "}
-                              MB
-                            </p>
-                          )}
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(
-                                `${import.meta.env.VITE_API_URL}/api/upload/signed-url?key=${encodeURIComponent(item.file!.object_key)}`,
-                              );
-                              const json = await res.json();
-                              if (json.success) window.open(json.url, "_blank");
-                            } catch {
-                              alert("Gagal membuka file");
-                            }
-                          }}
-                        >
-                          <Download className="h-4 w-4 mr-1" />
-                          Unduh
-                        </Button>
-                      </div>
-                    )}
+                    {item.file &&
+                      (() => {
+                        const file = item.file;
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => openSubmissionFile(file)}
+                            className="flex w-full items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-left transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/10"
+                          >
+                            <FileText className="h-5 w-5 text-blue-600 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {file.original_filename}
+                              </p>
+                              {file.ukuran_file && (
+                                <p className="text-xs text-gray-500">
+                                  {(file.ukuran_file / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })()}
+                   
 
                     {!item.answer && !item.file && (
                       <p className="text-sm text-gray-400 italic">
@@ -417,6 +437,14 @@ export function SubmissionListPage() {
             ))
           )}
         </div>
+
+        {previewFile && (
+        <PdfViewerModal
+          url={previewFile.url}
+          fileName={previewFile.name}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
     </AppLayout>
   );
 }
