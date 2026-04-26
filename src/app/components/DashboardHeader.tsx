@@ -48,7 +48,7 @@ export function DashboardHeader() {
               style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
               onClick={() => navigate("/dashboard")}
             >
-              TaxaCore
+              KMS MHCorp
             </span>
             {/* {user && (
               <Badge
