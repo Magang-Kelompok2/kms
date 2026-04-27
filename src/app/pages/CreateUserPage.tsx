@@ -47,7 +47,7 @@ export function CreateUserPage() {
   const availableLevels = useMemo(
     () =>
       levels.map((level) => ({
-        id: String(level.level),
+        id: String(level.id),
         name: level.namaLevel,
       })),
     [levels],

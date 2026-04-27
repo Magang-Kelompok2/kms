@@ -4,7 +4,7 @@ import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { Users, Plus, TrendingUp, Loader } from "lucide-react";
+import { Users, Plus, TrendingUp, Loader, Search } from "lucide-react";
 import { useUsers } from "../hooks/useUsers";
 import { useState, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -105,6 +105,9 @@ type UserProfileData = {
   progress: ProgressSummary[];
 };
 
+const CLASS_FILTERS = ["Semua", "Akuntansi", "Audit", "Perpajakan"] as const;
+type ClassFilter = (typeof CLASS_FILTERS)[number];
+
 export function UserManagementPage() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
@@ -114,6 +117,8 @@ export function UserManagementPage() {
   const { users, loading, error, total } = useUsers(pageSize, offset);
   const [profiles, setProfiles] = useState<Record<number, UserProfileData>>({});
   const [profilesLoading, setProfilesLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [classFilter, setClassFilter] = useState<ClassFilter>("Semua");
 
   useEffect(() => {
     if (!token || users.length === 0) {
@@ -183,7 +188,24 @@ export function UserManagementPage() {
 
   const usersWithMetrics = useMemo(
     () =>
-      users.map((u) => {
+      users
+        .filter((u) => {
+          const q = searchQuery.trim().toLowerCase();
+          if (q && !u.username.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) {
+            return false;
+          }
+          if (classFilter !== "Semua") {
+            const profile = profiles[u.id];
+            // Jika profil belum dimuat dan masih loading, sembunyikan dulu
+            if (!profile) return !profilesLoading;
+            const hasClass = profile.enrollments.some((e) =>
+              e.className.toLowerCase().includes(classFilter.toLowerCase()),
+            );
+            if (!hasClass) return false;
+          }
+          return true;
+        })
+        .map((u) => {
         const profile = profiles[u.id] ?? { enrollments: [], progress: [] };
         const completed = profile.progress.reduce(
           (sum, item) =>
@@ -253,7 +275,7 @@ export function UserManagementPage() {
           chartData,
         };
       }),
-    [profiles, users],
+    [profiles, profilesLoading, users, searchQuery, classFilter],
   );
 
   if (user?.role !== "superadmin") {
@@ -282,7 +304,7 @@ export function UserManagementPage() {
   return (
     <AppLayout>
       {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="mb-1 text-3xl font-semibold tracking-tight">
             Kelola Pengguna
@@ -295,6 +317,44 @@ export function UserManagementPage() {
           <Plus className="h-4 w-4 mr-2" />
           Buat Pengguna Baru
         </Button>
+      </div>
+
+      {/* Search & Filter */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Search bar */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Cari username atau email..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-900 pl-9 pr-4 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-400 transition"
+          />
+        </div>
+
+        {/* Class filter buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {CLASS_FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => {
+                setClassFilter(f);
+                setCurrentPage(1);
+              }}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                classFilter === f
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mb-4 flex items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400">

@@ -440,7 +440,7 @@ export function SubmissionListPage() {
                           void openSubmissionFile(item.file);
                         }
                       }}
-                      className="flex w-full items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-left transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/10"
+                      className="flex w-fit px-4 items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-left transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/10"
                     >
                       <FileText className="h-5 w-5 text-blue-600 shrink-0" />
                       <div className="flex-1 min-w-0">
