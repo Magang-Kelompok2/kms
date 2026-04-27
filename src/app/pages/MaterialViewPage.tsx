@@ -29,6 +29,7 @@ export function MaterialViewPage() {
   const [progressLoading, setProgressLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -38,6 +39,11 @@ export function MaterialViewPage() {
     description: "",
     meetingNumber: "",
   });
+
+  const getFileKey = (file: { id: string; type: "pdf" | "video" }) =>
+    `${file.type}:${file.id}`;
+  const localProgressKey =
+    user?.id && materialId ? `material-progress:${user.id}:${materialId}` : null;
 
   // ── 1. Fetch material ──────────────────────────────────────────
   useEffect(() => {
@@ -117,7 +123,20 @@ export function MaterialViewPage() {
         const completedMaterials: string[] =
           json.data?.completedMaterials ?? [];
         if (materialId && completedMaterials.includes(materialId)) {
+          setCompletedFiles(
+            material.files.map((file) => getFileKey(file)),
+          );
           setIsCompleted(true);
+          setCompletionMessage("Materi telah diselesaikan.");
+        } else {
+          const savedLocalProgress =
+            localProgressKey && typeof window !== "undefined"
+              ? window.localStorage.getItem(localProgressKey)
+              : null;
+          setCompletedFiles(
+            savedLocalProgress ? JSON.parse(savedLocalProgress) : [],
+          );
+          setCompletionMessage(null);
         }
       } catch {
         // Gagal fetch progress → default level 1 agar tidak langsung ditolak
@@ -128,7 +147,7 @@ export function MaterialViewPage() {
     };
 
     fetchProgress();
-  }, [material, user?.id, user?.role, materialId, token]);
+  }, [localProgressKey, material, user?.id, user?.role, materialId, token]);
 
   // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
@@ -267,15 +286,77 @@ export function MaterialViewPage() {
     );
   }
 
-  const handleMarkComplete = (fileId: string) => {
-    if (!completedFiles.includes(fileId)) {
-      setCompletedFiles([...completedFiles, fileId]);
+  const handleMarkComplete = async (fileId: string) => {
+    if (!material || !user?.id || !token) return;
+
+    const targetFile = material.files.find((file) => file.id === fileId);
+    if (!targetFile) return;
+
+    const fileKey = getFileKey(targetFile);
+    if (completedFiles.includes(fileKey)) return;
+
+    const nextCompletedFiles = [...completedFiles, fileKey];
+    setCompletedFiles(nextCompletedFiles);
+    if (localProgressKey && typeof window !== "undefined") {
+      window.localStorage.setItem(
+        localProgressKey,
+        JSON.stringify(nextCompletedFiles),
+      );
+    }
+
+    if (nextCompletedFiles.length < material.files.length) {
+      setCompletionMessage("Progress materi disimpan di perangkat ini.");
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/materials/${material.id}/complete-file`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            fileId: Number(targetFile.id),
+            fileType: targetFile.type,
+          }),
+        },
+      );
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? "Gagal menyimpan progress materi");
+      }
+
+      setCompletedFiles(material.files.map((file) => getFileKey(file)));
+      setIsCompleted(true);
+      setCompletionMessage("Materi telah diselesaikan.");
+      setError(null);
+      if (localProgressKey && typeof window !== "undefined") {
+        window.localStorage.removeItem(localProgressKey);
+      }
+    } catch (err) {
+      setCompletedFiles(completedFiles);
+      if (localProgressKey && typeof window !== "undefined") {
+        window.localStorage.setItem(
+          localProgressKey,
+          JSON.stringify(completedFiles),
+        );
+      }
+      setError(
+        err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan progress",
+      );
     }
   };
 
+  const completedCurrentMaterialFiles = material.files.filter((file) =>
+    completedFiles.includes(getFileKey(file)),
+  ).length;
   const allFilesCompleted =
     material.files.length > 0 &&
-    completedFiles.length === material.files.length;
+    completedCurrentMaterialFiles === material.files.length;
 
   const videoFiles = material.files.filter((f) => f.type === "video");
   const pdfFiles = material.files.filter((f) => f.type === "pdf");
@@ -310,7 +391,7 @@ export function MaterialViewPage() {
               </div>
 
               <div className="p-4 space-y-5">
-                {videoFiles.length === 0 && pdfFiles.length === 0 ? (
+                  {videoFiles.length === 0 && pdfFiles.length === 0 ? (
                   <div className="text-center py-8">
                     <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -332,7 +413,9 @@ export function MaterialViewPage() {
                               className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
                                 selectedFile === file.id
                                   ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                                  : "border-gray-200 dark:border-gray-700 hover:border-red-300"
+                                  : completedFiles.includes(getFileKey(file))
+                                    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/10"
+                                    : "border-gray-200 dark:border-gray-700 hover:border-red-300"
                               }`}
                               onClick={() => setSelectedFile(file.id)}
                             >
@@ -345,7 +428,7 @@ export function MaterialViewPage() {
                                     <h4 className="font-bold text-base leading-tight">
                                       {file.name}
                                     </h4>
-                                    {completedFiles.includes(file.id) && (
+                                    {completedFiles.includes(getFileKey(file)) && (
                                       <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                                     )}
                                   </div>
@@ -373,7 +456,9 @@ export function MaterialViewPage() {
                               className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
                                 selectedFile === file.id
                                   ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                  : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
+                                  : completedFiles.includes(getFileKey(file))
+                                    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/10"
+                                    : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
                               }`}
                               onClick={() => setSelectedFile(file.id)}
                             >
@@ -386,7 +471,7 @@ export function MaterialViewPage() {
                                     <h4 className="font-semibold text-base leading-tight">
                                       {file.name}
                                     </h4>
-                                    {completedFiles.includes(file.id) && (
+                                    {completedFiles.includes(getFileKey(file)) && (
                                       <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                                     )}
                                   </div>
@@ -440,11 +525,17 @@ export function MaterialViewPage() {
                         </p>
                       </div>
                     </div>
-                    {!completedFiles.includes(selectedFile) && (
+                    {!isCompleted && !completedFiles.includes(getFileKey(selectedFileData)) && (
                       <Button onClick={() => handleMarkComplete(selectedFile)}>
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Tandai Selesai
                       </Button>
+                    )}
+                    {isCompleted && (
+                      <Badge className="bg-emerald-600 text-white">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Materi selesai
+                      </Badge>
                     )}
                   </div>
 
@@ -584,25 +675,21 @@ export function MaterialViewPage() {
               </Card>
 
               {/* Completion banner */}
-              {allFilesCompleted && !isCompleted && (
+              {(allFilesCompleted || isCompleted || completionMessage) && (
                 <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
-                      <div>
-                        <h3 className="text-base font-bold text-green-900 dark:text-green-100">
-                          Semua materi selesai!
-                        </h3>
-                        <p className="text-sm text-green-700 dark:text-green-300">
-                          Kerja bagus! Sekarang Anda dapat melanjutkan ke kuis.
-                        </p>
-                      </div>
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                    <div>
+                      <h3 className="text-base font-bold text-green-900 dark:text-green-100">
+                        {isCompleted ? "Materi telah diselesaikan" : "Progress materi tersimpan"}
+                      </h3>
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        {completionMessage ??
+                          (isCompleted
+                            ? "Materi selesai."
+                            : "Sebagian file sudah ditandai selesai.")}
+                      </p>
                     </div>
-                    <Button
-                      onClick={() => navigate(`/class/${material.classId}`)}
-                    >
-                      Lanjut ke Kuis
-                    </Button>
                   </div>
                 </Card>
               )}

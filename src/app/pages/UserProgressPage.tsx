@@ -11,7 +11,6 @@ import {
   CheckCircle,
   XCircle,
   TrendingUp,
-  Award,
   FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -25,11 +24,18 @@ interface UserData {
 }
 
 interface ProgressEntry {
-  id: number;
+  id: number | null;
   classId: string;
   className: string;
   currentLevel: number;
-  updatedAt: string;
+  progressPercent: number;
+  completedMaterialCount: number;
+  totalMaterialCount: number;
+  completedAssignmentCount: number;
+  totalAssignmentCount: number;
+  completedQuizCount: number;
+  totalQuizCount: number;
+  updatedAt: string | null;
 }
 
 interface SubmissionItem {
@@ -223,11 +229,25 @@ export function UserProgressPage() {
                     {item.className}
                   </h3>
                   <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                    Level {item.currentLevel}
+                    {item.progressPercent}%
                   </Badge>
                 </div>
+                <div className="grid grid-cols-3 gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <span>
+                    Materi {item.completedMaterialCount}/{item.totalMaterialCount}
+                  </span>
+                  <span>
+                    Tugas {item.completedAssignmentCount}/{item.totalAssignmentCount}
+                  </span>
+                  <span>
+                    Kuis {item.completedQuizCount}/{item.totalQuizCount}
+                  </span>
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Progress terakhir diupdate {new Date(item.updatedAt).toLocaleDateString()}
+                  Progress terakhir diupdate{" "}
+                  {item.updatedAt
+                    ? new Date(item.updatedAt).toLocaleDateString()
+                    : "-"}
                 </p>
               </div>
             </Card>
@@ -251,7 +271,9 @@ export function UserProgressPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {submissions.map((submission) => {
             const override = overrides[submission.id];
-            const status = override?.status ?? submission.status;
+            const status: SubmissionItem["status"] =
+              override?.status ?? submission.status;
+            const isPending = !override && submission.status === "pending";
             const feedback = override?.feedback;
             const statusConfig =
               status === "approved"
@@ -325,7 +347,7 @@ export function UserProgressPage() {
                     </p>
                   )}
 
-                  {status === "pending" && (
+                  {isPending && (
                     <div className="flex gap-2 mt-auto pt-2">
                       <Button
                         size="sm"

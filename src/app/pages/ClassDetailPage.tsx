@@ -10,7 +10,6 @@ import {
   FileText,
   ClipboardCheck,
   Layers,
-  TrendingUp,
 } from "lucide-react";
 import { UserLevelCard } from "../components/UserLevelCard";
 import { AdminLevelCard } from "../components/AdminLevelCard";
@@ -83,6 +82,9 @@ interface DonutProgressCardProps {
   totalMaterials: number;
   totalAssignments: number;
   totalQuizzes: number;
+  completedMaterials: number;
+  completedAssignments: number;
+  completedQuizzes: number;
 }
 
 function DonutProgressCard({
@@ -92,6 +94,9 @@ function DonutProgressCard({
   totalMaterials,
   totalAssignments,
   totalQuizzes,
+  completedMaterials,
+  completedAssignments,
+  completedQuizzes,
 }: DonutProgressCardProps) {
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
@@ -170,15 +175,21 @@ function DonutProgressCard({
           <div className="flex flex-col gap-2 text-xs">
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-blue-400 shrink-0" />
-              <span className="text-white/70">{totalMaterials} Materi</span>
+              <span className="text-white/70">
+                Materi {completedMaterials}/{totalMaterials}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="text-white/70">{totalAssignments} Tugas</span>
+              <span className="text-white/70">
+                Tugas {completedAssignments}/{totalAssignments}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-purple-400 shrink-0" />
-              <span className="text-white/70">{totalQuizzes} Kuis</span>
+              <span className="text-white/70">
+                Kuis {completedQuizzes}/{totalQuizzes}
+              </span>
             </div>
             <div className="mt-1 border-t border-white/10 pt-1">
               <span className="text-white/40">
@@ -235,6 +246,12 @@ export function ClassDetailPage() {
   const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
   const [localQuizzes, setLocalQuizzes] = useState<Quiz[]>([]);
   const [userLevel, setUserLevel] = useState(1);
+  const [classProgress, setClassProgress] = useState({
+    progressPercent: 0,
+    completedMaterialCount: 0,
+    completedAssignmentCount: 0,
+    completedQuizCount: 0,
+  });
 
   useEffect(() => {
     if (!user?.id || !classId || user.role === "superadmin") return;
@@ -247,6 +264,12 @@ export function ClassDetailPage() {
         if (!res.ok) return;
         const json = await res.json();
         setUserLevel(json.data.tingkatanSaatIni ?? 1);
+        setClassProgress({
+          progressPercent: json.data.progressPercent ?? 0,
+          completedMaterialCount: json.data.completedMaterialCount ?? 0,
+          completedAssignmentCount: json.data.completedAssignmentCount ?? 0,
+          completedQuizCount: json.data.completedQuizCount ?? 0,
+        });
       } catch {
         // default tetap 1
       }
@@ -309,10 +332,7 @@ export function ClassDetailPage() {
   );
   const totalQuizzes = levels.reduce((acc, lvl) => acc + lvl.quizzes.length, 0);
 
-  const userProgress =
-    levels.length > 0
-      ? Math.min(Math.round((userLevel / levels.length) * 100), 100)
-      : 0;
+  const userProgress = classProgress.progressPercent;
 
   const classImage = getClassImage(currentClass.name);
 
@@ -469,6 +489,9 @@ export function ClassDetailPage() {
           totalMaterials={totalMaterials}
           totalAssignments={totalAssignments}
           totalQuizzes={totalQuizzes}
+          completedMaterials={classProgress.completedMaterialCount}
+          completedAssignments={classProgress.completedAssignmentCount}
+          completedQuizzes={classProgress.completedQuizCount}
         />
       </div>
 

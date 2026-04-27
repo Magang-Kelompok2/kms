@@ -33,12 +33,20 @@ type ProgressSummary = {
   classId: string;
   className: string;
   currentLevel: number;
+  totalLevels: number;
+  progressPercent: number;
+  completedMaterialCount: number;
+  totalMaterialCount: number;
+  completedAssignmentCount: number;
+  totalAssignmentCount: number;
+  completedQuizCount: number;
+  totalQuizCount: number;
   updatedAt: string;
 };
 
 type RecentActivity = {
   id: string;
-  type: "tugas" | "kuis";
+  type: "materi" | "tugas" | "kuis";
   title: string;
   classId: string;
   className: string;
@@ -178,17 +186,25 @@ export function ProfilePage() {
     () =>
       enrollments.map((item) => {
         const progress = progressByClass[item.classId];
-        const totalLevels = levelCountByClass[item.classId] ?? item.level ?? 0;
         const currentLevel = progress?.currentLevel ?? 1;
-        const completedLevels = Math.max(0, Math.min(currentLevel - 1, totalLevels));
-        const percent =
-          totalLevels > 0 ? Math.round((completedLevels / totalLevels) * 100) : 0;
+        const totalLevels =
+          progress?.totalLevels ?? levelCountByClass[item.classId] ?? item.level ?? 0;
+        const completedItems =
+          (progress?.completedMaterialCount ?? 0) +
+          (progress?.completedAssignmentCount ?? 0) +
+          (progress?.completedQuizCount ?? 0);
+        const totalItems =
+          (progress?.totalMaterialCount ?? 0) +
+          (progress?.totalAssignmentCount ?? 0) +
+          (progress?.totalQuizCount ?? 0);
+        const percent = progress?.progressPercent ?? 0;
 
         return {
           ...item,
           currentLevel,
-          completedLevels,
           totalLevels,
+          completedItems,
+          totalItems,
           percent,
           updatedAt: progress?.updatedAt ?? null,
         };
@@ -197,20 +213,20 @@ export function ProfilePage() {
   );
 
   const overallProgress = useMemo(() => {
-    const totalLevels = enrollmentCards.reduce(
-      (sum, item) => sum + item.totalLevels,
+    const totalItems = enrollmentCards.reduce(
+      (sum, item) => sum + item.totalItems,
       0,
     );
-    const completedLevels = enrollmentCards.reduce(
-      (sum, item) => sum + item.completedLevels,
+    const completedItems = enrollmentCards.reduce(
+      (sum, item) => sum + item.completedItems,
       0,
     );
 
     return {
-      totalLevels,
-      completedLevels,
+      totalItems,
+      completedItems,
       percent:
-        totalLevels > 0 ? Math.round((completedLevels / totalLevels) * 100) : 0,
+        totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0,
     };
   }, [enrollmentCards]);
 
@@ -407,8 +423,7 @@ export function ProfilePage() {
                 Aktivitas Terbaru
               </h2>
               <p className="text-sm text-muted-foreground">
-                Menampilkan tugas dan kuis yang baru diselesaikan. Riwayat materi
-                selesai per item belum tersimpan di database saat ini.
+                Menampilkan materi, tugas, dan kuis yang baru diselesaikan.
               </p>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
@@ -436,7 +451,11 @@ export function ProfilePage() {
                         </p>
                       </div>
                       <Badge variant="outline">
-                        {activity.type === "kuis" ? "Kuis" : "Tugas"}
+                        {activity.type === "kuis"
+                          ? "Kuis"
+                          : activity.type === "materi"
+                            ? "Materi"
+                            : "Tugas"}
                       </Badge>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
@@ -525,7 +544,7 @@ export function ProfilePage() {
                         Level Selesai
                       </p>
                       <p className="font-medium text-slate-900">
-                        {item.completedLevels}/{item.totalLevels || "-"}
+                        {item.completedItems}/{item.totalItems || "-"}
                       </p>
                     </div>
                     <div className="rounded-xl bg-slate-50 p-3">
@@ -542,8 +561,8 @@ export function ProfilePage() {
 
                   <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
                     <GraduationCap className="size-4" />
-                    Persentase dihitung dari jumlah level yang sudah selesai pada
-                    kelas ini.
+                    Persentase dihitung dari materi, tugas, dan kuis yang sudah
+                    diselesaikan pada kelas ini.
                   </div>
                 </div>
               ))

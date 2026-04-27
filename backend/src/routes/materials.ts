@@ -1,8 +1,13 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
-import { getPresignedUrl } from "../lib/minio";
+import { verifySupabaseToken } from "../middleware/auth";
 
 const router = Router();
+
+const isDuplicateKeyError = (error: any) => {
+  const message = String(error?.message ?? error?.details ?? "").toLowerCase();
+  return error?.code === "23505" || message.includes("duplicate key");
+};
 
 // GET /api/materials
 router.get("/", async (_req, res) => {
@@ -277,6 +282,109 @@ router.put("/:materialId", async (req, res) => {
     });
   }
 });
+
+router.post(
+  "/:materialId/complete-file",
+  verifySupabaseToken,
+  async (req: any, res) => {
+    const materialId = Number(req.params.materialId);
+    const fileId = Number(req.body?.fileId);
+    const fileType = String(req.body?.fileType ?? "").trim().toLowerCase();
+    const userId = Number(req.user?.id_user);
+
+    if (
+      isNaN(materialId) ||
+      isNaN(fileId) ||
+      !["pdf", "video"].includes(fileType) ||
+      !Number.isFinite(userId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "materialId, fileId, dan fileType wajib valid",
+      });
+    }
+
+    try {
+      const { data: material, error: materialError } = await supabase
+        .from("materi")
+        .select("id_materi")
+        .eq("id_materi", materialId)
+        .maybeSingle();
+
+      if (materialError) throw materialError;
+      if (!material) {
+        return res
+          .status(404)
+          .json({ success: false, error: "Materi tidak ditemukan" });
+      }
+
+      const fileTable = fileType === "pdf" ? "pdf" : "video";
+      const fileIdColumn = fileType === "pdf" ? "id_pdf" : "id_video";
+      const { data: fileRow, error: fileError } = await supabase
+        .from(fileTable)
+        .select(`${fileIdColumn}, id_materi`)
+        .eq(fileIdColumn, fileId)
+        .eq("id_materi", materialId)
+        .maybeSingle();
+
+      if (fileError) throw fileError;
+      if (!fileRow) {
+        return res
+          .status(404)
+          .json({ success: false, error: "File materi tidak ditemukan" });
+      }
+
+      const completedAt = new Date().toISOString();
+      const payload = {
+        id_user: userId,
+        id_materi: materialId,
+        completed_at: completedAt,
+      };
+
+      const { error: upsertError } = await supabase
+        .from("user_materi")
+        .upsert(payload, {
+          onConflict: "id_user,id_materi",
+        });
+
+      if (upsertError) {
+        const { data: existingRow, error: existingError } = await supabase
+          .from("user_materi")
+          .select("id_user")
+          .eq("id_user", userId)
+          .eq("id_materi", materialId)
+          .maybeSingle();
+
+        if (existingError) throw existingError;
+
+        if (!existingRow) {
+          const { error: insertError } = await supabase
+            .from("user_materi")
+            .insert(payload);
+
+          if (insertError && !isDuplicateKeyError(insertError)) {
+            throw insertError;
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          materialCompleted: true,
+          completedFileKeys: [`${fileType}:${fileId}`],
+        },
+      });
+    } catch (error: any) {
+      console.error("Error marking material file complete:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to save material progress",
+        detail: error?.message ?? error,
+      });
+    }
+  },
+);
 
 // DELETE /api/materials/:materialId
 router.delete("/:materialId", async (req, res) => {

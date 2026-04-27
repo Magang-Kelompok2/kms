@@ -9,7 +9,6 @@ import { useUsers } from "../hooks/useUsers";
 import { useState, useEffect } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
-const TOTAL_LEVELS = 5;
 const COLORS = ["#22C55E", "#E5E7EB"];
 
 type EnrollmentSummary = {
@@ -20,7 +19,13 @@ type EnrollmentSummary = {
 };
 
 type ProgressSummary = {
-  currentLevel: number;
+  progressPercent: number;
+  completedMaterialCount: number;
+  totalMaterialCount: number;
+  completedAssignmentCount: number;
+  totalAssignmentCount: number;
+  completedQuizCount: number;
+  totalQuizCount: number;
 };
 
 type UserProfileData = {
@@ -145,13 +150,59 @@ export function UserManagementPage() {
           {users.map((u) => {
             const profile = profiles[u.id] ?? { enrollments: [], progress: [] };
             const completed = profile.progress.reduce(
-              (sum, item) => sum + item.currentLevel,
+              (sum, item) =>
+                sum +
+                item.completedMaterialCount +
+                item.completedAssignmentCount +
+                item.completedQuizCount,
               0,
             );
-            const possible = profile.enrollments.length * TOTAL_LEVELS;
+            const possible = profile.progress.reduce(
+              (sum, item) =>
+                sum +
+                item.totalMaterialCount +
+                item.totalAssignmentCount +
+                item.totalQuizCount,
+              0,
+            );
             const remaining = Math.max(0, possible - completed);
             const percent =
               possible > 0 ? Math.round((completed / possible) * 100) : 0;
+            const materialCompleted = profile.progress.reduce(
+              (sum, item) => sum + item.completedMaterialCount,
+              0,
+            );
+            const materialTotal = profile.progress.reduce(
+              (sum, item) => sum + item.totalMaterialCount,
+              0,
+            );
+            const assignmentCompleted = profile.progress.reduce(
+              (sum, item) => sum + item.completedAssignmentCount,
+              0,
+            );
+            const assignmentTotal = profile.progress.reduce(
+              (sum, item) => sum + item.totalAssignmentCount,
+              0,
+            );
+            const quizCompleted = profile.progress.reduce(
+              (sum, item) => sum + item.completedQuizCount,
+              0,
+            );
+            const quizTotal = profile.progress.reduce(
+              (sum, item) => sum + item.totalQuizCount,
+              0,
+            );
+            const chartData =
+              possible <= 0
+                ? [{ name: "Empty", value: 1, color: "#E5E7EB" }]
+                : completed <= 0
+                  ? [{ name: "Remaining", value: possible, color: "#E5E7EB" }]
+                  : remaining <= 0
+                    ? [{ name: "Completed", value: completed, color: COLORS[0] }]
+                    : [
+                        { name: "Completed", value: completed, color: COLORS[0] },
+                        { name: "Remaining", value: remaining, color: COLORS[1] },
+                      ];
 
             return (
               <Card
@@ -265,11 +316,17 @@ export function UserManagementPage() {
                       <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                         Progress
                       </p>
-                      <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                        {possible > 0
-                          ? `${completed} dari ${possible} level selesai`
-                          : "Belum ada progress"}
-                      </p>
+                      {possible > 0 ? (
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                          <p>Materi {materialCompleted}/{materialTotal} selesai</p>
+                          <p>Tugas {assignmentCompleted}/{assignmentTotal} selesai</p>
+                          <p>Kuis {quizCompleted}/{quizTotal} selesai</p>
+                        </div>
+                      ) : (
+                        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                          Belum ada progress
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -278,29 +335,17 @@ export function UserManagementPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={
-                            possible > 0
-                              ? [
-                                  { name: "Completed", value: completed },
-                                  { name: "Remaining", value: remaining },
-                                ]
-                              : [{ name: "Empty", value: 1 }]
-                          }
+                          data={chartData}
                           dataKey="value"
                           innerRadius={28}
                           outerRadius={40}
-                          paddingAngle={possible > 0 ? 2 : 0}
+                          paddingAngle={chartData.length > 1 ? 2 : 0}
                           startAngle={90}
                           endAngle={-270}
                         >
-                          {(possible > 0 ? [completed, remaining] : [1]).map(
-                            (_, index) => (
-                              <Cell
-                                key={index}
-                                fill={COLORS[index] ?? COLORS[1]}
-                              />
-                            ),
-                          )}
+                          {chartData.map((item) => (
+                            <Cell key={item.name} fill={item.color} />
+                          ))}
                         </Pie>
                       </PieChart>
                     </ResponsiveContainer>

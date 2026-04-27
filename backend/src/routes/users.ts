@@ -17,6 +17,17 @@ const isMissingColumnError = (error: any, columnName: string) => {
   );
 };
 
+const isMissingRelationError = (error: any, relationName: string) => {
+  const message = String(error?.message ?? error?.details ?? "").toLowerCase();
+  const normalizedRelation = relationName.toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    message.includes(`relation "${normalizedRelation}"`) ||
+    message.includes(`relation '${normalizedRelation}'`) ||
+    message.includes(normalizedRelation)
+  );
+};
+
 const extractProgressLevel = (row: any) => {
   const value = row?.id_tingkatan ?? row?.tingkatan_saat_ini ?? 1;
   return typeof value === "number" && value >= 1 ? value : 1;
@@ -25,6 +36,41 @@ const extractProgressLevel = (row: any) => {
 const canAccessUserScopedData = (requestUser: any, targetUserId: number) =>
   requestUser?.role === "superadmin" ||
   Number(requestUser?.id_user) === targetUserId;
+
+type ProgressSummaryItem = {
+  id: number | null;
+  classId: string;
+  className: string;
+  currentLevel: number;
+  totalLevels: number;
+  progressPercent: number;
+  updatedAt: string | null;
+  completedMaterials: string[];
+  completedAssignments: string[];
+  completedQuizzes: string[];
+  completedMaterialFiles: string[];
+  completedMaterialCount: number;
+  totalMaterialCount: number;
+  completedAssignmentCount: number;
+  totalAssignmentCount: number;
+  completedQuizCount: number;
+  totalQuizCount: number;
+};
+
+const normalizeTaskType = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+const getLatestTimestamp = (...values: Array<string | null | undefined>) => {
+  const timestamps = values
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length === 0) return null;
+  return new Date(Math.max(...timestamps)).toISOString();
+};
 
 async function insertUserProgressRows(
   userId: number,
@@ -131,6 +177,311 @@ async function saveUserProgress(
     [{ id_kelas: classId, id_tingkatan: level }],
     updatedAt,
   );
+}
+
+async function buildUserProgressSummary(
+  userId: number,
+): Promise<ProgressSummaryItem[]> {
+  const [progressRows, enrollmentResult] = await Promise.all([
+    getUserProgressRows(userId),
+    supabase
+      .from("user_enrollment")
+      .select("id_kelas")
+      .eq("id_user", userId)
+      .eq("status", "approved"),
+  ]);
+
+  if (enrollmentResult.error) throw enrollmentResult.error;
+
+  const classIds = [
+    ...new Set(
+      [...(progressRows ?? []), ...(enrollmentResult.data ?? [])]
+        .map((row: any) => Number(row.id_kelas))
+        .filter((value) => Number.isFinite(value) && value > 0),
+    ),
+  ];
+
+  if (classIds.length === 0) return [];
+
+  const [
+    kelasResult,
+    tingkatanResult,
+    materiResult,
+    tugasResult,
+    userMateriResult,
+    userMateriFileResult,
+    submissionResult,
+    quizResult,
+  ] = await Promise.all([
+    supabase.from("kelas").select("id_kelas, nama_kelas").in("id_kelas", classIds),
+    supabase
+      .from("tingkatan")
+      .select("id_tingkatan, id_kelas, level_urutan")
+      .in("id_kelas", classIds),
+    supabase
+      .from("materi")
+      .select("id_materi, id_kelas, title_materi")
+      .in("id_kelas", classIds),
+    supabase
+      .from("tugas")
+      .select("id_tugas, id_kelas, type")
+      .in("id_kelas", classIds),
+    supabase.from("user_materi").select("id_materi").eq("id_user", userId),
+    supabase
+      .from("user_materi_file")
+      .select("id_materi, file_type, file_id, completed_at")
+      .eq("id_user", userId),
+    supabase
+      .from("user_pengumpulan")
+      .select("created_at, pengumpulan(id_tugas, created_at)")
+      .eq("id_user", userId),
+    supabase
+      .from("hasil_kuis")
+      .select("id_tugas, created_at")
+      .eq("id_user", userId),
+  ]);
+
+  if (kelasResult.error) throw kelasResult.error;
+  if (tingkatanResult.error) throw tingkatanResult.error;
+  if (materiResult.error) throw materiResult.error;
+  if (tugasResult.error) throw tugasResult.error;
+  const userMateriRows =
+    userMateriResult.error && isMissingRelationError(userMateriResult.error, "user_materi")
+      ? []
+      : ((() => {
+          if (userMateriResult.error) throw userMateriResult.error;
+          return userMateriResult.data ?? [];
+        })());
+
+  const userMateriFileRows =
+    userMateriFileResult.error &&
+    isMissingRelationError(userMateriFileResult.error, "user_materi_file")
+      ? []
+      : ((() => {
+          if (userMateriFileResult.error) throw userMateriFileResult.error;
+          return userMateriFileResult.data ?? [];
+        })());
+
+  if (submissionResult.error) throw submissionResult.error;
+  if (quizResult.error) throw quizResult.error;
+
+  const materiRows = materiResult.data ?? [];
+  const materiIds = materiRows.map((item: any) => item.id_materi);
+
+  const [videoResult, pdfResult] = await Promise.all([
+    materiIds.length > 0
+      ? supabase.from("video").select("id_video, id_materi").in("id_materi", materiIds)
+      : Promise.resolve({ data: [], error: null }),
+    materiIds.length > 0
+      ? supabase.from("pdf").select("id_pdf, id_materi").in("id_materi", materiIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (videoResult.error) throw videoResult.error;
+  if (pdfResult.error) throw pdfResult.error;
+
+  const classNameMap = Object.fromEntries(
+    ((kelasResult.data as any[]) ?? []).map((item: any) => [
+      item.id_kelas,
+      item.nama_kelas,
+    ]),
+  );
+
+  const tingkatanLevelMap: Record<number, number> = {};
+  const totalLevelsByClass: Record<number, number> = {};
+  for (const item of (tingkatanResult.data as any[]) ?? []) {
+    tingkatanLevelMap[item.id_tingkatan] = item.level_urutan ?? item.id_tingkatan;
+    totalLevelsByClass[item.id_kelas] = (totalLevelsByClass[item.id_kelas] ?? 0) + 1;
+  }
+
+  const materialIdsByClass: Record<number, Set<number>> = {};
+  const materialTitleMap: Record<number, string> = {};
+  const materialClassMap: Record<number, number> = {};
+  const materialFileTotals: Record<number, number> = {};
+
+  for (const item of materiRows as any[]) {
+    if (!materialIdsByClass[item.id_kelas]) {
+      materialIdsByClass[item.id_kelas] = new Set<number>();
+    }
+    materialIdsByClass[item.id_kelas].add(item.id_materi);
+    materialTitleMap[item.id_materi] = item.title_materi ?? "Materi";
+    materialClassMap[item.id_materi] = item.id_kelas;
+    materialFileTotals[item.id_materi] = materialFileTotals[item.id_materi] ?? 0;
+  }
+
+  for (const item of (videoResult.data as any[]) ?? []) {
+    materialFileTotals[item.id_materi] = (materialFileTotals[item.id_materi] ?? 0) + 1;
+  }
+
+  for (const item of (pdfResult.data as any[]) ?? []) {
+    materialFileTotals[item.id_materi] = (materialFileTotals[item.id_materi] ?? 0) + 1;
+  }
+
+  const completedFileKeysByClass: Record<number, Set<string>> = {};
+  const completedFileCountsByMaterial: Record<number, number> = {};
+  const latestMaterialUpdateByClass: Record<number, string | null> = {};
+
+  for (const item of (userMateriFileRows as any[]) ?? []) {
+    const classId = materialClassMap[item.id_materi];
+    if (!classId) continue;
+
+    if (!completedFileKeysByClass[classId]) {
+      completedFileKeysByClass[classId] = new Set<string>();
+    }
+
+    const fileKey = `${item.file_type}:${item.file_id}`;
+    if (!completedFileKeysByClass[classId].has(fileKey)) {
+      completedFileKeysByClass[classId].add(fileKey);
+      completedFileCountsByMaterial[item.id_materi] =
+        (completedFileCountsByMaterial[item.id_materi] ?? 0) + 1;
+    }
+
+    latestMaterialUpdateByClass[classId] = getLatestTimestamp(
+      latestMaterialUpdateByClass[classId],
+      item.completed_at,
+    );
+  }
+
+  const completedMaterialIdsByClass: Record<number, Set<number>> = {};
+  for (const item of (userMateriRows as any[]) ?? []) {
+    const materialId = Number(item.id_materi);
+    const classId = materialClassMap[materialId];
+    if (!classId) continue;
+
+    if (!completedMaterialIdsByClass[classId]) {
+      completedMaterialIdsByClass[classId] = new Set<number>();
+    }
+    completedMaterialIdsByClass[classId].add(materialId);
+  }
+
+  for (const [materialIdValue, totalFiles] of Object.entries(materialFileTotals)) {
+    const materialId = Number(materialIdValue);
+    const classId = materialClassMap[materialId];
+    if (!classId || totalFiles <= 0) continue;
+
+    const completedFiles = completedFileCountsByMaterial[materialId] ?? 0;
+    if (completedFiles >= totalFiles) {
+      if (!completedMaterialIdsByClass[classId]) {
+        completedMaterialIdsByClass[classId] = new Set<number>();
+      }
+      completedMaterialIdsByClass[classId].add(materialId);
+    }
+  }
+
+  const assignmentIdsByClass: Record<number, Set<number>> = {};
+  const quizIdsByClass: Record<number, Set<number>> = {};
+
+  for (const item of (tugasResult.data as any[]) ?? []) {
+    const normalizedType = normalizeTaskType(item.type);
+    const target =
+      normalizedType === "kuis" ? quizIdsByClass : assignmentIdsByClass;
+
+    if (!target[item.id_kelas]) {
+      target[item.id_kelas] = new Set<number>();
+    }
+    target[item.id_kelas].add(item.id_tugas);
+  }
+
+  const completedAssignmentIdsByClass: Record<number, Set<number>> = {};
+  const latestSubmissionByClass: Record<number, string | null> = {};
+
+  for (const row of (submissionResult.data as any[]) ?? []) {
+    const pengumpulan = Array.isArray(row.pengumpulan)
+      ? row.pengumpulan[0]
+      : row.pengumpulan;
+    const tugasId = Number(pengumpulan?.id_tugas);
+    if (!Number.isFinite(tugasId)) continue;
+
+    const classId = classIds.find((item) => assignmentIdsByClass[item]?.has(tugasId));
+    if (!classId) continue;
+
+    if (!completedAssignmentIdsByClass[classId]) {
+      completedAssignmentIdsByClass[classId] = new Set<number>();
+    }
+    completedAssignmentIdsByClass[classId].add(tugasId);
+    latestSubmissionByClass[classId] = getLatestTimestamp(
+      latestSubmissionByClass[classId],
+      pengumpulan?.created_at,
+      row.created_at,
+    );
+  }
+
+  const completedQuizIdsByClass: Record<number, Set<number>> = {};
+  const latestQuizByClass: Record<number, string | null> = {};
+
+  for (const row of (quizResult.data as any[]) ?? []) {
+    const tugasId = Number(row.id_tugas);
+    if (!Number.isFinite(tugasId)) continue;
+
+    const classId = classIds.find((item) => quizIdsByClass[item]?.has(tugasId));
+    if (!classId) continue;
+
+    if (!completedQuizIdsByClass[classId]) {
+      completedQuizIdsByClass[classId] = new Set<number>();
+    }
+    completedQuizIdsByClass[classId].add(tugasId);
+    latestQuizByClass[classId] = getLatestTimestamp(
+      latestQuizByClass[classId],
+      row.created_at,
+    );
+  }
+
+  return classIds.map((classId) => {
+    const progressRow =
+      (progressRows ?? []).find((row: any) => Number(row.id_kelas) === classId) ?? null;
+    const rawLevel = extractProgressLevel(progressRow);
+    const currentLevel = tingkatanLevelMap[rawLevel] ?? rawLevel;
+
+    const totalMaterialCount = materialIdsByClass[classId]?.size ?? 0;
+    const totalAssignmentCount = assignmentIdsByClass[classId]?.size ?? 0;
+    const totalQuizCount = quizIdsByClass[classId]?.size ?? 0;
+
+    const completedMaterials = [
+      ...(completedMaterialIdsByClass[classId] ?? new Set<number>()),
+    ].map((item) => String(item));
+    const completedAssignments = [
+      ...(completedAssignmentIdsByClass[classId] ?? new Set<number>()),
+    ].map((item) => String(item));
+    const completedQuizzes = [
+      ...(completedQuizIdsByClass[classId] ?? new Set<number>()),
+    ].map((item) => String(item));
+    const completedMaterialFiles = [
+      ...(completedFileKeysByClass[classId] ?? new Set<string>()),
+    ];
+
+    const completedCount =
+      completedMaterials.length +
+      completedAssignments.length +
+      completedQuizzes.length;
+    const totalCount =
+      totalMaterialCount + totalAssignmentCount + totalQuizCount;
+
+    return {
+      id: progressRow?.id_progress ?? null,
+      classId: String(classId),
+      className: classNameMap[classId] ?? "Tidak diketahui",
+      currentLevel,
+      totalLevels: totalLevelsByClass[classId] ?? 1,
+      progressPercent:
+        totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
+      updatedAt: getLatestTimestamp(
+        progressRow?.updated_at,
+        latestMaterialUpdateByClass[classId],
+        latestSubmissionByClass[classId],
+        latestQuizByClass[classId],
+      ),
+      completedMaterials,
+      completedAssignments,
+      completedQuizzes,
+      completedMaterialFiles,
+      completedMaterialCount: completedMaterials.length,
+      totalMaterialCount,
+      completedAssignmentCount: completedAssignments.length,
+      totalAssignmentCount,
+      completedQuizCount: completedQuizzes.length,
+      totalQuizCount,
+    };
+  });
 }
 
 type RequestedAccess = {
@@ -434,74 +785,11 @@ router.get("/:userId/progress", verifySupabaseToken, async (req: any, res) => {
   }
 
   try {
-    const progressRows = await getUserProgressRows(userId);
-
-    const kelasIds = [
-      ...new Set((progressRows ?? []).map((row: any) => row.id_kelas)),
-    ];
-
-    const idTingkatanList = [
-      ...new Set(
-        (progressRows ?? [])
-          .map((row: any) => extractProgressLevel(row))
-          .filter(Boolean),
-      ),
-    ];
-
-    let kelasMap: Record<number, string> = {};
-    let tingkatanMap: Record<number, number> = {};
-    let classTingkatanCount: Record<number, number> = {};
-
-    const [kelasResult, tingkatanResult] = await Promise.all([
-      kelasIds.length > 0
-        ? supabase
-            .from("kelas")
-            .select("id_kelas, nama_kelas")
-            .in("id_kelas", kelasIds)
-        : Promise.resolve({ data: [], error: null }),
-      kelasIds.length > 0
-        ? supabase
-            .from("tingkatan")
-            .select("id_tingkatan, id_kelas, level_urutan")
-            .in("id_kelas", kelasIds)
-        : Promise.resolve({ data: [], error: null }),
-    ]);
-
-    if (kelasResult.error) throw kelasResult.error;
-    if (tingkatanResult.error) throw tingkatanResult.error;
-
-    kelasMap = Object.fromEntries(
-      ((kelasResult.data as any[]) ?? []).map((k: any) => [
-        k.id_kelas,
-        k.nama_kelas,
-      ]),
-    );
-
-    for (const t of (tingkatanResult.data as any[]) ?? []) {
-      tingkatanMap[t.id_tingkatan] = t.level_urutan ?? t.id_tingkatan;
-      classTingkatanCount[t.id_kelas] =
-        (classTingkatanCount[t.id_kelas] ?? 0) + 1;
-    }
+    const progressSummary = await buildUserProgressSummary(userId);
 
     res.json({
       success: true,
-      data: (progressRows ?? []).map((row: any) => {
-        const rawLevel = extractProgressLevel(row);
-        const currentLevel = tingkatanMap[rawLevel] ?? rawLevel;
-        const totalLevels = classTingkatanCount[row.id_kelas] ?? 1;
-        return {
-          id: row.id_progress,
-          classId: String(row.id_kelas),
-          className: kelasMap[row.id_kelas] ?? "Tidak diketahui",
-          currentLevel,
-          totalLevels,
-          progressPercent: Math.min(
-            Math.round((currentLevel / totalLevels) * 100),
-            100,
-          ),
-          updatedAt: row.updated_at,
-        };
-      }),
+      data: progressSummary,
     });
   } catch (error) {
     console.error("Error fetching user progress:", error);
@@ -548,22 +836,32 @@ router.get(
         .json({ success: false, error: "Parameter tidak valid" });
 
     try {
-      const data = await getUserProgressByClass(userId, classId);
-      const rawLevel = extractProgressLevel(data);
+      const [summaryRows, progressRow] = await Promise.all([
+        buildUserProgressSummary(userId),
+        getUserProgressByClass(userId, classId),
+      ]);
+      const summary = summaryRows.find(
+        (item) => Number(item.classId) === classId,
+      );
 
-      // Convert id_tingkatan to level_urutan for consistent display
-      const { data: tingkatanData } = await supabase
-        .from("tingkatan")
-        .select("level_urutan")
-        .eq("id_tingkatan", rawLevel)
-        .maybeSingle();
-
-      const levelUrutan = tingkatanData?.level_urutan ?? rawLevel;
-
-      // PGRST116 = row not found, berarti user belum ada progress → default 1
       res.json({
         success: true,
-        data: { tingkatanSaatIni: levelUrutan },
+        data: {
+          tingkatanSaatIni:
+            summary?.currentLevel ?? extractProgressLevel(progressRow),
+          progressPercent: summary?.progressPercent ?? 0,
+          completedMaterials: summary?.completedMaterials ?? [],
+          completedAssignments: summary?.completedAssignments ?? [],
+          completedQuizzes: summary?.completedQuizzes ?? [],
+          completedMaterialFiles: summary?.completedMaterialFiles ?? [],
+          completedMaterialCount: summary?.completedMaterialCount ?? 0,
+          totalMaterialCount: summary?.totalMaterialCount ?? 0,
+          completedAssignmentCount: summary?.completedAssignmentCount ?? 0,
+          totalAssignmentCount: summary?.totalAssignmentCount ?? 0,
+          completedQuizCount: summary?.completedQuizCount ?? 0,
+          totalQuizCount: summary?.totalQuizCount ?? 0,
+          updatedAt: summary?.updatedAt ?? null,
+        },
       });
     } catch (error) {
       console.error("Error fetching progress:", error);
@@ -682,7 +980,7 @@ router.get(
     }
 
     try {
-      const [submissionResult, quizResult] = await Promise.all([
+      const [submissionResult, quizResult, materialProgressResult, coarseMaterialProgressResult] = await Promise.all([
         supabase
           .from("user_pengumpulan")
           .select(
@@ -700,10 +998,38 @@ router.get(
           .eq("id_user", userId)
           .order("created_at", { ascending: false })
           .limit(10),
+        supabase
+          .from("user_materi_file")
+          .select("id_materi, completed_at")
+          .eq("id_user", userId)
+          .order("completed_at", { ascending: false })
+          .limit(20),
+        supabase
+          .from("user_materi")
+          .select("id_materi")
+          .eq("id_user", userId)
+          .limit(20),
       ]);
 
       if (submissionResult.error) throw submissionResult.error;
       if (quizResult.error) throw quizResult.error;
+      const materialProgressRows =
+        materialProgressResult.error &&
+        isMissingRelationError(materialProgressResult.error, "user_materi_file")
+          ? []
+          : ((() => {
+              if (materialProgressResult.error) throw materialProgressResult.error;
+              return materialProgressResult.data ?? [];
+            })());
+
+      const coarseMaterialProgressRows =
+        coarseMaterialProgressResult.error &&
+        isMissingRelationError(coarseMaterialProgressResult.error, "user_materi")
+          ? []
+          : ((() => {
+              if (coarseMaterialProgressResult.error) throw coarseMaterialProgressResult.error;
+              return coarseMaterialProgressResult.data ?? [];
+            })());
 
       const submissionActivities = (submissionResult.data ?? []).map((item: any) => {
         const pengumpulan = item.pengumpulan ?? {};
@@ -756,9 +1082,58 @@ router.get(
         };
       });
 
+      const latestMaterialCompletionMap = new Map<number, string>();
+      for (const row of materialProgressRows ?? []) {
+        const materialId = Number(row.id_materi);
+        if (!Number.isFinite(materialId) || latestMaterialCompletionMap.has(materialId)) {
+          continue;
+        }
+        latestMaterialCompletionMap.set(materialId, row.completed_at);
+      }
+
+      for (const row of coarseMaterialProgressRows ?? []) {
+        const materialId = Number(row.id_materi);
+        if (!Number.isFinite(materialId) || latestMaterialCompletionMap.has(materialId)) {
+          continue;
+        }
+        latestMaterialCompletionMap.set(materialId, new Date().toISOString());
+      }
+
+      let materialActivities: Array<{
+        id: string;
+        type: "materi";
+        title: string;
+        classId: string;
+        createdAt: string;
+        status: "completed";
+        score: null;
+      }> = [];
+
+      const completedMaterialIds = [...latestMaterialCompletionMap.keys()];
+      if (completedMaterialIds.length > 0) {
+        const { data: materialRows, error: materialError } = await supabase
+          .from("materi")
+          .select("id_materi, title_materi, id_kelas")
+          .in("id_materi", completedMaterialIds);
+
+        if (materialError) throw materialError;
+
+        materialActivities = (materialRows ?? []).map((item: any) => ({
+          id: `materi-${item.id_materi}`,
+          type: "materi",
+          title: item.title_materi ?? "Materi",
+          classId: item.id_kelas ? String(item.id_kelas) : "",
+          createdAt:
+            latestMaterialCompletionMap.get(item.id_materi) ??
+            new Date().toISOString(),
+          status: "completed",
+          score: null,
+        }));
+      }
+
       const classIds = [
         ...new Set(
-          [...submissionActivities, ...quizActivities]
+          [...submissionActivities, ...quizActivities, ...materialActivities]
             .map((item) => Number(item.classId))
             .filter((value) => Number.isFinite(value) && value > 0),
         ),
@@ -777,7 +1152,7 @@ router.get(
         );
       }
 
-      const data = [...submissionActivities, ...quizActivities]
+      const data = [...submissionActivities, ...quizActivities, ...materialActivities]
         .map((item) => ({
           ...item,
           className: classMap[Number(item.classId)] ?? "Kelas tidak diketahui",
