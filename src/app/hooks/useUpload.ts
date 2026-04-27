@@ -1,5 +1,6 @@
 // src/hooks/useUpload.ts
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 interface UploadedFile {
   id: string; // id_pdf / id_video / id_file dari DB
@@ -22,6 +23,7 @@ interface UseUploadReturn {
 }
 
 export function useUpload(): UseUploadReturn {
+  const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +48,11 @@ export function useUpload(): UseUploadReturn {
 
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/upload/materi-file`,
-        { method: "POST", body: formData },
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        },
       );
 
       const json = await res.json();
@@ -78,7 +84,11 @@ export function useUpload(): UseUploadReturn {
 
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/upload/tugas-file`,
-        { method: "POST", body: formData },
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        },
       );
 
       const json = await res.json();

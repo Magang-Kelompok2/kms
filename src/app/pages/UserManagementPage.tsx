@@ -6,8 +6,9 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Users, Plus, TrendingUp, Loader } from "lucide-react";
 import { useUsers } from "../hooks/useUsers";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { UserManagementSkeleton } from "../components/PageSkeletons";
 
 const COLORS = ["#22C55E", "#E5E7EB"];
 
@@ -36,15 +37,24 @@ type UserProfileData = {
 export function UserManagementPage() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
-  const { users, loading, error } = useUsers(100);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
+  const offset = (currentPage - 1) * pageSize;
+  const { users, loading, error, total } = useUsers(pageSize, offset);
   const [profiles, setProfiles] = useState<Record<number, UserProfileData>>({});
+  const [profilesLoading, setProfilesLoading] = useState(false);
 
   useEffect(() => {
-    if (!token || users.length === 0) return;
+    if (!token || users.length === 0) {
+      setProfiles({});
+      setProfilesLoading(false);
+      return;
+    }
 
     let canceled = false;
 
     const fetchProfiles = async () => {
+      setProfilesLoading(true);
       const data: Record<number, UserProfileData> = {};
 
       await Promise.all(
@@ -80,7 +90,10 @@ export function UserManagementPage() {
         }),
       );
 
-      if (!canceled) setProfiles(data);
+      if (!canceled) {
+        setProfiles(data);
+        setProfilesLoading(false);
+      }
     };
 
     fetchProfiles();
@@ -89,22 +102,98 @@ export function UserManagementPage() {
     };
   }, [token, users]);
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const usersWithMetrics = useMemo(
+    () =>
+      users.map((u) => {
+        const profile = profiles[u.id] ?? { enrollments: [], progress: [] };
+        const completed = profile.progress.reduce(
+          (sum, item) =>
+            sum +
+            item.completedMaterialCount +
+            item.completedAssignmentCount +
+            item.completedQuizCount,
+          0,
+        );
+        const possible = profile.progress.reduce(
+          (sum, item) =>
+            sum +
+            item.totalMaterialCount +
+            item.totalAssignmentCount +
+            item.totalQuizCount,
+          0,
+        );
+        const remaining = Math.max(0, possible - completed);
+        const percent = possible > 0 ? Math.round((completed / possible) * 100) : 0;
+        const materialCompleted = profile.progress.reduce(
+          (sum, item) => sum + item.completedMaterialCount,
+          0,
+        );
+        const materialTotal = profile.progress.reduce(
+          (sum, item) => sum + item.totalMaterialCount,
+          0,
+        );
+        const assignmentCompleted = profile.progress.reduce(
+          (sum, item) => sum + item.completedAssignmentCount,
+          0,
+        );
+        const assignmentTotal = profile.progress.reduce(
+          (sum, item) => sum + item.totalAssignmentCount,
+          0,
+        );
+        const quizCompleted = profile.progress.reduce(
+          (sum, item) => sum + item.completedQuizCount,
+          0,
+        );
+        const quizTotal = profile.progress.reduce(
+          (sum, item) => sum + item.totalQuizCount,
+          0,
+        );
+        const chartData =
+          possible <= 0
+            ? [{ name: "Empty", value: 1, color: "#E5E7EB" }]
+            : completed <= 0
+              ? [{ name: "Remaining", value: possible, color: "#E5E7EB" }]
+              : remaining <= 0
+                ? [{ name: "Completed", value: completed, color: COLORS[0] }]
+                : [
+                    { name: "Completed", value: completed, color: COLORS[0] },
+                    { name: "Remaining", value: remaining, color: COLORS[1] },
+                  ];
+
+        return {
+          user: u,
+          profile,
+          possible,
+          percent,
+          materialCompleted,
+          materialTotal,
+          assignmentCompleted,
+          assignmentTotal,
+          quizCompleted,
+          quizTotal,
+          chartData,
+        };
+      }),
+    [profiles, users],
+  );
+
   if (user?.role !== "superadmin") {
     navigate("/dashboard");
     return null;
   }
 
-  if (loading) {
+  if (loading && users.length === 0) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <Loader className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
-            <p className="text-gray-600 dark:text-gray-400">
-              Memuat data pengguna...
-            </p>
-          </div>
-        </div>
+        <UserManagementSkeleton />
       </AppLayout>
     );
   }
@@ -137,6 +226,18 @@ export function UserManagementPage() {
         </Button>
       </div>
 
+      <div className="mb-4 flex items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400">
+        <span>
+          Menampilkan {users.length} user pada halaman {currentPage} dari {totalPages}
+        </span>
+        {profilesLoading && (
+          <span className="inline-flex items-center gap-2">
+            <Loader className="h-4 w-4 animate-spin" />
+            Memproses ringkasan user...
+          </span>
+        )}
+      </div>
+
       {/* Content */}
       {users.length === 0 ? (
         <Card className="p-8 text-center">
@@ -146,64 +247,9 @@ export function UserManagementPage() {
           </p>
         </Card>
       ) : (
+        <>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {users.map((u) => {
-            const profile = profiles[u.id] ?? { enrollments: [], progress: [] };
-            const completed = profile.progress.reduce(
-              (sum, item) =>
-                sum +
-                item.completedMaterialCount +
-                item.completedAssignmentCount +
-                item.completedQuizCount,
-              0,
-            );
-            const possible = profile.progress.reduce(
-              (sum, item) =>
-                sum +
-                item.totalMaterialCount +
-                item.totalAssignmentCount +
-                item.totalQuizCount,
-              0,
-            );
-            const remaining = Math.max(0, possible - completed);
-            const percent =
-              possible > 0 ? Math.round((completed / possible) * 100) : 0;
-            const materialCompleted = profile.progress.reduce(
-              (sum, item) => sum + item.completedMaterialCount,
-              0,
-            );
-            const materialTotal = profile.progress.reduce(
-              (sum, item) => sum + item.totalMaterialCount,
-              0,
-            );
-            const assignmentCompleted = profile.progress.reduce(
-              (sum, item) => sum + item.completedAssignmentCount,
-              0,
-            );
-            const assignmentTotal = profile.progress.reduce(
-              (sum, item) => sum + item.totalAssignmentCount,
-              0,
-            );
-            const quizCompleted = profile.progress.reduce(
-              (sum, item) => sum + item.completedQuizCount,
-              0,
-            );
-            const quizTotal = profile.progress.reduce(
-              (sum, item) => sum + item.totalQuizCount,
-              0,
-            );
-            const chartData =
-              possible <= 0
-                ? [{ name: "Empty", value: 1, color: "#E5E7EB" }]
-                : completed <= 0
-                  ? [{ name: "Remaining", value: possible, color: "#E5E7EB" }]
-                  : remaining <= 0
-                    ? [{ name: "Completed", value: completed, color: COLORS[0] }]
-                    : [
-                        { name: "Completed", value: completed, color: COLORS[0] },
-                        { name: "Remaining", value: remaining, color: COLORS[1] },
-                      ];
-
+          {usersWithMetrics.map(({ user: u, profile, possible, percent, materialCompleted, materialTotal, assignmentCompleted, assignmentTotal, quizCompleted, quizTotal, chartData }) => {
             return (
               <Card
                 key={u.id}
@@ -256,7 +302,12 @@ export function UserManagementPage() {
                         Kelas yang Diikuti
                       </p>
                       <div className="mt-1.5 flex flex-col gap-2">
-                        {profile.enrollments.length > 0 ? (
+                        {!profiles[u.id] && profilesLoading ? (
+                          <div className="space-y-2">
+                            <div className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                            <div className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                          </div>
+                        ) : profile.enrollments.length > 0 ? (
                           (() => {
                             const CLASS_GRADIENTS = [
                               "from-blue-600 to-cyan-400",
@@ -316,7 +367,9 @@ export function UserManagementPage() {
                       <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                         Progress
                       </p>
-                      {possible > 0 ? (
+                      {!profiles[u.id] && profilesLoading ? (
+                        <div className="mt-2 h-5 w-48 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                      ) : possible > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
                           <p>Materi {materialCompleted}/{materialTotal} selesai</p>
                           <p>Tugas {assignmentCompleted}/{assignmentTotal} selesai</p>
@@ -332,35 +385,62 @@ export function UserManagementPage() {
 
                   {/* Right: Pie chart with percent overlay */}
                   <div className="relative shrink-0 h-24 w-24">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={chartData}
-                          dataKey="value"
-                          innerRadius={28}
-                          outerRadius={40}
-                          paddingAngle={chartData.length > 1 ? 2 : 0}
-                          startAngle={90}
-                          endAngle={-270}
-                        >
-                          {chartData.map((item) => (
-                            <Cell key={item.name} fill={item.color} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                    {/* Percent label in center */}
-                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                        {percent}%
-                      </span>
-                    </div>
+                    {!profiles[u.id] && profilesLoading ? (
+                      <div className="h-24 w-24 animate-pulse rounded-full bg-slate-100 dark:bg-slate-800" />
+                    ) : (
+                      <>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={chartData}
+                              dataKey="value"
+                              innerRadius={28}
+                              outerRadius={40}
+                              paddingAngle={chartData.length > 1 ? 2 : 0}
+                              startAngle={90}
+                              endAngle={-270}
+                            >
+                              {chartData.map((item) => (
+                                <Cell key={item.name} fill={item.color} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                            {percent}%
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>
             );
           })}
         </div>
+        <div className="mt-6 flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1 || loading}
+          >
+            Sebelumnya
+          </Button>
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            Total {total} user
+          </span>
+          <Button
+            variant="outline"
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+            }
+            disabled={currentPage >= totalPages || loading}
+          >
+            Selanjutnya
+          </Button>
+        </div>
+        </>
       )}
     </AppLayout>
   );

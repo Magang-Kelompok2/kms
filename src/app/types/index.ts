@@ -111,3 +111,14 @@ export interface UserAccess {
   quizIds: string[];
   assignmentIds: string[];
 }
+
+export interface AppNotification {
+  id_notification: number;
+  id_user: number;
+  type: "SUCCESS" | "FAILED" | "INFO";
+  status: number;
+  category: "MATERI" | "USER" | "TUGAS" | "KUIS" | null;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}

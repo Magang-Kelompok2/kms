@@ -20,6 +20,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Progress } from "../components/ui/progress";
+import { ProfileSkeleton } from "../components/PageSkeletons";
 
 type EnrollmentSummary = {
   classId: string;
@@ -71,6 +72,7 @@ export function ProfilePage() {
   const [levelCountByClass, setLevelCountByClass] = useState<Record<string, number>>(
     {},
   );
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setFormData({
@@ -230,10 +232,21 @@ export function ProfilePage() {
     };
   }, [enrollmentCards]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setIsSaving(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
     alert("Profil berhasil diperbarui!");
     setIsEditing(false);
+    setIsSaving(false);
   };
+
+  if (loading && enrollments.length === 0 && progressRows.length === 0) {
+    return (
+      <AppLayout className="max-w-6xl">
+        <ProfileSkeleton />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout className="max-w-6xl">
@@ -396,8 +409,8 @@ export function ProfilePage() {
 
               {isEditing && (
                 <div className="flex gap-3 pt-4">
-                  <Button onClick={handleSave} className="flex-1">
-                    Simpan Perubahan
+                  <Button onClick={handleSave} className="flex-1" disabled={isSaving}>
+                    {isSaving ? "Processing..." : "Simpan Perubahan"}
                   </Button>
                   <Button
                     onClick={() => {
@@ -409,6 +422,7 @@ export function ProfilePage() {
                     }}
                     variant="outline"
                     className="flex-1"
+                    disabled={isSaving}
                   >
                     Batal
                   </Button>

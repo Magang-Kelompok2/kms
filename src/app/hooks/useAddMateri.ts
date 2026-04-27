@@ -1,5 +1,6 @@
 // src/hooks/useAddMateri.ts
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 export interface VideoInput {
   title_video?: string;
@@ -30,6 +31,7 @@ interface UseAddMateriReturn {
 }
 
 export function useAddMateri(): UseAddMateriReturn {
+  const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -47,7 +49,10 @@ export function useAddMateri(): UseAddMateriReturn {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/materials`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       });
 

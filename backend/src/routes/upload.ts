@@ -5,6 +5,12 @@ import { minioClient, BUCKET } from "../lib/minio";
 import { supabase } from "../lib/supabase";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
+import { verifySupabaseToken } from "../middleware/auth";
+import {
+  buildErrorNotificationMessage,
+  buildNotificationMessage,
+  createNotificationSafe,
+} from "../lib/notifications";
 
 const router = Router();
 
@@ -38,8 +44,9 @@ async function uploadToMinio(
 // ── POST /api/upload/materi-file ──────────────────────────────────────────
 router.post(
   "/materi-file",
+  verifySupabaseToken,
   upload.single("file"),
-  async (req: Request, res: Response) => {
+  async (req: any, res: Response) => {
     const file = req.file;
     if (!file)
       return res
@@ -92,6 +99,17 @@ router.post(
           .single();
 
         if (error) throw error;
+        await createNotificationSafe({
+          userId: Number(req.user?.id_user),
+          type: "SUCCESS",
+          status: 200,
+          category: "MATERI",
+          message: buildNotificationMessage(
+            200,
+            "Berhasil",
+            `PDF ${data.title_pdf ?? file.originalname} telah ditambahkan ke materi ${materiData.title_materi ?? "materi"}`,
+          ),
+        });
         return res.json({ success: true, data: { ...data, url, objectKey } });
       } else {
         const { data, error } = await supabase
@@ -105,10 +123,34 @@ router.post(
           .single();
 
         if (error) throw error;
+        await createNotificationSafe({
+          userId: Number(req.user?.id_user),
+          type: "SUCCESS",
+          status: 200,
+          category: "MATERI",
+          message: buildNotificationMessage(
+            200,
+            "Berhasil",
+            `Video ${data.title_video ?? file.originalname} telah ditambahkan ke materi ${materiData.title_materi ?? "materi"}`,
+          ),
+        });
         return res.json({ success: true, data: { ...data, url, objectKey } });
       }
     } catch (err: any) {
       console.error("Error uploading materi file:", err);
+      if (Number.isFinite(Number(req.user?.id_user))) {
+        await createNotificationSafe({
+          userId: Number(req.user.id_user),
+          type: "FAILED",
+          status: 400,
+          category: "MATERI",
+          message: buildErrorNotificationMessage(
+            "Gagal",
+            err,
+            `Upload file materi ${file?.originalname ?? ""} gagal`,
+          ),
+        });
+      }
       return res
         .status(500)
         .json({ success: false, error: err?.message ?? "Upload gagal" });
@@ -222,6 +264,60 @@ router.post(
     }
   },
 );
+
+// ── GET /api/upload/tugas-files/:tugasId ──────────────────────────────────
+router.get("/tugas-files/:tugasId", async (req: Request, res: Response) => {
+  const tugasId = Number(req.params.tugasId);
+
+  if (isNaN(tugasId)) {
+    return res
+      .status(400)
+      .json({ success: false, error: "tugasId tidak valid" });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("tugas")
+      .select("id_tugas, path_tugas")
+      .eq("id_tugas", tugasId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!data?.path_tugas) {
+      return res.json({ success: true, data: { files: [] } });
+    }
+
+    const objectKey = String(data.path_tugas);
+    const fileName = objectKey.split("/").pop() || "File Tugas";
+    const url = await minioClient.presignedGetObject(
+      BUCKET,
+      objectKey,
+      7 * 24 * 60 * 60,
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        files: [
+          {
+            id: String(data.id_tugas),
+            name: fileName,
+            type: path.extname(fileName).replace(".", "") || "file",
+            size: 0,
+            url,
+          },
+        ],
+      },
+    });
+  } catch (err: any) {
+    console.error("Error fetching tugas files:", err);
+    return res.status(500).json({
+      success: false,
+      error: err?.message ?? "Gagal mengambil file tugas",
+    });
+  }
+});
 
 // ── GET /api/upload/signed-url ────────────────────────────────────────────
 router.get("/signed-url", async (req: Request, res: Response) => {

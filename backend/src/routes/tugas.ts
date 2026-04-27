@@ -1,5 +1,11 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
+import { verifySupabaseToken } from "../middleware/auth";
+import {
+  buildErrorNotificationMessage,
+  buildNotificationMessage,
+  createNotificationSafe,
+} from "../lib/notifications";
 
 const router = Router();
 
@@ -110,7 +116,7 @@ router.get("/:tugasId", async (req, res) => {
 });
 
 // POST /api/tugas
-router.post("/", async (req, res) => {
+router.post("/", verifySupabaseToken, async (req: any, res) => {
   const {
     nama_tugas,
     deskripsi,
@@ -148,9 +154,36 @@ router.post("/", async (req, res) => {
 
     if (error) throw error;
 
+    const category = validatedType?.toLowerCase() === "kuis" ? "KUIS" : "TUGAS";
+    await createNotificationSafe({
+      userId: Number(req.user?.id_user),
+      type: "SUCCESS",
+      status: 200,
+      category,
+      message: buildNotificationMessage(
+        200,
+        "Berhasil",
+        `${category === "KUIS" ? "Kuis" : "Tugas"} ${data.nama_tugas ?? nama_tugas} telah ditambahkan`,
+      ),
+    });
+
     res.json({ success: true, data });
   } catch (error: any) {
     console.error("Error creating tugas:", error);
+    if (Number.isFinite(Number(req.user?.id_user))) {
+      const normalizedType = String(type ?? "").toLowerCase();
+      await createNotificationSafe({
+        userId: Number(req.user.id_user),
+        type: "FAILED",
+        status: 400,
+        category: normalizedType === "kuis" ? "KUIS" : "TUGAS",
+        message: buildErrorNotificationMessage(
+          "Gagal",
+          error,
+          `Penambahan ${normalizedType === "kuis" ? "kuis" : "tugas"} ${String(nama_tugas ?? "").trim() || "baru"} gagal`,
+        ),
+      });
+    }
     res.status(500).json({
       success: false,
       error: "Failed to create tugas",
@@ -160,7 +193,7 @@ router.post("/", async (req, res) => {
 });
 
 // PUT /api/tugas/:tugasId
-router.put("/:tugasId", async (req, res) => {
+router.put("/:tugasId", verifySupabaseToken, async (req: any, res) => {
   const tugasId = Number(req.params.tugasId);
   if (isNaN(tugasId)) {
     return res
@@ -189,6 +222,19 @@ router.put("/:tugasId", async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    const category = data.type?.toLowerCase() === "kuis" ? "KUIS" : "TUGAS";
+    await createNotificationSafe({
+      userId: Number(req.user?.id_user),
+      type: "SUCCESS",
+      status: 200,
+      category,
+      message: buildNotificationMessage(
+        200,
+        "Berhasil",
+        `${category === "KUIS" ? "Kuis" : "Tugas"} ${data.nama_tugas ?? tugasId} telah diperbarui`,
+      ),
+    });
 
     const level =
       (data.materi as any)?.tingkatan?.level_urutan ??
@@ -235,6 +281,19 @@ router.put("/:tugasId", async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating tugas:", error);
+    if (Number.isFinite(Number(req.user?.id_user))) {
+      await createNotificationSafe({
+        userId: Number(req.user.id_user),
+        type: "FAILED",
+        status: 400,
+        category: "TUGAS",
+        message: buildErrorNotificationMessage(
+          "Gagal",
+          error,
+          `Pembaruan tugas ${tugasId} gagal`,
+        ),
+      });
+    }
     res.status(500).json({ success: false, error: "Failed to update tugas" });
   }
 });

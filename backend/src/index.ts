@@ -24,6 +24,7 @@ import pengumpulanRoutes from "./routes/pengumpulan"; // ← tambah ini
 import kuisRoutes from "./routes/kuis";
 import authRoutes from "./routes/auth";
 import filesRoutes from "./routes/files";
+import notificationsRoutes from "./routes/notifications";
 
 const PORT = Number(process.env.PORT ?? 4000);
 const app = express();
@@ -44,6 +45,7 @@ app.use("/api/pengumpulan", pengumpulanRoutes); // ← tambah ini
 app.use("/api/kuis", kuisRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/files", filesRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 // ─── START SERVER ─────────────────────────────────────────────────────────────
 async function start() {

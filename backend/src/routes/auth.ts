@@ -2,6 +2,10 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { supabase } from "../lib/supabase";
+import {
+  buildNotificationMessage,
+  createNotificationSafe,
+} from "../lib/notifications";
 
 const router = Router();
 
@@ -136,6 +140,18 @@ router.post("/register", async (req, res) => {
         .status(500)
         .json({ success: false, error: "Gagal membuat akun" });
     }
+
+    await createNotificationSafe({
+      userId: newUser.id_user,
+      type: "SUCCESS",
+      status: 200,
+      category: "USER",
+      message: buildNotificationMessage(
+        200,
+        "Berhasil",
+        `Akun ${newUser.username} telah dibuat`,
+      ),
+    });
 
     // Buat JWT token
     const token = jwt.sign(

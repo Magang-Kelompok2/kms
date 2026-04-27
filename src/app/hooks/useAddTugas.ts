@@ -1,5 +1,6 @@
 // src/hooks/useAddTugas.ts
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 export interface AddTugasPayload {
   nama_tugas: string;
@@ -22,6 +23,7 @@ interface UseAddTugasReturn {
 }
 
 export function useAddTugas(): UseAddTugasReturn {
+  const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -41,7 +43,10 @@ export function useAddTugas(): UseAddTugasReturn {
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tugas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(tugasPayload),
       });
 
@@ -59,7 +64,11 @@ export function useAddTugas(): UseAddTugasReturn {
 
         const uploadRes = await fetch(
           `${import.meta.env.VITE_API_URL}/api/upload/assignment-file`,
-          { method: "POST", body: formData },
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          },
         );
 
         const uploadJson = await uploadRes.json();

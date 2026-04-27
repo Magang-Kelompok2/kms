@@ -2,6 +2,11 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { supabase } from "../lib/supabase";
 import { verifySupabaseToken } from "../middleware/auth";
+import {
+  buildErrorNotificationMessage,
+  buildNotificationMessage,
+  createNotificationSafe,
+} from "../lib/notifications";
 
 const router = Router();
 const SALT_ROUNDS = 10;
@@ -570,6 +575,10 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
       id_kelas: number;
       id_tingkatan: number;
     }> = [];
+    const accessSummary: Array<{
+      className: string;
+      levelName: string;
+    }> = [];
     const progressRows: Array<{
       id_kelas: number;
       id_tingkatan: number;
@@ -612,6 +621,12 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
       }
 
       const accessibleLevels = levels.slice(0, selectedIndex + 1);
+      accessSummary.push({
+        className: kelas.nama_kelas ?? `Kelas ${access.id_kelas}`,
+        levelName:
+          levels[selectedIndex]?.nama_tingkatan ??
+          `Tingkatan ${access.id_tingkatan}`,
+      });
       expandedEnrollments.push(
         ...accessibleLevels.map((level) => ({
           id_kelas: access.id_kelas,
@@ -667,6 +682,34 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
       throw nestedError;
     }
 
+    await createNotificationSafe({
+      userId: Number(req.user?.id_user),
+      type: "SUCCESS",
+      status: 200,
+      category: "USER",
+      message: buildNotificationMessage(
+        200,
+        "Berhasil",
+        `User ${createdUser.username} telah dibuat`,
+      ),
+    });
+
+    await Promise.all(
+      accessSummary.map((access) =>
+        createNotificationSafe({
+          userId: createdUser.id_user,
+          type: "INFO",
+          status: 200,
+          category: "USER",
+          message: buildNotificationMessage(
+            200,
+            "Info",
+            `Anda telah didaftarkan ke kelas ${access.className} sampai ${access.levelName}`,
+          ),
+        }),
+      ),
+    );
+
     return res.status(201).json({
       success: true,
       data: {
@@ -680,6 +723,19 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
     });
   } catch (error) {
     console.error("Error creating user:", error);
+    if (Number.isFinite(Number(req.user?.id_user))) {
+      await createNotificationSafe({
+        userId: Number(req.user.id_user),
+        type: "FAILED",
+        status: 400,
+        category: "USER",
+        message: buildErrorNotificationMessage(
+          "Gagal",
+          error,
+          `Pembuatan user ${normalizedUsername || normalizedEmail || "baru"} gagal`,
+        ),
+      });
+    }
     return res
       .status(500)
       .json({ success: false, error: "Gagal membuat user" });

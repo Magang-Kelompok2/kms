@@ -14,8 +14,13 @@ export function useQueryCache<T>(
   options: { ttl?: number; enableCache?: boolean } = {},
 ) {
   const { ttl = 5 * 60 * 1000, enableCache = true } = options; // 5 min default
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialCache = enableCache ? queryCache.get(key) : null;
+  const [data, setData] = useState<T | null>(() =>
+    initialCache && Date.now() - initialCache.timestamp < initialCache.ttl
+      ? (initialCache.data as T)
+      : null,
+  );
+  const [loading, setLoading] = useState(() => !(initialCache && Date.now() - initialCache.timestamp < initialCache.ttl));
   const [error, setError] = useState<Error | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -29,9 +34,6 @@ export function useQueryCache<T>(
 
   // Fetch with abort support
   const fetch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
     // Return cached data if valid
     if (isCacheValid()) {
       const cached = queryCache.get(key);
@@ -39,6 +41,9 @@ export function useQueryCache<T>(
       setLoading(false);
       return;
     }
+
+    setLoading(true);
+    setError(null);
 
     try {
       abortControllerRef.current = new AbortController();

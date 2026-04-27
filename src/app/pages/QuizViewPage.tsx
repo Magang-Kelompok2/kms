@@ -207,7 +207,10 @@ export function QuizViewPage() {
         `${import.meta.env.VITE_API_URL}/api/kuis/${quizId}/submit`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({ id_user: Number(user.id), jawaban }),
         },
       );

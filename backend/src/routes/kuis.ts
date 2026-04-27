@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
 import { verifySupabaseToken, AuthenticatedRequest } from "../middleware/auth";
+import {
+  buildErrorNotificationMessage,
+  buildNotificationMessage,
+  createNotificationSafe,
+} from "../lib/notifications";
 
 const router = Router();
 const MAX_PERCOBAAN_KUIS = 5;
@@ -190,7 +195,7 @@ router.get("/:tugasId/hasil/:userId", async (req, res) => {
 });
 
 // ── POST /api/kuis/:tugasId/submit ────────────────────────────────────────
-router.post("/:tugasId/submit", async (req, res) => {
+router.post("/:tugasId/submit", verifySupabaseToken, async (req: any, res) => {
   const tugasId = Number(req.params.tugasId);
   if (isNaN(tugasId))
     return res
@@ -230,7 +235,7 @@ router.post("/:tugasId/submit", async (req, res) => {
     const skor = Math.round((benar / total) * 100);
 
     // 3. Selalu insert percobaan baru (mendukung pengerjaan ulang maks. 5×)
-    const numericUserId = Number(id_user);
+    const numericUserId = Number(req.user?.id_user ?? id_user);
     const currentState = await getQuizAttemptState(tugasId, numericUserId);
     if (currentState.totalAttempts >= MAX_PERCOBAAN_KUIS) {
       return res.status(400).json({
@@ -311,12 +316,44 @@ router.post("/:tugasId/submit", async (req, res) => {
         currentState.totalAttempts > 0 ? nextAttemptCount : 1;
     }
 
+    const { data: tugas } = await supabase
+      .from("tugas")
+      .select("nama_tugas")
+      .eq("id_tugas", tugasId)
+      .maybeSingle();
+
+    await createNotificationSafe({
+      userId: numericUserId,
+      type: "SUCCESS",
+      status: 200,
+      category: "KUIS",
+      message: buildNotificationMessage(
+        200,
+        "Berhasil",
+        `Kuis ${tugas?.nama_tugas ?? tugasId} telah dikumpulkan dengan skor ${skor}`,
+      ),
+    });
+
     res.json({
       success: true,
       data: { skor, benar, total, jumlahPercobaan: persistedAttempts },
     });
   } catch (error: any) {
     console.error("Error submitting kuis:", error);
+    const numericUserId = Number(req.user?.id_user ?? id_user);
+    if (Number.isFinite(numericUserId)) {
+      await createNotificationSafe({
+        userId: numericUserId,
+        type: "FAILED",
+        status: 400,
+        category: "KUIS",
+        message: buildErrorNotificationMessage(
+          "Gagal",
+          error,
+          `Pengumpulan kuis ${tugasId} gagal`,
+        ),
+      });
+    }
     res.status(500).json({
       success: false,
       error: "Failed to submit kuis",
@@ -339,15 +376,27 @@ router.get("/:tugasId/hasil", verifySupabaseToken, async (req: any, res) => {
   }
 
   try {
-    const { data: hasilList, error: hasilError } = await supabase
+    const limit = Math.min(Number(req.query.limit ?? 20), 100);
+    const offset = Math.max(Number(req.query.offset ?? 0), 0);
+
+    const { data: hasilList, error: hasilError, count } = await supabase
       .from("hasil_kuis")
-      .select("id_hasil, id_user, skor, benar, total, created_at")
+      .select("id_hasil, id_user, skor, benar, total, created_at", {
+        count: "exact",
+      })
       .eq("id_tugas", tugasId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (hasilError) throw hasilError;
     if (!hasilList || hasilList.length === 0)
-      return res.json({ success: true, data: [] });
+      return res.json({
+        success: true,
+        data: [],
+        total: count ?? 0,
+        limit,
+        offset,
+      });
 
     const userIds = [...new Set(hasilList.map((h) => h.id_user))];
     const { data: users, error: userError } = await supabase
@@ -370,7 +419,13 @@ router.get("/:tugasId/hasil", verifySupabaseToken, async (req: any, res) => {
       user: userMap[h.id_user] ?? null,
     }));
 
-    res.json({ success: true, data: result });
+    res.json({
+      success: true,
+      data: result,
+      total: count ?? 0,
+      limit,
+      offset,
+    });
   } catch (error: any) {
     console.error("Error fetching semua hasil:", error);
     res.status(500).json({ success: false, error: "Failed to fetch hasil" });

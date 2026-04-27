@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Material, Assignment, Quiz } from "../types";
+import { useQueryCache } from "./useQueryCache";
 
 interface Level {
   id: string;
@@ -11,32 +12,37 @@ interface Level {
 }
 
 export function useLevels(classId: string | number | undefined) {
+  const apiUrl = import.meta.env.VITE_API_URL;
   const [levels, setLevels] = useState<Level[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const fetchLevels = useCallback(async (): Promise<{ data: Level[] }> => {
+    const res = await fetch(`${apiUrl}/api/kelas/${classId}/levels`);
+    if (!res.ok) throw new Error("Gagal mengambil data tingkatan");
+    return res.json();
+  }, [apiUrl, classId]);
+
+  const { data, loading, error, refetch } = useQueryCache<{ data: Level[] }>(
+    `levels:${classId ?? "none"}`,
+    fetchLevels,
+    {
+      ttl: 5 * 60 * 1000,
+      enableCache: Boolean(classId),
+    },
+  );
 
   useEffect(() => {
-    if (!classId) return;
+    if (!classId) {
+      setLevels([]);
+      return;
+    }
 
-    const fetchLevels = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/kelas/${classId}/levels`,
-        );
-        if (!res.ok) throw new Error("Gagal mengambil data tingkatan");
-        const json = await res.json();
-        setLevels(json.data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Terjadi kesalahan");
-      } finally {
-        setLoading(false);
-      }
-    };
+    setLevels(data?.data ?? []);
+  }, [classId, data]);
 
-    fetchLevels();
-  }, [classId]);
-
-  return { levels, loading, error };
+  return {
+    levels,
+    loading: classId ? loading : false,
+    error: error?.message ?? null,
+    refetch,
+  };
 }

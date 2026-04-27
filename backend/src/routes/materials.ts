@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
 import { verifySupabaseToken } from "../middleware/auth";
+import {
+  buildErrorNotificationMessage,
+  buildNotificationMessage,
+  createNotificationSafe,
+} from "../lib/notifications";
 
 const router = Router();
 
@@ -140,7 +145,7 @@ router.get("/:materialId", async (req, res) => {
 });
 
 // POST /api/materials
-router.post("/", async (req, res) => {
+router.post("/", verifySupabaseToken, async (req: any, res) => {
   const {
     title_materi,
     deskripsi,
@@ -201,9 +206,34 @@ router.post("/", async (req, res) => {
       if (pdfError) throw pdfError;
     }
 
+    await createNotificationSafe({
+      userId: Number(req.user?.id_user),
+      type: "SUCCESS",
+      status: 200,
+      category: "MATERI",
+      message: buildNotificationMessage(
+        200,
+        "Berhasil",
+        `Materi ${materi.title_materi} telah ditambahkan`,
+      ),
+    });
+
     res.status(201).json({ success: true, data: { id_materi, ...materi } });
   } catch (error: any) {
     console.error("Error creating materi:", error);
+    if (Number.isFinite(Number(req.user?.id_user))) {
+      await createNotificationSafe({
+        userId: Number(req.user.id_user),
+        type: "FAILED",
+        status: 400,
+        category: "MATERI",
+        message: buildErrorNotificationMessage(
+          "Gagal",
+          error,
+          `Penambahan materi ${String(title_materi ?? "").trim() || "baru"} gagal`,
+        ),
+      });
+    }
     res.status(500).json({
       success: false,
       error: "Failed to create materi",
@@ -214,7 +244,7 @@ router.post("/", async (req, res) => {
 
 // PUT /api/materials/:materialId
 // Body: { title_materi?, deskripsi?, pertemuan? }
-router.put("/:materialId", async (req, res) => {
+router.put("/:materialId", verifySupabaseToken, async (req: any, res) => {
   const materialId = Number(req.params.materialId);
   if (isNaN(materialId)) {
     return res
@@ -246,6 +276,18 @@ router.put("/:materialId", async (req, res) => {
 
     if (error) throw error;
 
+    await createNotificationSafe({
+      userId: Number(req.user?.id_user),
+      type: "SUCCESS",
+      status: 200,
+      category: "MATERI",
+      message: buildNotificationMessage(
+        200,
+        "Berhasil",
+        `Materi ${data.title_materi} telah diperbarui`,
+      ),
+    });
+
     res.json({
       success: true,
       data: {
@@ -275,6 +317,19 @@ router.put("/:materialId", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Error updating material:", error);
+    if (Number.isFinite(Number(req.user?.id_user))) {
+      await createNotificationSafe({
+        userId: Number(req.user.id_user),
+        type: "FAILED",
+        status: 400,
+        category: "MATERI",
+        message: buildErrorNotificationMessage(
+          "Gagal",
+          error,
+          `Pembaruan materi ${materialId} gagal`,
+        ),
+      });
+    }
     res.status(500).json({
       success: false,
       error: "Failed to update material",

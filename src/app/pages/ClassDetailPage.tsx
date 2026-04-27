@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { UserLevelCard } from "../components/UserLevelCard";
 import { AdminLevelCard } from "../components/AdminLevelCard";
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLevels } from "../hooks/useLevels";
+import { ClassDetailSkeleton } from "../components/PageSkeletons";
 
 interface KelasData {
   id: number;
@@ -291,12 +292,23 @@ export function ClassDetailPage() {
 
   const loading = classLoading || levelsLoading;
 
+  const totalMaterials = useMemo(
+    () => levels.reduce((acc, lvl) => acc + lvl.materials.length, 0),
+    [levels],
+  );
+  const totalAssignments = useMemo(
+    () => levels.reduce((acc, lvl) => acc + lvl.assignments.length, 0),
+    [levels],
+  );
+  const totalQuizzes = useMemo(
+    () => levels.reduce((acc, lvl) => acc + lvl.quizzes.length, 0),
+    [levels],
+  );
+
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex justify-center py-24">
-          <p className="text-sm text-muted-foreground">Memuat data kelas...</p>
-        </div>
+        <ClassDetailSkeleton />
       </AppLayout>
     );
   }
@@ -321,16 +333,6 @@ export function ClassDetailPage() {
       </AppLayout>
     );
   }
-
-  const totalMaterials = levels.reduce(
-    (acc, lvl) => acc + lvl.materials.length,
-    0,
-  );
-  const totalAssignments = levels.reduce(
-    (acc, lvl) => acc + lvl.assignments.length,
-    0,
-  );
-  const totalQuizzes = levels.reduce((acc, lvl) => acc + lvl.quizzes.length, 0);
 
   const userProgress = classProgress.progressPercent;
 

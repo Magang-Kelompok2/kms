@@ -3,15 +3,21 @@ import { supabase } from "../lib/supabase";
 const API_BASE =
   process.env.VITE_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
 import { verifySupabaseToken, AuthenticatedRequest } from "../middleware/auth";
+import {
+  buildErrorNotificationMessage,
+  buildNotificationMessage,
+  createNotificationSafe,
+} from "../lib/notifications";
 
 const router = Router();
 
 // POST /api/pengumpulan
 // Body: { id_tugas, id_user, answer?, id_file? }
-router.post("/", async (req, res) => {
+router.post("/", verifySupabaseToken, async (req: any, res) => {
   const { id_tugas, id_user, answer, id_file } = req.body;
+  const actingUserId = Number(req.user?.id_user ?? id_user);
 
-  if (!id_tugas || !id_user) {
+  if (!id_tugas || !actingUserId) {
     return res.status(400).json({
       success: false,
       error: "id_tugas dan id_user wajib diisi",
@@ -36,15 +42,46 @@ router.post("/", async (req, res) => {
     const { error: userPengumpulanError } = await supabase
       .from("user_pengumpulan")
       .insert({
-        id_user: Number(id_user),
+        id_user: actingUserId,
         id_pengumpulan: pengumpulan.id_pengumpulan,
       });
 
     if (userPengumpulanError) throw userPengumpulanError;
 
+    const { data: tugas } = await supabase
+      .from("tugas")
+      .select("nama_tugas")
+      .eq("id_tugas", Number(id_tugas))
+      .maybeSingle();
+
+    await createNotificationSafe({
+      userId: actingUserId,
+      type: "SUCCESS",
+      status: 200,
+      category: "TUGAS",
+      message: buildNotificationMessage(
+        200,
+        "Berhasil",
+        `Pengumpulan tugas ${tugas?.nama_tugas ?? id_tugas} telah dikirim`,
+      ),
+    });
+
     res.status(201).json({ success: true, data: pengumpulan });
   } catch (error: any) {
     console.error("Error creating pengumpulan:", error);
+    if (Number.isFinite(actingUserId)) {
+      await createNotificationSafe({
+        userId: actingUserId,
+        type: "FAILED",
+        status: 400,
+        category: "TUGAS",
+        message: buildErrorNotificationMessage(
+          "Gagal",
+          error,
+          `Pengumpulan tugas ${id_tugas ?? ""} gagal`,
+        ),
+      });
+    }
     res.status(500).json({
       success: false,
       error: "Failed to submit pengumpulan",
@@ -68,16 +105,21 @@ router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
   }
 
   try {
-    const { data, error } = await supabase
+    const limit = Math.min(Number(req.query.limit ?? 20), 100);
+    const offset = Math.max(Number(req.query.offset ?? 0), 0);
+
+    const { data, error, count } = await supabase
       .from("pengumpulan")
       .select(
         `id_pengumpulan, answer, created_at,
          id_file,
          file_pengumpulan(original_filename, ukuran_file, object_key),
          user_pengumpulan(id_user, user(username, email))`,
+        { count: "exact" },
       )
       .eq("id_tugas", tugasId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
@@ -100,7 +142,13 @@ router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
       };
     });
 
-    res.json({ success: true, data: enriched });
+    res.json({
+      success: true,
+      data: enriched,
+      total: count ?? 0,
+      limit,
+      offset,
+    });
   } catch (error: any) {
     console.error("Error fetching pengumpulan:", error);
     res
@@ -177,7 +225,10 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
   }
 
   try {
-    const { data, error } = await supabase
+    const limit = Math.min(Number(req.query.limit ?? 12), 100);
+    const offset = Math.max(Number(req.query.offset ?? 0), 0);
+
+    const { data, error, count } = await supabase
       .from("user_pengumpulan")
       .select(
         `id_pengumpulan, created_at,
@@ -185,9 +236,11 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
            tugas(id_tugas, nama_tugas, id_kelas, type),
            file_pengumpulan(original_filename, ukuran_file, object_key)
          )`,
+        { count: "exact" },
       )
       .eq("id_user", userId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
@@ -216,7 +269,13 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
       }),
     );
 
-    res.json({ success: true, data: submissions });
+    res.json({
+      success: true,
+      data: submissions,
+      total: count ?? 0,
+      limit,
+      offset,
+    });
   } catch (error: any) {
     console.error("Error fetching user pengumpulan:", error);
     res

@@ -30,8 +30,6 @@ export function AssignmentViewPage() {
   const [submissionData, setSubmissionData] = useState<any>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewFileName, setPreviewFileName] = useState<string>("");
-  const [previewDownloadPath, setPreviewDownloadPath] = useState<string | null>(null);
-
   const [assignment, setAssignment] = useState<AssignmentType | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(true);
   const [progressLoading, setProgressLoading] = useState(true);
@@ -269,7 +267,11 @@ export function AssignmentViewPage() {
 
         const uploadRes = await fetch(
           `${import.meta.env.VITE_API_URL}/api/upload/tugas-file`,
-          { method: "POST", body: formData },
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          },
         );
         const uploadJson = await uploadRes.json();
         if (!uploadJson.success) throw new Error(`Gagal upload: ${file.name}`);
@@ -279,7 +281,10 @@ export function AssignmentViewPage() {
           `${import.meta.env.VITE_API_URL}/api/pengumpulan`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
             body: JSON.stringify({
               id_tugas: Number(assignmentId),
               id_user: Number(user?.id),
@@ -526,7 +531,6 @@ export function AssignmentViewPage() {
                         const fileName = assignment.file_path!.split("/").pop()?.split("?")[0] || "File Tugas";
                         setPreviewFileName(fileName);
                         setPreviewUrl(assignmentFileUrl);
-                        setPreviewDownloadPath(assignment.file_path ?? null);
                       }}
                     >
                       <Eye className="h-4 w-4 mr-1.5" />

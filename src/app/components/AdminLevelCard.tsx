@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "./ui/card";
-import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { ChevronDown, ChevronUp, Plus, BookOpen, ClipboardCheck, HelpCircle } from "lucide-react";
 import type { Assignment, Quiz, Material } from "../types";

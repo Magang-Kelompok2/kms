@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from "react-router";
-import { useAuth } from "../context/AuthContext";
 import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { ClassAssignmentsSkeleton } from "../components/PageSkeletons";
 import {
   ArrowLeft,
   File,
@@ -13,7 +13,15 @@ import {
   ChevronUp,
   Loader2,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+interface AssignmentFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+}
 
 interface TugasWithFiles {
   id: string;
@@ -21,8 +29,9 @@ interface TugasWithFiles {
   description: string;
   dueDate: string;
   meetingNumber: number;
-  files: any[];
+  files: AssignmentFile[];
   filesLoading?: boolean;
+  filesLoaded?: boolean;
   filesError?: string | null;
 }
 
@@ -31,28 +40,92 @@ interface PertemuanGroup {
   tugas: TugasWithFiles[];
 }
 
+const PAGE_SIZE = 24;
+
 export function ClassAssignmentsPage() {
   const { classId } = useParams();
-  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const [allTugas, setAllTugas] = useState<TugasWithFiles[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedPertemuan, setExpandedPertemuan] = useState<Set<number>>(
-    new Set([1]),
+    new Set(),
   );
+  const [currentPage, setCurrentPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
-  // Fetch semua tugas untuk class ini
+  const offset = (currentPage - 1) * PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const fetchTugasFiles = useCallback(async (tugasId: string) => {
+    setAllTugas((prev) =>
+      prev.map((t) =>
+        t.id === tugasId && !t.filesLoaded
+          ? { ...t, filesLoading: true, filesError: null }
+          : t,
+      ),
+    );
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/upload/tugas-files/${tugasId}`,
+      );
+
+      let files: AssignmentFile[] = [];
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data?.files) {
+          files = json.data.files;
+        }
+      }
+
+      setAllTugas((prev) =>
+        prev.map((t) =>
+          t.id === tugasId
+            ? {
+                ...t,
+                files,
+                filesLoaded: true,
+                filesLoading: false,
+                filesError: null,
+              }
+            : t,
+        ),
+      );
+    } catch (err) {
+      setAllTugas((prev) =>
+        prev.map((t) =>
+          t.id === tugasId
+            ? {
+                ...t,
+                filesLoaded: true,
+                filesLoading: false,
+                filesError: err instanceof Error ? err.message : "Error",
+              }
+            : t,
+        ),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [classId]);
+
   useEffect(() => {
     if (!classId) return;
 
-    const fetchAllTugas = async () => {
-      setLoading(true);
+    const fetchPage = async () => {
+      if (loading) setLoading(true);
+      else setPageLoading(true);
+
       setError(null);
+
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/tugas?classId=${classId}&limit=100`,
+          `${import.meta.env.VITE_API_URL}/api/tugas?classId=${classId}&limit=${PAGE_SIZE}&offset=${offset}`,
         );
         if (!res.ok) throw new Error("Gagal mengambil data tugas");
         const json = await res.json();
@@ -64,103 +137,73 @@ export function ClassAssignmentsPage() {
           description: t.deskripsi ?? "",
           dueDate: t.deadline ?? t.created_at,
           meetingNumber: t.pertemuan,
-          type: t.type ?? "",
           files: [],
-          filesLoading: true,
+          filesLoading: false,
+          filesLoaded: false,
           filesError: null,
         }));
 
         setAllTugas(tugasData);
+        setTotal(json.total ?? tugasData.length);
 
-        // Fetch files untuk setiap tugas secara parallel
-        await Promise.all(
-          tugasData.map((tugas) => fetchTugasFiles(tugas.id, tugasData)),
+        const firstMeeting = tugasData[0]?.meetingNumber;
+        setExpandedPertemuan(
+          firstMeeting ? new Set([firstMeeting]) : new Set<number>(),
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
       } finally {
         setLoading(false);
+        setPageLoading(false);
       }
     };
 
-    fetchAllTugas();
-  }, [classId]);
+    fetchPage();
+  }, [classId, offset]);
 
-  // Fetch files untuk satu tugas
-  const fetchTugasFiles = async (
-    tugasId: string,
-    tugasArray: TugasWithFiles[],
-  ) => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/upload/tugas-files/${tugasId}`,
-      );
+  const pertemuanGroups = useMemo<PertemuanGroup[]>(() => {
+    const pertemuanMap = new Map<number, TugasWithFiles[]>();
 
-      let files: any[] = [];
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data?.files) {
-          files = json.data.files;
-        }
+    for (const tugas of allTugas) {
+      const meeting = tugas.meetingNumber;
+      if (!pertemuanMap.has(meeting)) {
+        pertemuanMap.set(meeting, []);
       }
-
-      // Update state untuk tugas ini
-      setAllTugas((prev) =>
-        prev.map((t) =>
-          t.id === tugasId
-            ? { ...t, files, filesLoading: false, filesError: null }
-            : t,
-        ),
-      );
-    } catch (err) {
-      setAllTugas((prev) =>
-        prev.map((t) =>
-          t.id === tugasId
-            ? {
-                ...t,
-                filesLoading: false,
-                filesError: err instanceof Error ? err.message : "Error",
-              }
-            : t,
-        ),
-      );
+      pertemuanMap.get(meeting)?.push(tugas);
     }
-  };
 
-  // Group tugas by pertemuan
-  const pertemuanGroups: PertemuanGroup[] = [];
-  const pertemuanMap = new Map<number, TugasWithFiles[]>();
+    return Array.from(pertemuanMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([meetingNumber, tugas]) => ({ meetingNumber, tugas }));
+  }, [allTugas]);
 
-  allTugas.forEach((tugas) => {
-    const meeting = tugas.meetingNumber;
-    if (!pertemuanMap.has(meeting)) {
-      pertemuanMap.set(meeting, []);
-    }
-    pertemuanMap.get(meeting)!.push(tugas);
-  });
+  useEffect(() => {
+    const visibleTaskIds = pertemuanGroups
+      .filter((group) => expandedPertemuan.has(group.meetingNumber))
+      .flatMap((group) =>
+        group.tugas
+          .filter((tugas) => !tugas.filesLoaded && !tugas.filesLoading)
+          .map((tugas) => tugas.id),
+      );
 
-  Array.from(pertemuanMap.entries())
-    .sort((a, b) => a[0] - b[0])
-    .forEach(([meeting, tugas]) => {
-      pertemuanGroups.push({ meetingNumber: meeting, tugas });
+    visibleTaskIds.forEach((taskId) => {
+      void fetchTugasFiles(taskId);
     });
+  }, [expandedPertemuan, fetchTugasFiles, pertemuanGroups]);
 
   const togglePertemuan = (meetingNumber: number) => {
-    const newExpanded = new Set(expandedPertemuan);
-    if (newExpanded.has(meetingNumber)) {
-      newExpanded.delete(meetingNumber);
-    } else {
-      newExpanded.add(meetingNumber);
-    }
-    setExpandedPertemuan(newExpanded);
+    setExpandedPertemuan((prev) => {
+      const next = new Set(prev);
+      if (next.has(meetingNumber)) next.delete(meetingNumber);
+      else next.add(meetingNumber);
+      return next;
+    });
   };
 
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <ClassAssignmentsSkeleton />
       </AppLayout>
     );
   }
@@ -191,10 +234,21 @@ export function ClassAssignmentsPage() {
       </Button>
 
       <Card className="p-6 mb-6">
-        <h1 className="text-3xl font-bold">Daftar Tugas</h1>
-        <p className="text-muted-foreground mt-2">
-          {allTugas.length} tugas di {pertemuanGroups.length} pertemuan
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Daftar Tugas</h1>
+            <p className="text-muted-foreground mt-2">
+              {total} tugas, menampilkan {allTugas.length} item di halaman{" "}
+              {currentPage}
+            </p>
+          </div>
+          {pageLoading && (
+            <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Memuat halaman...
+            </div>
+          )}
+        </div>
       </Card>
 
       <div className="space-y-4">
@@ -205,7 +259,6 @@ export function ClassAssignmentsPage() {
         ) : (
           pertemuanGroups.map((pertemuan) => (
             <Card key={pertemuan.meetingNumber} className="overflow-hidden">
-              {/* Header Pertemuan */}
               <button
                 onClick={() => togglePertemuan(pertemuan.meetingNumber)}
                 className="w-full p-6 flex items-center justify-between hover:bg-muted/50 transition-colors"
@@ -227,12 +280,10 @@ export function ClassAssignmentsPage() {
                 )}
               </button>
 
-              {/* Daftar Tugas */}
               {expandedPertemuan.has(pertemuan.meetingNumber) && (
                 <div className="border-t divide-y">
                   {pertemuan.tugas.map((tugas) => (
                     <div key={tugas.id} className="p-6">
-                      {/* Judul Tugas */}
                       <div className="mb-4">
                         <h3 className="text-lg font-bold mb-2">
                           {tugas.title}
@@ -250,7 +301,6 @@ export function ClassAssignmentsPage() {
                         )}
                       </div>
 
-                      {/* Files Section */}
                       <div className="ml-4 mt-4 pt-4 border-t">
                         <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
                           <File className="h-4 w-4" />
@@ -258,9 +308,15 @@ export function ClassAssignmentsPage() {
                         </h4>
 
                         {tugas.filesLoading ? (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Memuat file...
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Memuat file...
+                            </div>
+                            <div className="space-y-2">
+                              <div className="h-16 rounded-lg bg-muted animate-pulse" />
+                              <div className="h-16 rounded-lg bg-muted animate-pulse" />
+                            </div>
                           </div>
                         ) : tugas.filesError ? (
                           <p className="text-sm text-muted-foreground">
@@ -321,7 +377,6 @@ export function ClassAssignmentsPage() {
                         )}
                       </div>
 
-                      {/* Button untuk lihat detail tugas */}
                       <div className="mt-4">
                         <Button
                           variant="outline"
@@ -339,6 +394,30 @@ export function ClassAssignmentsPage() {
           ))
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1 || pageLoading}
+          >
+            Sebelumnya
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Halaman {currentPage} dari {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+            }
+            disabled={currentPage >= totalPages || pageLoading}
+          >
+            Selanjutnya
+          </Button>
+        </div>
+      )}
     </AppLayout>
   );
 }

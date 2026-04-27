@@ -201,7 +201,6 @@ export function UserLevelCard({
             <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
               {itemsByTab[activeTab].length > 0 ? (
                 itemsByTab[activeTab].map((item) => {
-                  const Icon = typeIcon[item.type];
                   return (
                     <div
                       id={item.id}

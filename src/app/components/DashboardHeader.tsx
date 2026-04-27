@@ -1,8 +1,9 @@
-import { Bell, User, Moon, Sun, LogOut } from "lucide-react";
+import { User, Moon, Sun, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
 import { Button } from "./ui/button";
+import { NotificationButton } from "./NotificationButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,9 +77,7 @@ export function DashboardHeader() {
             )}
           </Button>
 
-          <Button variant="ghost" size="icon" aria-label="Notifications">
-            <Bell className="h-5 w-5" />
-          </Button>
+          <NotificationButton />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

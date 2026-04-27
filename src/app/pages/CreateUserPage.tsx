@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { ArrowLeft, Plus, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Plus, Trash2, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 
 type SelectedAccess = {
   classId: string;
@@ -106,8 +107,16 @@ export function CreateUserPage() {
         throw new Error(json.error ?? "Gagal membuat user");
       }
 
-      alert(
-        "User berhasil dibuat. Pada tiap kelas, semua tingkatan sampai level yang dipilih ikut terbuka.",
+      toast.custom(
+        () => (
+          <div className="flex w-[360px] items-center gap-2.5 rounded-xl border border-border bg-background px-4 py-3 shadow-lg">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <p className="line-clamp-1 text-sm text-foreground">
+              User {formData.name} telah dibuat
+            </p>
+          </div>
+        ),
+        { duration: 3500 },
       );
       navigate("/users");
     } catch (error) {

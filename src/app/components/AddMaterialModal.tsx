@@ -11,6 +11,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useUpload } from "../hooks/useUpload";
+import { useAuth } from "../context/AuthContext";
 
 interface AddMaterialModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export function AddMaterialModal({
   level,
   onAdd,
 }: AddMaterialModalProps) {
+  const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [meetingNumber, setMeetingNumber] = useState("");
@@ -127,7 +129,10 @@ export function AddMaterialModal({
       setUploadProgress("Menyimpan materi...");
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/materials`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           title_materi: title,
           deskripsi: description,

@@ -10,17 +10,17 @@ import {
   Plus,
   Eye,
   Search,
-  Layers,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useClasses } from "../hooks/useClasses";
 import { useMateri } from "../hooks/useMateri";
 import { useTugas } from "../hooks/useTugas";
 import { useUsers } from "../hooks/useUsers";
+import { DashboardSkeleton } from "../components/PageSkeletons";
 
 // ─── Gradient KPI Card ─────────────────────────────────────────────────────────
 interface GradientStatCardProps {
@@ -89,18 +89,41 @@ export function DashboardPage() {
   const { classes, loading: classesLoading } = useClasses();
   const { materi, loading: materiLoading } = useMateri();
   const { tugas, loading: tugasLoading } = useTugas();
-  const { users, loading: usersLoading, deleteUser } = useUsers();
+  const { users, loading: usersLoading, deleteUser, total } = useUsers(10, 0);
 
-  const penugasan = tugas.filter((t) => t.type !== "Kuis");
-  const kuis = tugas.filter((t) => t.type === "Kuis");
+  const penugasan = useMemo(
+    () => tugas.filter((t) => t.type !== "Kuis"),
+    [tugas],
+  );
+  const kuis = useMemo(() => tugas.filter((t) => t.type === "Kuis"), [tugas]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
 
   const [progressByClass, setProgressByClass] = useState<
     Record<string, number>
   >({});
+
+  const tugasByClass = useMemo(() => {
+    const stats = new Map<number, { materi: number; tugas: number; kuis: number }>();
+
+    for (const item of materi) {
+      const current = stats.get(item.id_kelas) ?? { materi: 0, tugas: 0, kuis: 0 };
+      current.materi += 1;
+      stats.set(item.id_kelas, current);
+    }
+
+    for (const item of tugas) {
+      const current = stats.get(item.id_kelas) ?? { materi: 0, tugas: 0, kuis: 0 };
+      if (item.type === "Kuis") current.kuis += 1;
+      else current.tugas += 1;
+      stats.set(item.id_kelas, current);
+    }
+
+    return stats;
+  }, [materi, tugas]);
 
   useEffect(() => {
     if (!user?.id || user.role === "superadmin" || !token) return;
@@ -126,22 +149,46 @@ export function DashboardPage() {
       return;
     }
     if (confirm("Apakah Anda yakin ingin menghapus pengguna ini?")) {
+      setDeletingUserId(userId);
       const success = await deleteUser(userId);
+      setDeletingUserId(null);
       if (success) alert("Pengguna berhasil dihapus!");
       else alert("Gagal menghapus pengguna.");
     }
   };
 
-  const filteredUsers = users.filter(
-    (u) =>
-      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filteredUsers = useMemo(
+    () =>
+      users.filter(
+        (u) =>
+          u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          u.email.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
+    [searchQuery, users],
   );
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const currentUsers = filteredUsers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
+  const currentUsers = useMemo(
+    () =>
+      filteredUsers.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage,
+      ),
+    [currentPage, filteredUsers],
   );
+  const latestMateri = useMemo(() => materi.slice(0, 5), [materi]);
+  const isInitialLoading =
+    classesLoading ||
+    materiLoading ||
+    tugasLoading ||
+    (user?.role === "superadmin" && usersLoading && users.length === 0);
+
+  if (isInitialLoading) {
+    return (
+      <AppLayout>
+        <DashboardSkeleton showUserTable={user?.role === "superadmin"} />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -204,32 +251,26 @@ export function DashboardPage() {
           Kelas Anda
         </h2>
 
-        {classesLoading ? (
-          <p className="text-sm text-muted-foreground">Memuat kelas...</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {classes.map((cls) => {
-              const kelasMateri = materi.filter((m) => m.id_kelas === cls.id);
-              const kelasTugas = tugas.filter(
-                (t) => t.id_kelas === cls.id && t.type === "Tugas",
-              );
-              const kelasKuis = tugas.filter(
-                (t) => t.id_kelas === cls.id && t.type === "Kuis",
-              );
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {classes.map((cls) => {
+            const classStats = tugasByClass.get(cls.id) ?? {
+              materi: 0,
+              tugas: 0,
+              kuis: 0,
+            };
+            const userProgress =
+              user?.role !== "superadmin"
+                ? (progressByClass[String(cls.id)] ?? 0)
+                : 0;
 
-              const userProgress =
-                user?.role !== "superadmin"
-                  ? (progressByClass[String(cls.id)] ?? 0)
-                  : 0;
+            const classImage = getClassImage(cls.name);
 
-              const classImage = getClassImage(cls.name);
-
-              return (
-                <Card
-                  key={cls.id}
-                  className="cursor-pointer overflow-hidden transition-all hover:shadow-xl hover:scale-105 border-0 shadow-lg"
-                  onClick={() => navigate(`/class/${cls.id}`)}
-                >
+            return (
+              <Card
+                key={cls.id}
+                className="cursor-pointer overflow-hidden transition-all hover:shadow-xl hover:scale-105 border-0 shadow-lg"
+                onClick={() => navigate(`/class/${cls.id}`)}
+              >
                   {/* ── Area Gambar dengan Overlay Gradient ── */}
                   <div className="relative h-52 w-full overflow-hidden">
                     <img
@@ -251,13 +292,13 @@ export function DashboardPage() {
                   <CardContent className="pt-4">
                     <div className="mb-4 flex gap-3 text-sm flex-wrap">
                       <span className="text-sm font-semibold text-foreground border border-border rounded-full px-3 py-1">
-                        {kelasMateri.length} Materi
+                        {classStats.materi} Materi
                       </span>
                       <span className="text-sm font-semibold text-foreground border border-border rounded-full px-3 py-1">
-                        {kelasTugas.length} Tugas
+                        {classStats.tugas} Tugas
                       </span>
                       <span className="text-sm font-semibold text-foreground border border-border rounded-full px-3 py-1">
-                        {kelasKuis.length} Kuis
+                        {classStats.kuis} Kuis
                       </span>
                     </div>
                     <p className="mb-4 text-xs text-muted-foreground">
@@ -285,10 +326,9 @@ export function DashboardPage() {
                     )}
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Manajemen Pengguna (Superadmin) ── */}
@@ -393,8 +433,12 @@ export function DashboardPage() {
                                   e.stopPropagation();
                                   handleDeleteUser(u.id, u.role);
                                 }}
+                                disabled={deletingUserId === u.id}
                               >
                                 <Trash2 className="size-4" />
+                                <span className="ml-1">
+                                  {deletingUserId === u.id ? "Processing..." : ""}
+                                </span>
                               </Button>
                             )}
                           </div>
@@ -416,6 +460,7 @@ export function DashboardPage() {
               </Button>
               <div className="text-sm text-muted-foreground">
                 Halaman {currentPage} dari {Math.max(totalPages, 1)}
+                {total > 0 ? ` • ${total} user` : ""}
               </div>
               <Button
                 size="sm"
@@ -440,7 +485,7 @@ export function DashboardPage() {
           </h2>
 
           <div className="grid gap-3">
-            {materi.slice(0, 5).map((m) => {
+            {latestMateri.map((m) => {
               const cls = classes.find((c) => c.id === m.id_kelas);
               const classImage = cls ? getClassImage(cls.name) : "/akuntansi.jpg";
 
