@@ -12,6 +12,77 @@ import { UserManagementSkeleton } from "../components/PageSkeletons";
 
 const COLORS = ["#22C55E", "#E5E7EB"];
 
+type ClassPalette = {
+  gradient: string;
+  chip: string;
+};
+
+const CLASS_PALETTES: ClassPalette[] = [
+  {
+    gradient: "from-blue-600 to-cyan-400",
+    chip: "bg-white/25",
+  },
+  {
+    gradient: "from-emerald-600 to-teal-400",
+    chip: "bg-white/20",
+  },
+  {
+    gradient: "from-indigo-600 to-violet-500",
+    chip: "bg-white/20",
+  },
+  {
+    gradient: "from-amber-500 to-orange-500",
+    chip: "bg-black/10",
+  },
+  {
+    gradient: "from-rose-500 to-pink-500",
+    chip: "bg-white/20",
+  },
+  {
+    gradient: "from-sky-700 to-blue-500",
+    chip: "bg-white/20",
+  },
+];
+
+const KNOWN_CLASS_PALETTES: Record<string, ClassPalette> = {
+  perpajakan: {
+    gradient: "from-blue-600 to-cyan-400",
+    chip: "bg-white/25",
+  },
+  audit: {
+    gradient: "from-emerald-600 to-teal-400",
+    chip: "bg-white/20",
+  },
+  akuntansi: {
+    gradient: "from-indigo-600 to-violet-500",
+    chip: "bg-white/20",
+  },
+};
+
+const normalizeClassKey = (value: string) => value.trim().toLowerCase();
+
+const hashString = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+};
+
+const getClassPalette = (classId: string, className: string): ClassPalette => {
+  const normalizedName = normalizeClassKey(className);
+
+  for (const [knownName, palette] of Object.entries(KNOWN_CLASS_PALETTES)) {
+    if (normalizedName.includes(knownName)) {
+      return palette;
+    }
+  }
+
+  const paletteIndex =
+    hashString(`${classId}:${normalizedName}`) % CLASS_PALETTES.length;
+  return CLASS_PALETTES[paletteIndex];
+};
+
 type EnrollmentSummary = {
   classId: string;
   className: string;
@@ -309,12 +380,6 @@ export function UserManagementPage() {
                           </div>
                         ) : profile.enrollments.length > 0 ? (
                           (() => {
-                            const CLASS_GRADIENTS = [
-                              "from-blue-600 to-cyan-400",
-                              "from-cyan-500 to-teal-400",
-                              "from-indigo-600 to-purple-500",
-                              "from-blue-700 to-indigo-500",
-                            ];
                             const grouped = profile.enrollments.reduce(
                               (acc, e) => {
                                 if (!acc[e.classId])
@@ -333,26 +398,33 @@ export function UserManagementPage() {
                               >,
                             );
                             return Object.entries(grouped).map(
-                              ([classId, { className, tingkatans }], idx) => (
-                                <div
-                                  key={classId}
-                                  className={`rounded-xl bg-linear-to-r ${CLASS_GRADIENTS[idx % CLASS_GRADIENTS.length]} px-3 py-2 text-white`}
-                                >
-                                  <p className="text-xs font-bold mb-1.5 tracking-wide">
-                                    {className}
-                                  </p>
-                                  <div className="flex flex-wrap gap-1">
-                                    {tingkatans.map((t) => (
-                                      <span
-                                        key={t}
-                                        className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-medium"
-                                      >
-                                        {t}
-                                      </span>
-                                    ))}
+                              ([classId, { className, tingkatans }]) => {
+                                const palette = getClassPalette(
+                                  classId,
+                                  className,
+                                );
+
+                                return (
+                                  <div
+                                    key={classId}
+                                    className={`rounded-xl bg-linear-to-r ${palette.gradient} px-3 py-2 text-white`}
+                                  >
+                                    <p className="text-xs font-bold mb-1.5 tracking-wide">
+                                      {className}
+                                    </p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {tingkatans.map((t) => (
+                                        <span
+                                          key={t}
+                                          className={`rounded-full ${palette.chip} px-2 py-0.5 text-xs font-medium`}
+                                        >
+                                          {t}
+                                        </span>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              ),
+                                );
+                              },
                             );
                           })()
                         ) : (
