@@ -4,84 +4,13 @@ import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { Users, Plus, TrendingUp, Loader, Search } from "lucide-react";
+import { Users, Plus, TrendingUp, Loader, ChevronDown } from "lucide-react";
 import { useUsers } from "../hooks/useUsers";
-import { useState, useEffect, useMemo } from "react";
+import { useClasses } from "../hooks/useClasses";
+import { useState, useEffect } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { UserManagementSkeleton } from "../components/PageSkeletons";
 
 const COLORS = ["#22C55E", "#E5E7EB"];
-
-type ClassPalette = {
-  gradient: string;
-  chip: string;
-};
-
-const CLASS_PALETTES: ClassPalette[] = [
-  {
-    gradient: "from-blue-600 to-cyan-400",
-    chip: "bg-white/25",
-  },
-  {
-    gradient: "from-emerald-600 to-teal-400",
-    chip: "bg-white/20",
-  },
-  {
-    gradient: "from-indigo-600 to-violet-500",
-    chip: "bg-white/20",
-  },
-  {
-    gradient: "from-amber-500 to-orange-500",
-    chip: "bg-black/10",
-  },
-  {
-    gradient: "from-rose-500 to-pink-500",
-    chip: "bg-white/20",
-  },
-  {
-    gradient: "from-sky-700 to-blue-500",
-    chip: "bg-white/20",
-  },
-];
-
-const KNOWN_CLASS_PALETTES: Record<string, ClassPalette> = {
-  perpajakan: {
-    gradient: "from-blue-600 to-cyan-400",
-    chip: "bg-white/25",
-  },
-  audit: {
-    gradient: "from-emerald-600 to-teal-400",
-    chip: "bg-white/20",
-  },
-  akuntansi: {
-    gradient: "from-indigo-600 to-violet-500",
-    chip: "bg-white/20",
-  },
-};
-
-const normalizeClassKey = (value: string) => value.trim().toLowerCase();
-
-const hashString = (value: string) => {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash;
-};
-
-const getClassPalette = (classId: string, className: string): ClassPalette => {
-  const normalizedName = normalizeClassKey(className);
-
-  for (const [knownName, palette] of Object.entries(KNOWN_CLASS_PALETTES)) {
-    if (normalizedName.includes(knownName)) {
-      return palette;
-    }
-  }
-
-  const paletteIndex =
-    hashString(`${classId}:${normalizedName}`) % CLASS_PALETTES.length;
-  return CLASS_PALETTES[paletteIndex];
-};
 
 type EnrollmentSummary = {
   classId: string;
@@ -105,32 +34,21 @@ type UserProfileData = {
   progress: ProgressSummary[];
 };
 
-const CLASS_FILTERS = ["Semua", "Akuntansi", "Audit", "Perpajakan"] as const;
-type ClassFilter = (typeof CLASS_FILTERS)[number];
-
 export function UserManagementPage() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 12;
-  const offset = (currentPage - 1) * pageSize;
-  const { users, loading, error, total } = useUsers(pageSize, offset);
+  const { users, loading, error } = useUsers(100);
+  const { classes } = useClasses();
   const [profiles, setProfiles] = useState<Record<number, UserProfileData>>({});
-  const [profilesLoading, setProfilesLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [classFilter, setClassFilter] = useState<ClassFilter>("Semua");
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [showClassDropdown, setShowClassDropdown] = useState(false);
 
   useEffect(() => {
-    if (!token || users.length === 0) {
-      setProfiles({});
-      setProfilesLoading(false);
-      return;
-    }
+    if (!token || users.length === 0) return;
 
     let canceled = false;
 
     const fetchProfiles = async () => {
-      setProfilesLoading(true);
       const data: Record<number, UserProfileData> = {};
 
       await Promise.all(
@@ -166,10 +84,7 @@ export function UserManagementPage() {
         }),
       );
 
-      if (!canceled) {
-        setProfiles(data);
-        setProfilesLoading(false);
-      }
+      if (!canceled) setProfiles(data);
     };
 
     fetchProfiles();
@@ -178,115 +93,22 @@ export function UserManagementPage() {
     };
   }, [token, users]);
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const usersWithMetrics = useMemo(
-    () =>
-      users
-        .filter((u) => {
-          const q = searchQuery.trim().toLowerCase();
-          if (q && !u.username.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) {
-            return false;
-          }
-          if (classFilter !== "Semua") {
-            const profile = profiles[u.id];
-            // Jika profil belum dimuat dan masih loading, sembunyikan dulu
-            if (!profile) return !profilesLoading;
-            const hasClass = profile.enrollments.some((e) =>
-              e.className.toLowerCase().includes(classFilter.toLowerCase()),
-            );
-            if (!hasClass) return false;
-          }
-          return true;
-        })
-        .map((u) => {
-        const profile = profiles[u.id] ?? { enrollments: [], progress: [] };
-        const completed = profile.progress.reduce(
-          (sum, item) =>
-            sum +
-            item.completedMaterialCount +
-            item.completedAssignmentCount +
-            item.completedQuizCount,
-          0,
-        );
-        const possible = profile.progress.reduce(
-          (sum, item) =>
-            sum +
-            item.totalMaterialCount +
-            item.totalAssignmentCount +
-            item.totalQuizCount,
-          0,
-        );
-        const remaining = Math.max(0, possible - completed);
-        const percent = possible > 0 ? Math.round((completed / possible) * 100) : 0;
-        const materialCompleted = profile.progress.reduce(
-          (sum, item) => sum + item.completedMaterialCount,
-          0,
-        );
-        const materialTotal = profile.progress.reduce(
-          (sum, item) => sum + item.totalMaterialCount,
-          0,
-        );
-        const assignmentCompleted = profile.progress.reduce(
-          (sum, item) => sum + item.completedAssignmentCount,
-          0,
-        );
-        const assignmentTotal = profile.progress.reduce(
-          (sum, item) => sum + item.totalAssignmentCount,
-          0,
-        );
-        const quizCompleted = profile.progress.reduce(
-          (sum, item) => sum + item.completedQuizCount,
-          0,
-        );
-        const quizTotal = profile.progress.reduce(
-          (sum, item) => sum + item.totalQuizCount,
-          0,
-        );
-        const chartData =
-          possible <= 0
-            ? [{ name: "Empty", value: 1, color: "#E5E7EB" }]
-            : completed <= 0
-              ? [{ name: "Remaining", value: possible, color: "#E5E7EB" }]
-              : remaining <= 0
-                ? [{ name: "Completed", value: completed, color: COLORS[0] }]
-                : [
-                    { name: "Completed", value: completed, color: COLORS[0] },
-                    { name: "Remaining", value: remaining, color: COLORS[1] },
-                  ];
-
-        return {
-          user: u,
-          profile,
-          possible,
-          percent,
-          materialCompleted,
-          materialTotal,
-          assignmentCompleted,
-          assignmentTotal,
-          quizCompleted,
-          quizTotal,
-          chartData,
-        };
-      }),
-    [profiles, profilesLoading, users, searchQuery, classFilter],
-  );
-
   if (user?.role !== "superadmin") {
     navigate("/dashboard");
     return null;
   }
 
-  if (loading && users.length === 0) {
+  if (loading) {
     return (
       <AppLayout>
-        <UserManagementSkeleton />
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <Loader className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
+            <p className="text-gray-600 dark:text-gray-400">
+              Memuat data pengguna...
+            </p>
+          </div>
+        </div>
       </AppLayout>
     );
   }
@@ -301,10 +123,20 @@ export function UserManagementPage() {
     );
   }
 
+  const filteredUsers = selectedClass
+    ? users.filter((u) => {
+        const profile = profiles[u.id];
+        if (!profile) return false;
+        return profile.enrollments.some(
+          (e) => String(e.classId) === selectedClass,
+        );
+      })
+    : users;
+
   return (
     <AppLayout>
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="mb-1 text-3xl font-semibold tracking-tight">
             Kelola Pengguna
@@ -319,68 +151,135 @@ export function UserManagementPage() {
         </Button>
       </div>
 
-      {/* Search & Filter */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {/* Search bar */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Cari username atau email..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-900 pl-9 pr-4 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-400 transition"
-          />
-        </div>
+      {/* Class Filter */}
+      <div className="mb-6 relative">
+        <div className="inline-block relative">
+          <button
+            onClick={() => setShowClassDropdown(!showClassDropdown)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 font-medium text-sm"
+          >
+            Filter Kelas:{" "}
+            {selectedClass
+              ? (classes.find((c) => String(c.id) === selectedClass)?.name ??
+                "Semua")
+              : "Semua"}
+            <ChevronDown className="h-4 w-4" />
+          </button>
 
-        {/* Class filter buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {CLASS_FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => {
-                setClassFilter(f);
-                setCurrentPage(1);
-              }}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                classFilter === f
-                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+          {showClassDropdown && (
+            <div className="absolute top-full mt-1 left-0 z-20 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+              <button
+                onClick={() => {
+                  setSelectedClass(null);
+                  setShowClassDropdown(false);
+                }}
+                className="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 first:rounded-t-lg"
+              >
+                Semua Kelas
+              </button>
+              {classes.map((cls) => (
+                <button
+                  key={cls.id}
+                  onClick={() => {
+                    setSelectedClass(String(cls.id));
+                    setShowClassDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                >
+                  {cls.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="mb-4 flex items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400">
-        <span>
-          Menampilkan {users.length} user pada halaman {currentPage} dari {totalPages}
-        </span>
-        {profilesLoading && (
-          <span className="inline-flex items-center gap-2">
-            <Loader className="h-4 w-4 animate-spin" />
-            Memproses ringkasan user...
-          </span>
-        )}
-      </div>
-
-      {/* Content */}
-      {users.length === 0 ? (
+      {/* User Cards */}
+      {filteredUsers.length === 0 ? (
         <Card className="p-8 text-center">
           <Users className="mx-auto mb-4 h-12 w-12 text-slate-300" />
           <p className="text-slate-600 dark:text-slate-400">
-            Belum ada pengguna. Tambahkan pengguna baru untuk mulai.
+            {selectedClass
+              ? "Tidak ada pengguna di kelas ini."
+              : "Belum ada pengguna. Tambahkan pengguna baru untuk mulai."}
           </p>
         </Card>
       ) : (
-        <>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {usersWithMetrics.map(({ user: u, profile, possible, percent, materialCompleted, materialTotal, assignmentCompleted, assignmentTotal, quizCompleted, quizTotal, chartData }) => {
+          {filteredUsers.map((u) => {
+            const profile = profiles[u.id] ?? {
+              enrollments: [],
+              progress: [],
+            };
+            const completed = profile.progress.reduce(
+              (sum, item) =>
+                sum +
+                item.completedMaterialCount +
+                item.completedAssignmentCount +
+                item.completedQuizCount,
+              0,
+            );
+            const possible = profile.progress.reduce(
+              (sum, item) =>
+                sum +
+                item.totalMaterialCount +
+                item.totalAssignmentCount +
+                item.totalQuizCount,
+              0,
+            );
+            const remaining = Math.max(0, possible - completed);
+            const percent =
+              possible > 0 ? Math.round((completed / possible) * 100) : 0;
+            const materialCompleted = profile.progress.reduce(
+              (sum, item) => sum + item.completedMaterialCount,
+              0,
+            );
+            const materialTotal = profile.progress.reduce(
+              (sum, item) => sum + item.totalMaterialCount,
+              0,
+            );
+            const assignmentCompleted = profile.progress.reduce(
+              (sum, item) => sum + item.completedAssignmentCount,
+              0,
+            );
+            const assignmentTotal = profile.progress.reduce(
+              (sum, item) => sum + item.totalAssignmentCount,
+              0,
+            );
+            const quizCompleted = profile.progress.reduce(
+              (sum, item) => sum + item.completedQuizCount,
+              0,
+            );
+            const quizTotal = profile.progress.reduce(
+              (sum, item) => sum + item.totalQuizCount,
+              0,
+            );
+            const chartData =
+              possible <= 0
+                ? [{ name: "Empty", value: 1, color: "#E5E7EB" }]
+                : completed <= 0
+                  ? [{ name: "Remaining", value: possible, color: "#E5E7EB" }]
+                  : remaining <= 0
+                    ? [
+                        {
+                          name: "Completed",
+                          value: completed,
+                          color: COLORS[0],
+                        },
+                      ]
+                    : [
+                        {
+                          name: "Completed",
+                          value: completed,
+                          color: COLORS[0],
+                        },
+                        {
+                          name: "Remaining",
+                          value: remaining,
+                          color: COLORS[1],
+                        },
+                      ];
+
             return (
               <Card
                 key={u.id}
@@ -433,13 +332,14 @@ export function UserManagementPage() {
                         Kelas yang Diikuti
                       </p>
                       <div className="mt-1.5 flex flex-col gap-2">
-                        {!profiles[u.id] && profilesLoading ? (
-                          <div className="space-y-2">
-                            <div className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
-                            <div className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
-                          </div>
-                        ) : profile.enrollments.length > 0 ? (
+                        {profile.enrollments.length > 0 ? (
                           (() => {
+                            const CLASS_GRADIENTS = [
+                              "from-blue-600 to-cyan-400",
+                              "from-cyan-500 to-teal-400",
+                              "from-indigo-600 to-purple-500",
+                              "from-blue-700 to-indigo-500",
+                            ];
                             const grouped = profile.enrollments.reduce(
                               (acc, e) => {
                                 if (!acc[e.classId])
@@ -458,33 +358,26 @@ export function UserManagementPage() {
                               >,
                             );
                             return Object.entries(grouped).map(
-                              ([classId, { className, tingkatans }]) => {
-                                const palette = getClassPalette(
-                                  classId,
-                                  className,
-                                );
-
-                                return (
-                                  <div
-                                    key={classId}
-                                    className={`rounded-xl bg-linear-to-r ${palette.gradient} px-3 py-2 text-white`}
-                                  >
-                                    <p className="text-xs font-bold mb-1.5 tracking-wide">
-                                      {className}
-                                    </p>
-                                    <div className="flex flex-wrap gap-1">
-                                      {tingkatans.map((t) => (
-                                        <span
-                                          key={t}
-                                          className={`rounded-full ${palette.chip} px-2 py-0.5 text-xs font-medium`}
-                                        >
-                                          {t}
-                                        </span>
-                                      ))}
-                                    </div>
+                              ([classId, { className, tingkatans }], idx) => (
+                                <div
+                                  key={classId}
+                                  className={`rounded-xl bg-linear-to-r ${CLASS_GRADIENTS[idx % CLASS_GRADIENTS.length]} px-3 py-2 text-white`}
+                                >
+                                  <p className="text-xs font-bold mb-1.5 tracking-wide">
+                                    {className}
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {tingkatans.map((t) => (
+                                      <span
+                                        key={t}
+                                        className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-medium"
+                                      >
+                                        {t}
+                                      </span>
+                                    ))}
                                   </div>
-                                );
-                              },
+                                </div>
+                              ),
                             );
                           })()
                         ) : (
@@ -499,13 +392,17 @@ export function UserManagementPage() {
                       <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                         Progress
                       </p>
-                      {!profiles[u.id] && profilesLoading ? (
-                        <div className="mt-2 h-5 w-48 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
-                      ) : possible > 0 ? (
+                      {possible > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
-                          <p>Materi {materialCompleted}/{materialTotal} selesai</p>
-                          <p>Tugas {assignmentCompleted}/{assignmentTotal} selesai</p>
-                          <p>Kuis {quizCompleted}/{quizTotal} selesai</p>
+                          <p>
+                            Materi {materialCompleted}/{materialTotal} selesai
+                          </p>
+                          <p>
+                            Tugas {assignmentCompleted}/{assignmentTotal} selesai
+                          </p>
+                          <p>
+                            Kuis {quizCompleted}/{quizTotal} selesai
+                          </p>
                         </div>
                       ) : (
                         <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
@@ -517,62 +414,35 @@ export function UserManagementPage() {
 
                   {/* Right: Pie chart with percent overlay */}
                   <div className="relative shrink-0 h-24 w-24">
-                    {!profiles[u.id] && profilesLoading ? (
-                      <div className="h-24 w-24 animate-pulse rounded-full bg-slate-100 dark:bg-slate-800" />
-                    ) : (
-                      <>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={chartData}
-                              dataKey="value"
-                              innerRadius={28}
-                              outerRadius={40}
-                              paddingAngle={chartData.length > 1 ? 2 : 0}
-                              startAngle={90}
-                              endAngle={-270}
-                            >
-                              {chartData.map((item) => (
-                                <Cell key={item.name} fill={item.color} />
-                              ))}
-                            </Pie>
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                            {percent}%
-                          </span>
-                        </div>
-                      </>
-                    )}
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          dataKey="value"
+                          innerRadius={28}
+                          outerRadius={40}
+                          paddingAngle={chartData.length > 1 ? 2 : 0}
+                          startAngle={90}
+                          endAngle={-270}
+                        >
+                          {chartData.map((item) => (
+                            <Cell key={item.name} fill={item.color} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Percent label in center */}
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        {percent}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               </Card>
             );
           })}
         </div>
-        <div className="mt-6 flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1 || loading}
-          >
-            Sebelumnya
-          </Button>
-          <span className="text-sm text-slate-500 dark:text-slate-400">
-            Total {total} user
-          </span>
-          <Button
-            variant="outline"
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-            }
-            disabled={currentPage >= totalPages || loading}
-          >
-            Selanjutnya
-          </Button>
-        </div>
-        </>
       )}
     </AppLayout>
   );

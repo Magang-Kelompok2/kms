@@ -3,556 +3,229 @@ import { useAuth } from "../context/AuthContext";
 import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { useClasses } from "../hooks/useClasses";
-import { UserProgressSkeleton } from "../components/PageSkeletons";
 import {
   ArrowLeft,
   Clock,
   CheckCircle,
-  XCircle,
-  TrendingUp,
   FileText,
-  Loader2,
+  X,
+  Filter,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface UserData {
   id: number;
   username: string;
   email: string;
   role: string;
-  createdAt: string;
-}
-
-interface ProgressEntry {
-  id: number | null;
-  classId: string;
-  className: string;
-  currentLevel: number;
-  progressPercent: number;
-  completedMaterialCount: number;
-  totalMaterialCount: number;
-  completedAssignmentCount: number;
-  totalAssignmentCount: number;
-  completedQuizCount: number;
-  totalQuizCount: number;
-  updatedAt: string | null;
 }
 
 interface SubmissionItem {
   id: number;
   classId: string;
+  className: string;
   title: string;
-  answer: string | null;
-  file: { name: string; objectKey: string; size: number } | null;
-  createdAt: string;
-  status: "pending" | "approved" | "rejected";
+  file: { name: string; url: string } | null;
+  user_pengumpulan: {
+    score: number | null;
+    feedback: string | null;
+  };
 }
-
-const PAGE_SIZE = 9;
 
 export function UserProgressPage() {
   const { userId } = useParams();
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const { classes } = useClasses();
+
   const [targetUser, setTargetUser] = useState<UserData | null>(null);
-  const [progress, setProgress] = useState<ProgressEntry[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
-  const [systemError, setSystemError] = useState<string | null>(null);
-  const [baseLoading, setBaseLoading] = useState(true);
-  const [submissionsLoading, setSubmissionsLoading] = useState(false);
-  const [overrides, setOverrides] = useState<
-    Record<number, { status: "approved" | "rejected"; feedback?: string }>
-  >({});
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalAction, setModalAction] = useState<"approved" | "rejected" | null>(
-    null,
-  );
-  const [modalTargetId, setModalTargetId] = useState<number | null>(null);
-  const [feedbackInput, setFeedbackInput] = useState("");
-  const [isApplyingDecision, setIsApplyingDecision] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalSubmissions, setTotalSubmissions] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [selectedClassId, setSelectedClassId] = useState<string>("all");
 
-  const offset = (currentPage - 1) * PAGE_SIZE;
-  const totalPages = Math.max(1, Math.ceil(totalSubmissions / PAGE_SIZE));
+  const [filePreviewOpen, setFilePreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [userId]);
+    if (!token || user?.role !== "superadmin" || !userId) return;
 
-  useEffect(() => {
-    if (!token) return;
-    if (user?.role !== "superadmin") {
-      navigate("/dashboard");
-      return;
-    }
-    if (!userId) return;
-
-    const controller = new AbortController();
-
-    const fetchBaseData = async () => {
-      setBaseLoading(true);
-      setSystemError(null);
-
+    const fetchData = async () => {
       try {
-        const [userRes, progressRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}`, {
-            signal: controller.signal,
-            headers: { Authorization: `Bearer ${token}` },
+        const [uRes, sRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}`, { 
+            headers: { Authorization: `Bearer ${token}` } 
           }),
-          fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}/progress`, {
-            signal: controller.signal,
-            headers: { Authorization: `Bearer ${token}` },
+          fetch(`${import.meta.env.VITE_API_URL}/api/pengumpulan/user/${userId}`, { 
+            headers: { Authorization: `Bearer ${token}` } 
           }),
         ]);
 
-        if (!userRes.ok) {
-          const json = await userRes.json();
-          throw new Error(json.error || "Gagal mengambil pengguna");
-        }
+        const uJson = await uRes.json();
+        const sJson = await sRes.json();
 
-        if (!progressRes.ok) {
-          const json = await progressRes.json();
-          throw new Error(json.error || "Gagal mengambil progress user");
-        }
-
-        const userJson = await userRes.json();
-        const progressJson = await progressRes.json();
-
-        setTargetUser(userJson.data ?? null);
-        setProgress(progressJson.data ?? []);
-      } catch (error: any) {
-        if (error.name !== "AbortError") {
-          setSystemError(error.message ?? "Terjadi kesalahan saat memuat data");
-        }
+        setTargetUser(uJson.data);
+        
+        const mappedSubmissions = (sJson.data || []).map((s: any) => ({
+          ...s,
+          className: classes.find(c => String(c.id) === String(s.classId))?.name || "Kelas",
+          user_pengumpulan: s.user_pengumpulan || { score: null, feedback: null }
+        }));
+        
+        setSubmissions(mappedSubmissions);
+      } catch (err: any) {
+        console.error(err.message);
       } finally {
-        setBaseLoading(false);
+        setLoading(false);
       }
     };
+    fetchData();
+  }, [userId, token, user, classes]);
 
-    fetchBaseData();
-    return () => controller.abort();
-  }, [navigate, token, user?.role, userId]);
+  const filteredSubmissions = useMemo(() => {
+    if (selectedClassId === "all") return submissions;
+    return submissions.filter(s => String(s.classId) === selectedClassId);
+  }, [submissions, selectedClassId]);
 
-  useEffect(() => {
-    if (!token || !userId || user?.role !== "superadmin") return;
-
-    const controller = new AbortController();
-
-    const fetchSubmissions = async () => {
-      setSubmissionsLoading(true);
-      setSystemError(null);
-
-      try {
-        const submissionsRes = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/pengumpulan/user/${userId}?limit=${PAGE_SIZE}&offset=${offset}`,
-          {
-            signal: controller.signal,
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-
-        if (!submissionsRes.ok) {
-          const json = await submissionsRes.json();
-          throw new Error(json.error || "Gagal mengambil pengumpulan user");
-        }
-
-        const submissionsJson = await submissionsRes.json();
-        setSubmissions(submissionsJson.data ?? []);
-        setTotalSubmissions(submissionsJson.total ?? 0);
-      } catch (error: any) {
-        if (error.name !== "AbortError") {
-          setSystemError(error.message ?? "Terjadi kesalahan saat memuat data");
-        }
-      } finally {
-        setSubmissionsLoading(false);
-      }
-    };
-
-    fetchSubmissions();
-    return () => controller.abort();
-  }, [offset, token, user?.role, userId]);
-
-  const classNameMap = useMemo(
-    () =>
-      Object.fromEntries(classes.map((item) => [String(item.id), item.name])),
-    [classes],
-  );
-
-  const normalizedSubmissions = useMemo(
-    () =>
-      submissions.map((submission) => ({
-        ...submission,
-        className:
-          classNameMap[String(submission.classId)] ?? "Kelas tidak diketahui",
-      })),
-    [classNameMap, submissions],
-  );
-
-  if (baseLoading) {
-    return (
-      <AppLayout>
-        <UserProgressSkeleton />
-      </AppLayout>
-    );
-  }
-
-  if (systemError) {
-    return (
-      <AppLayout>
-        <Card className="p-6 text-center text-red-600">{systemError}</Card>
-      </AppLayout>
-    );
-  }
-
-  if (!targetUser) {
-    return (
-      <AppLayout>
-        <Card className="p-6 text-center">Pengguna tidak ditemukan.</Card>
-      </AppLayout>
-    );
-  }
-
-  const openModal = (id: number, action: "approved" | "rejected") => {
-    setModalTargetId(id);
-    setModalAction(action);
-    setFeedbackInput("");
-    setModalOpen(true);
-  };
-
-  const closeModal = () => {
-    if (isApplyingDecision) return;
-    setModalOpen(false);
-    setModalTargetId(null);
-    setModalAction(null);
-    setFeedbackInput("");
-  };
-
-  const handleConfirm = async () => {
-    if (!modalTargetId || !modalAction) return;
-
-    setIsApplyingDecision(true);
-
-    try {
-      const nextTargetId = modalTargetId;
-      const nextAction = modalAction;
-      const nextFeedback = feedbackInput || undefined;
-
-      setOverrides((prev) => ({
-        ...prev,
-        [nextTargetId]: {
-          status: nextAction,
-          feedback: nextFeedback,
-        },
-      }));
-      setModalOpen(false);
-      setModalTargetId(null);
-      setModalAction(null);
-      setFeedbackInput("");
-    } finally {
-      setIsApplyingDecision(false);
-    }
-  };
+  if (loading) return <AppLayout><div className="p-10 text-center text-blue-600 font-bold animate-pulse">Memuat Data...</div></AppLayout>;
 
   return (
     <AppLayout>
-      <Button
-        variant="ghost"
-        onClick={() => navigate("/users")}
-        className="mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Kembali ke Laman Pengguna
+      <Button variant="ghost" onClick={() => navigate("/users")} className="mb-6 hover:bg-slate-100">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Daftar User
       </Button>
 
-      <Card className="p-6 mb-8">
-        <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] flex items-center justify-center text-white text-xl font-semibold">
-            {targetUser.username.charAt(0).toUpperCase()}
-          </div>
-
-          <div className="flex-1">
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              {targetUser.username}
-            </h1>
-
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              {targetUser.email}
-            </p>
-
-            <div className="flex gap-6 mt-2 text-sm text-gray-500 dark:text-gray-400">
-              <span>
-                Bergabung:{" "}
-                {new Date(targetUser.createdAt).toLocaleDateString()}
-              </span>
-              <span>Total Pengumpulan: {totalSubmissions}</span>
-            </div>
-          </div>
+      {/* Profile Header */}
+      <Card className="p-6 mb-8 flex items-center gap-5 border-none shadow-sm bg-white rounded-2xl">
+        <div className="w-16 h-16 rounded-2xl bg-[#0C4E8C] flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-blue-200">
+          {targetUser?.username?.[0].toUpperCase()}
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-slate-800">{targetUser?.username}</h1>
+          <p className="text-slate-500 font-medium text-sm">{targetUser?.email} • <span className="capitalize">{targetUser?.role}</span></p>
         </div>
       </Card>
 
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Progress Kelas</h2>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          {progress.map((item) => (
-            <Card key={item.id} className="p-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {item.className}
-                  </h3>
-                  <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                    {item.progressPercent}%
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-sm text-gray-600 dark:text-gray-400">
-                  <span>
-                    Materi {item.completedMaterialCount}/{item.totalMaterialCount}
-                  </span>
-                  <span>
-                    Tugas {item.completedAssignmentCount}/{item.totalAssignmentCount}
-                  </span>
-                  <span>
-                    Kuis {item.completedQuizCount}/{item.totalQuizCount}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Progress terakhir diupdate{" "}
-                  {item.updatedAt
-                    ? new Date(item.updatedAt).toLocaleDateString()
-                    : "-"}
-                </p>
-              </div>
-            </Card>
-          ))}
-          {progress.length === 0 && (
-            <div className="col-span-full">
-              <Card className="p-12 text-center">
-                <TrendingUp className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">
-                  Belum ada data progress untuk pengguna ini.
-                </p>
-              </Card>
-            </div>
-          )}
+      {/* Filter Section */}
+      <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
+        <div>
+          <h2 className="text-xl font-black text-slate-800">Daftar Pengumpulan</h2>
+          <p className="text-xs text-slate-400 font-bold">Total: {filteredSubmissions.length} Tugas</p>
+        </div>
+        
+        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-80">
+          <Filter className="h-4 w-4 text-[#0C4E8C]" />
+          <select 
+            className="text-sm font-bold w-full outline-none bg-transparent cursor-pointer text-slate-600"
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+          >
+            <option value="all">Semua Mata Kuliah</option>
+            {classes.map(c => (
+              <option key={c.id} value={String(c.id)}>{c.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      <div>
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 className="text-2xl font-bold">Pengumpulan</h2>
-          {submissionsLoading && (
-            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Memuat halaman...
-            </span>
-          )}
-        </div>
-
-        {submissionsLoading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="h-60 rounded-xl bg-muted animate-pulse" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {normalizedSubmissions.map((submission) => {
-              const override = overrides[submission.id];
-              const status: SubmissionItem["status"] =
-                override?.status ?? submission.status;
-              const isPending = !override && submission.status === "pending";
-              const feedback = override?.feedback;
-              const statusConfig =
-                status === "approved"
-                  ? {
-                      label: "approved",
-                      className:
-                        "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-                      icon: <CheckCircle className="h-3 w-3" />,
-                    }
-                  : status === "rejected"
-                    ? {
-                        label: "rejected",
-                        className:
-                          "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-                        icon: <XCircle className="h-3 w-3" />,
-                      }
-                    : {
-                        label: "pending",
-                        className:
-                          "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-600",
-                        icon: <Clock className="h-3 w-3" />,
-                      };
-
-              return (
-                <Card
-                  key={submission.id}
-                  className="flex flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="h-24 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] p-4 flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/80 text-xs font-medium uppercase tracking-wide">
-                        {submission.title ? "Pengumpulan" : "Tugas"}
-                      </span>
-                      <span
-                        className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusConfig.className}`}
-                      >
-                        {statusConfig.icon}
-                        {statusConfig.label}
-                      </span>
+      {/* Grid Card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {filteredSubmissions.length > 0 ? (
+          filteredSubmissions.map((sub) => {
+            const currentScore = sub.user_pengumpulan?.score;
+            const hasScore = currentScore !== null && currentScore !== undefined;
+            
+            const badgeStyle = !hasScore 
+              ? "bg-amber-100 text-amber-700" 
+              : Number(currentScore) >= 75 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700";
+            
+            return (
+              <Card key={sub.id} className="flex flex-col overflow-hidden min-h-[300px] shadow-xl shadow-slate-200/50 border-none rounded-3xl transition-transform hover:-translate-y-1">
+                {/* Header Card */}
+                <div className="h-32 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] p-6 flex flex-col justify-between relative">
+                  <div className="flex justify-between items-start">
+                    <span className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Submission</span>
+                    
+                    <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[13px] font-black shadow-inner min-w-[50px] justify-center ${badgeStyle}`}>
+                      {hasScore ? (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          <span className="leading-none">{currentScore}</span> 
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="h-4 w-4" />
+                          <span className="leading-none text-[11px]">Pending</span>
+                        </>
+                      )}
                     </div>
-                    <h3 className="text-white font-semibold text-sm leading-tight line-clamp-2">
-                      {submission.title || "Pengumpulan Tugas"}
-                    </h3>
+                  </div>
+                  <h3 className="text-white font-black text-xl line-clamp-2 leading-tight drop-shadow-sm">{sub.title}</h3>
+                </div>
+
+                {/* Body Card */}
+                <div className="p-6 flex flex-col flex-1 gap-5 bg-white">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-wider">Mata Kuliah</p>
+                    <p className="text-sm font-bold text-slate-700">{sub.className}</p>
                   </div>
 
-                  <div className="flex flex-col flex-1 p-4 gap-3">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {submission.className}
-                    </p>
-
-                    {submission.answer && (
-                      <div className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-                        <FileText className="h-4 w-4 text-slate-500" />
-                        <span>{submission.answer}</span>
+                  {sub.file && (
+                    <div 
+                      onClick={() => { setPreviewFile(sub.file); setFilePreviewOpen(true); }}
+                      className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer hover:bg-blue-50 border border-slate-100 transition-all group"
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="p-2 bg-white rounded-lg shadow-sm">
+                          <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                        </div>
+                        <span className="text-xs truncate font-bold text-slate-600">{sub.file.name}</span>
                       </div>
-                    )}
-
-                    {submission.file && (
-                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                        File: {submission.file.name}
-                      </p>
-                    )}
-
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Dikirim: {new Date(submission.createdAt).toLocaleString()}
-                    </p>
-
-                    {feedback && (
-                      <p className="text-xs bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-lg text-gray-600 dark:text-gray-300">
-                        <strong>Feedback:</strong> {feedback}
-                      </p>
-                    )}
-
-                    {isPending && (
-                      <div className="flex gap-2 mt-auto pt-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs"
-                          onClick={() => openModal(submission.id, "approved")}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs"
-                          onClick={() => openModal(submission.id, "rejected")}
-                        >
-                          <XCircle className="h-3.5 w-3.5 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
-
-            {normalizedSubmissions.length === 0 && (
-              <div className="col-span-full">
-                <Card className="p-12 text-center">
-                  <TrendingUp className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Belum ada pengumpulan.
-                  </p>
-                </Card>
-              </div>
-            )}
+                      <span className="text-[10px] font-black text-blue-600 opacity-0 group-hover:opacity-100 uppercase tracking-tighter">Preview</span>
+                    </div>
+                  )}
+                  
+                  {sub.user_pengumpulan?.feedback && (
+                    <div className="mt-auto pt-2">
+                      <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-wider">Feedback Mentor</p>
+                      <p className="text-xs text-slate-600 italic line-clamp-2">"{sub.user_pengumpulan.feedback}"</p>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })
+        ) : (
+          <div className="col-span-full py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
+             <p className="text-slate-400 font-bold">Belum ada tugas yang dikumpulkan.</p>
           </div>
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1 || submissionsLoading}
-          >
-            Sebelumnya
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Halaman {currentPage} dari {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-            }
-            disabled={currentPage >= totalPages || submissionsLoading}
-          >
-            Selanjutnya
-          </Button>
-        </div>
-      )}
-
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-              {modalAction === "approved"
-                ? "Approve Pengumpulan"
-                : "Reject Pengumpulan"}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              {modalAction === "approved"
-                ? "Tambahkan feedback untuk siswa (opsional)."
-                : "Berikan alasan penolakan untuk siswa."}
-            </p>
-            <textarea
-              className="w-full border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="Tulis feedback di sini..."
-              value={feedbackInput}
-              onChange={(e) => setFeedbackInput(e.target.value)}
-              disabled={isApplyingDecision}
-            />
-            <div className="flex gap-2 mt-4 justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={closeModal}
-                disabled={isApplyingDecision}
-              >
-                Batal
+      {/* Preview Modal */}
+      {filePreviewOpen && previewFile && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 md:p-10">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl h-full flex flex-col overflow-hidden shadow-2xl">
+            <div className="p-6 border-b flex justify-between items-center bg-white">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-50 rounded-xl">
+                  <FileText className="h-6 w-6 text-[#0C4E8C]" />
+                </div>
+                <h3 className="font-black text-slate-700 truncate max-w-xs md:max-w-xl">{previewFile.name}</h3>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setFilePreviewOpen(false)} className="rounded-full h-12 w-12 hover:bg-rose-50 hover:text-rose-500">
+                <X className="h-8 w-8" />
               </Button>
-              <Button
-                size="sm"
-                className={
-                  modalAction === "approved"
-                    ? "bg-green-500 hover:bg-green-600 text-white"
-                    : "bg-red-500 hover:bg-red-600 text-white"
-                }
-                onClick={handleConfirm}
-                disabled={isApplyingDecision}
-              >
-                {isApplyingDecision ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : modalAction === "approved" ? (
-                  "Approve"
-                ) : (
-                  "Reject"
-                )}
-              </Button>
+            </div>
+            <div className="flex-1 bg-slate-100">
+              <iframe 
+                src={`${previewFile.url}#toolbar=0&navpanes=0`} 
+                className="w-full h-full border-none" 
+                title="Admin Preview"
+              />
+            </div>
+            <div className="p-6 border-t flex justify-center bg-white">
+              <Button className="px-12 h-12 rounded-full font-black bg-slate-800" onClick={() => setFilePreviewOpen(false)}>Tutup Pratinjau</Button>
             </div>
           </div>
         </div>
