@@ -12,7 +12,8 @@ import {
   X,
   Filter,
   PlusCircle,
-  Edit3
+  Edit3,
+  Save,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 
@@ -35,6 +36,18 @@ interface SubmissionItem {
   };
 }
 
+interface EnrollmentItem {
+  classId: string;
+  className: string;
+  namaTingkatan: string;
+  level: number;
+}
+
+interface TingkatanOption {
+  id_tingkatan: number;
+  nama_tingkatan: string;
+}
+
 export function UserProgressPage() {
   const { userId } = useParams();
   const { user, token } = useAuth();
@@ -45,6 +58,13 @@ export function UserProgressPage() {
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClassId, setSelectedClassId] = useState<string>("all");
+
+  // State untuk fitur edit tingkatan
+  const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
+  const [allTingkatan, setAllTingkatan] = useState<Record<string, TingkatanOption[]>>({});
+  const [selectedTingkatan, setSelectedTingkatan] = useState<Record<string, number>>({});
+  const [savingClass, setSavingClass] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   // State untuk Preview File
   const [filePreviewOpen, setFilePreviewOpen] = useState(false);
@@ -61,58 +81,157 @@ export function UserProgressPage() {
 
     const fetchData = async () => {
       try {
-        const [uRes, sRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}`, { 
-            headers: { Authorization: `Bearer ${token}` } 
+        const [uRes, sRes, eRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`${import.meta.env.VITE_API_URL}/api/pengumpulan/user/${userId}`, { 
-            headers: { Authorization: `Bearer ${token}` } 
+          fetch(`${import.meta.env.VITE_API_URL}/api/pengumpulan/user/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}/enrollments`, {
+            headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
 
         const uJson = await uRes.json();
         const sJson = await sRes.json();
+        const eJson = await eRes.json();
 
         setTargetUser(uJson.data);
-        
+
         const mappedSubmissions = (sJson.data || []).map((s: any) => ({
           ...s,
-          className: classes.find(c => String(c.id) === String(s.classId))?.name || "Kelas",
-          user_pengumpulan: s.user_pengumpulan || { score: null, feedback: null }
+          className: classes.find((c) => String(c.id) === String(s.classId))?.name || "Kelas",
+          user_pengumpulan: s.user_pengumpulan || { score: null, feedback: null },
         }));
-        
         setSubmissions(mappedSubmissions);
+
+        // Proses enrollments — ambil tingkatan tertinggi per kelas
+        const enrollmentData: EnrollmentItem[] = eJson.data ?? [];
+        const grouped: Record<string, EnrollmentItem> = {};
+        for (const e of enrollmentData) {
+          if (!grouped[e.classId] || e.level > grouped[e.classId].level) {
+            grouped[e.classId] = e;
+          }
+        }
+        const groupedEnrollments = Object.values(grouped);
+        setEnrollments(groupedEnrollments);
+
+        // Fetch semua tingkatan per kelas yang diikuti user
+        const uniqueClassIds = Object.keys(grouped);
+        const tingkatanByClass: Record<string, TingkatanOption[]> = {};
+
+        await Promise.all(
+          uniqueClassIds.map(async (classId) => {
+            const res = await fetch(
+              `${import.meta.env.VITE_API_URL}/api/kelas/${classId}/levels`,
+              { headers: { Authorization: `Bearer ${token}` } },
+            );
+            if (res.ok) {
+              const json = await res.json();
+              tingkatanByClass[classId] = (json.data ?? []).map((l: any) => ({
+                id_tingkatan: Number(l.id),
+                nama_tingkatan: l.namaLevel,
+              }));
+            }
+          }),
+        );
+        setAllTingkatan(tingkatanByClass);
+
+        // Set default selected tingkatan = tingkatan tertinggi yang dimiliki user
+        const defaultSelected: Record<string, number> = {};
+        for (const e of groupedEnrollments) {
+          const tingkatanList = tingkatanByClass[e.classId] ?? [];
+          const matched = tingkatanList.find((t) => t.nama_tingkatan === e.namaTingkatan);
+          if (matched) defaultSelected[e.classId] = matched.id_tingkatan;
+        }
+        setSelectedTingkatan(defaultSelected);
       } catch (err: any) {
         console.error(err.message);
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
   }, [userId, token, user, classes]);
 
-  const handleUpdateScore = async () => {
-    if (!selectedSub || !token || !userId) return;
-    
+  const handleSaveTingkatan = async (classId: string) => {
+    if (!token || !userId) return;
+    const id_tingkatan = selectedTingkatan[classId];
+    if (!id_tingkatan) return;
+
+    setSavingClass(classId);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pengumpulan/score/${userId}/${selectedSub.id}`, {
-        method: "PUT",
-        headers: { 
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}` 
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/${userId}/enrollments`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ id_kelas: Number(classId), id_tingkatan }),
         },
-        body: JSON.stringify({ 
-          score: inputScore !== "" ? Number(inputScore) : null, 
-          feedback: inputFeedback 
-        })
-      });
+      );
 
       if (res.ok) {
-        // Update state lokal agar UI langsung berubah tanpa refresh halaman
-        setSubmissions(prev => prev.map(s => s.id === selectedSub.id 
-          ? { ...s, user_pengumpulan: { score: inputScore !== "" ? Number(inputScore) : null, feedback: inputFeedback } } 
-          : s
-        ));
+        // Update local state enrollments agar label tingkatan ikut berubah
+        const tingkatanList = allTingkatan[classId] ?? [];
+        const matched = tingkatanList.find((t) => t.id_tingkatan === id_tingkatan);
+        if (matched) {
+          setEnrollments((prev) =>
+            prev.map((e) =>
+              e.classId === classId ? { ...e, namaTingkatan: matched.nama_tingkatan } : e,
+            ),
+          );
+        }
+        setSaveSuccess(classId);
+        setTimeout(() => setSaveSuccess(null), 2000);
+      } else {
+        const errData = await res.json();
+        alert("Gagal menyimpan tingkatan: " + (errData.error || "Unknown Error"));
+      }
+    } catch {
+      alert("Terjadi kesalahan.");
+    } finally {
+      setSavingClass(null);
+    }
+  };
+
+  const handleUpdateScore = async () => {
+    if (!selectedSub || !token || !userId) return;
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/pengumpulan/score/${userId}/${selectedSub.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            score: inputScore !== "" ? Number(inputScore) : null,
+            feedback: inputFeedback,
+          }),
+        },
+      );
+
+      if (res.ok) {
+        setSubmissions((prev) =>
+          prev.map((s) =>
+            s.id === selectedSub.id
+              ? {
+                  ...s,
+                  user_pengumpulan: {
+                    score: inputScore !== "" ? Number(inputScore) : null,
+                    feedback: inputFeedback,
+                  },
+                }
+              : s,
+          ),
+        );
         setScoringOpen(false);
       } else {
         const errData = await res.json();
@@ -125,14 +244,25 @@ export function UserProgressPage() {
 
   const filteredSubmissions = useMemo(() => {
     if (selectedClassId === "all") return submissions;
-    return submissions.filter(s => String(s.classId) === selectedClassId);
+    return submissions.filter((s) => String(s.classId) === selectedClassId);
   }, [submissions, selectedClassId]);
 
-  if (loading) return <AppLayout><div className="p-10 text-center text-blue-600 font-bold animate-pulse">Memuat Data...</div></AppLayout>;
+  if (loading)
+    return (
+      <AppLayout>
+        <div className="p-10 text-center text-blue-600 font-bold animate-pulse">
+          Memuat Data...
+        </div>
+      </AppLayout>
+    );
 
   return (
     <AppLayout>
-      <Button variant="ghost" onClick={() => navigate("/users")} className="mb-6 hover:bg-slate-100">
+      <Button
+        variant="ghost"
+        onClick={() => navigate("/users")}
+        className="mb-6 hover:bg-slate-100"
+      >
         <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Daftar User
       </Button>
 
@@ -143,55 +273,142 @@ export function UserProgressPage() {
         </div>
         <div>
           <h1 className="text-2xl font-black text-slate-800">{targetUser?.username}</h1>
-          <p className="text-slate-500 font-medium text-sm">{targetUser?.email} • <span className="capitalize">{targetUser?.role}</span></p>
+          <p className="text-slate-500 font-medium text-sm">
+            {targetUser?.email} •{" "}
+            <span className="capitalize">{targetUser?.role}</span>
+          </p>
         </div>
       </Card>
+
+      {/* Kelola Akses Tingkatan */}
+      {enrollments.length > 0 && (
+        <div className="mb-10">
+          <h2 className="text-xl font-black text-slate-800 mb-1">Kelola Akses Tingkatan</h2>
+          <p className="text-xs text-slate-400 font-bold mb-4">
+            Atur tingkatan yang dapat diakses user per kelas
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {enrollments.map((enrollment) => {
+              const tingkatanList = allTingkatan[enrollment.classId] ?? [];
+              const isSaving = savingClass === enrollment.classId;
+              const isSuccess = saveSuccess === enrollment.classId;
+
+              return (
+                <Card
+                  key={enrollment.classId}
+                  className="p-5 border-none shadow-md rounded-2xl bg-white"
+                >
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                    Kelas
+                  </p>
+                  <h3 className="text-base font-black text-slate-800 mb-4">
+                    {enrollment.className}
+                  </h3>
+
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                    Tingkatan Akses
+                  </p>
+                  <select
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500 mb-4 cursor-pointer"
+                    value={selectedTingkatan[enrollment.classId] ?? ""}
+                    onChange={(e) =>
+                      setSelectedTingkatan((prev) => ({
+                        ...prev,
+                        [enrollment.classId]: Number(e.target.value),
+                      }))
+                    }
+                  >
+                    {tingkatanList.length === 0 && (
+                      <option value="">Memuat...</option>
+                    )}
+                    {tingkatanList.map((t) => (
+                      <option key={t.id_tingkatan} value={t.id_tingkatan}>
+                        {t.nama_tingkatan}
+                      </option>
+                    ))}
+                  </select>
+
+                  <Button
+                    onClick={() => handleSaveTingkatan(enrollment.classId)}
+                    disabled={isSaving || tingkatanList.length === 0}
+                    className={`w-full rounded-xl font-black py-5 transition-all duration-300 ${
+                      isSuccess
+                        ? "bg-emerald-500 hover:bg-emerald-600"
+                        : "bg-[#0C4E8C] hover:bg-[#093d6d]"
+                    }`}
+                  >
+                    {isSaving ? (
+                      "Menyimpan..."
+                    ) : isSuccess ? (
+                      <><CheckCircle className="mr-2 h-4 w-4" /> Tersimpan</>
+                    ) : (
+                      <><Save className="mr-2 h-4 w-4" /> Simpan</>
+                    )}
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filter Section */}
       <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
         <div>
           <h2 className="text-xl font-black text-slate-800">Daftar Pengumpulan</h2>
-          <p className="text-xs text-slate-400 font-bold">Total: {filteredSubmissions.length} Tugas</p>
+          <p className="text-xs text-slate-400 font-bold">
+            Total: {filteredSubmissions.length} Tugas
+          </p>
         </div>
-        
+
         <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-80">
           <Filter className="h-4 w-4 text-[#0C4E8C]" />
-          <select 
+          <select
             className="text-sm font-bold w-full outline-none bg-transparent cursor-pointer text-slate-600"
             value={selectedClassId}
             onChange={(e) => setSelectedClassId(e.target.value)}
           >
             <option value="all">Semua Mata Kuliah</option>
-            {classes.map(c => (
-              <option key={c.id} value={String(c.id)}>{c.name}</option>
+            {classes.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Grid Card */}
+      {/* Grid Card Submission */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {filteredSubmissions.length > 0 ? (
           filteredSubmissions.map((sub) => {
             const currentScore = sub.user_pengumpulan?.score;
             const hasScore = currentScore !== null && currentScore !== undefined;
-            
-            const badgeStyle = !hasScore 
-              ? "bg-amber-100 text-amber-700" 
-              : Number(currentScore) >= 75 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700";
-            
+
+            const badgeStyle = !hasScore
+              ? "bg-amber-100 text-amber-700"
+              : Number(currentScore) >= 75
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-rose-100 text-rose-700";
+
             return (
-              <Card key={sub.id} className="flex flex-col overflow-hidden min-h-[350px] shadow-xl shadow-slate-200/50 border-none rounded-3xl transition-transform hover:-translate-y-1">
+              <Card
+                key={sub.id}
+                className="flex flex-col overflow-hidden min-h-[350px] shadow-xl shadow-slate-200/50 border-none rounded-3xl transition-transform hover:-translate-y-1"
+              >
                 {/* Header Card */}
                 <div className="h-32 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] p-6 flex flex-col justify-between relative">
                   <div className="flex justify-between items-start">
-                    <span className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Submission</span>
-                    
-                    <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[13px] font-black shadow-inner min-w-[50px] justify-center ${badgeStyle}`}>
+                    <span className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">
+                      Submission
+                    </span>
+                    <div
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[13px] font-black shadow-inner min-w-[50px] justify-center ${badgeStyle}`}
+                    >
                       {hasScore ? (
                         <>
                           <CheckCircle className="h-4 w-4" />
-                          <span className="leading-none">{currentScore}</span> 
+                          <span className="leading-none">{currentScore}</span>
                         </>
                       ) : (
                         <>
@@ -201,41 +418,55 @@ export function UserProgressPage() {
                       )}
                     </div>
                   </div>
-                  <h3 className="text-white font-black text-xl line-clamp-2 leading-tight drop-shadow-sm">{sub.title}</h3>
+                  <h3 className="text-white font-black text-xl line-clamp-2 leading-tight drop-shadow-sm">
+                    {sub.title}
+                  </h3>
                 </div>
 
                 {/* Body Card */}
                 <div className="p-6 flex flex-col flex-1 gap-5 bg-white">
                   <div>
-                    <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-wider">Mata Kuliah</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-wider">
+                      Mata Kuliah
+                    </p>
                     <p className="text-sm font-bold text-slate-700">{sub.className}</p>
                   </div>
 
                   {sub.file && (
-                    <div 
-                      onClick={() => { setPreviewFile(sub.file); setFilePreviewOpen(true); }}
+                    <div
+                      onClick={() => {
+                        setPreviewFile(sub.file);
+                        setFilePreviewOpen(true);
+                      }}
                       className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer hover:bg-blue-50 border border-slate-100 transition-all group"
                     >
                       <div className="flex items-center gap-3 overflow-hidden">
                         <div className="p-2 bg-white rounded-lg shadow-sm">
                           <FileText className="h-4 w-4 text-blue-600 shrink-0" />
                         </div>
-                        <span className="text-xs truncate font-bold text-slate-600">{sub.file.name}</span>
+                        <span className="text-xs truncate font-bold text-slate-600">
+                          {sub.file.name}
+                        </span>
                       </div>
-                      <span className="text-[10px] font-black text-blue-600 opacity-0 group-hover:opacity-100 uppercase tracking-tighter">Preview</span>
-                    </div>
-                  )}
-                  
-                  {sub.user_pengumpulan?.feedback && (
-                    <div>
-                      <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-wider">Feedback Mentor</p>
-                      <p className="text-xs text-slate-600 italic line-clamp-2">"{sub.user_pengumpulan.feedback}"</p>
+                      <span className="text-[10px] font-black text-blue-600 opacity-0 group-hover:opacity-100 uppercase tracking-tighter">
+                        Preview
+                      </span>
                     </div>
                   )}
 
-                  {/* Tombol Input/Edit Nilai - DI SINI PERUBAHANNYA */}
+                  {sub.user_pengumpulan?.feedback && (
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-wider">
+                        Feedback Mentor
+                      </p>
+                      <p className="text-xs text-slate-600 italic line-clamp-2">
+                        "{sub.user_pengumpulan.feedback}"
+                      </p>
+                    </div>
+                  )}
+
                   <div className="mt-auto pt-4 border-t border-slate-50">
-                    <Button 
+                    <Button
                       onClick={() => {
                         setSelectedSub(sub);
                         setInputScore(sub.user_pengumpulan.score?.toString() || "");
@@ -245,9 +476,13 @@ export function UserProgressPage() {
                       className="w-full rounded-2xl font-black bg-[#0C4E8C] hover:bg-[#093d6d] shadow-md shadow-blue-100 py-6"
                     >
                       {hasScore ? (
-                        <><Edit3 className="mr-2 h-4 w-4" /> Edit Nilai</>
+                        <>
+                          <Edit3 className="mr-2 h-4 w-4" /> Edit Nilai
+                        </>
                       ) : (
-                        <><PlusCircle className="mr-2 h-4 w-4" /> Input Nilai</>
+                        <>
+                          <PlusCircle className="mr-2 h-4 w-4" /> Input Nilai
+                        </>
                       )}
                     </Button>
                   </div>
@@ -257,7 +492,7 @@ export function UserProgressPage() {
           })
         ) : (
           <div className="col-span-full py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
-             <p className="text-slate-400 font-bold">Belum ada tugas yang dikumpulkan.</p>
+            <p className="text-slate-400 font-bold">Belum ada tugas yang dikumpulkan.</p>
           </div>
         )}
       </div>
@@ -268,16 +503,23 @@ export function UserProgressPage() {
           <Card className="w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl bg-white border-none animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-black text-slate-800">Penilaian Tugas</h3>
-              <Button variant="ghost" size="icon" onClick={() => setScoringOpen(false)} className="rounded-full">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setScoringOpen(false)}
+                className="rounded-full"
+              >
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            
+
             <div className="space-y-6">
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Skor (0-100)</label>
-                <input 
-                  type="number" 
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">
+                  Skor (0-100)
+                </label>
+                <input
+                  type="number"
                   min="0"
                   max="100"
                   value={inputScore}
@@ -286,10 +528,12 @@ export function UserProgressPage() {
                   placeholder="Masukkan skor..."
                 />
               </div>
-              
+
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Feedback Mentor</label>
-                <textarea 
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">
+                  Feedback Mentor
+                </label>
+                <textarea
                   value={inputFeedback}
                   onChange={(e) => setInputFeedback(e.target.value)}
                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all h-32 resize-none"
@@ -299,15 +543,15 @@ export function UserProgressPage() {
             </div>
 
             <div className="flex gap-3 mt-8">
-              <Button 
-                variant="ghost" 
-                className="flex-1 h-14 rounded-2xl font-bold text-slate-500 hover:bg-slate-50" 
+              <Button
+                variant="ghost"
+                className="flex-1 h-14 rounded-2xl font-bold text-slate-500 hover:bg-slate-50"
                 onClick={() => setScoringOpen(false)}
               >
                 Batal
               </Button>
-              <Button 
-                className="flex-1 h-14 rounded-2xl font-black bg-[#0C4E8C] hover:bg-[#093d6d] shadow-lg shadow-blue-100" 
+              <Button
+                className="flex-1 h-14 rounded-2xl font-black bg-[#0C4E8C] hover:bg-[#093d6d] shadow-lg shadow-blue-100"
                 onClick={handleUpdateScore}
               >
                 Simpan Nilai
@@ -326,21 +570,33 @@ export function UserProgressPage() {
                 <div className="p-3 bg-blue-50 rounded-xl">
                   <FileText className="h-6 w-6 text-[#0C4E8C]" />
                 </div>
-                <h3 className="font-black text-slate-700 truncate max-w-xs md:max-w-xl">{previewFile.name}</h3>
+                <h3 className="font-black text-slate-700 truncate max-w-xs md:max-w-xl">
+                  {previewFile.name}
+                </h3>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setFilePreviewOpen(false)} className="rounded-full h-12 w-12 hover:bg-rose-50 hover:text-rose-500">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setFilePreviewOpen(false)}
+                className="rounded-full h-12 w-12 hover:bg-rose-50 hover:text-rose-500"
+              >
                 <X className="h-8 w-8" />
               </Button>
             </div>
             <div className="flex-1 bg-slate-100">
-              <iframe 
-                src={`${previewFile.url}#toolbar=0&navpanes=0`} 
-                className="w-full h-full border-none" 
+              <iframe
+                src={`${previewFile.url}#toolbar=0&navpanes=0`}
+                className="w-full h-full border-none"
                 title="Admin Preview"
               />
             </div>
             <div className="p-6 border-t flex justify-center bg-white">
-              <Button className="px-12 h-12 rounded-full font-black bg-slate-800" onClick={() => setFilePreviewOpen(false)}>Tutup Pratinjau</Button>
+              <Button
+                className="px-12 h-12 rounded-full font-black bg-slate-800"
+                onClick={() => setFilePreviewOpen(false)}
+              >
+                Tutup Pratinjau
+              </Button>
             </div>
           </div>
         </div>
