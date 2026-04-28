@@ -11,6 +11,8 @@ import {
   FileText,
   X,
   Filter,
+  PlusCircle,
+  Edit3
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 
@@ -44,8 +46,15 @@ export function UserProgressPage() {
   const [loading, setLoading] = useState(true);
   const [selectedClassId, setSelectedClassId] = useState<string>("all");
 
+  // State untuk Preview File
   const [filePreviewOpen, setFilePreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
+
+  // State untuk Modal Penilaian
+  const [scoringOpen, setScoringOpen] = useState(false);
+  const [selectedSub, setSelectedSub] = useState<SubmissionItem | null>(null);
+  const [inputScore, setInputScore] = useState("");
+  const [inputFeedback, setInputFeedback] = useState("");
 
   useEffect(() => {
     if (!token || user?.role !== "superadmin" || !userId) return;
@@ -81,6 +90,38 @@ export function UserProgressPage() {
     };
     fetchData();
   }, [userId, token, user, classes]);
+
+  const handleUpdateScore = async () => {
+    if (!selectedSub || !token || !userId) return;
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pengumpulan/score/${userId}/${selectedSub.id}`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ 
+          score: inputScore !== "" ? Number(inputScore) : null, 
+          feedback: inputFeedback 
+        })
+      });
+
+      if (res.ok) {
+        // Update state lokal agar UI langsung berubah tanpa refresh halaman
+        setSubmissions(prev => prev.map(s => s.id === selectedSub.id 
+          ? { ...s, user_pengumpulan: { score: inputScore !== "" ? Number(inputScore) : null, feedback: inputFeedback } } 
+          : s
+        ));
+        setScoringOpen(false);
+      } else {
+        const errData = await res.json();
+        alert("Gagal menyimpan nilai: " + (errData.error || "Unknown Error"));
+      }
+    } catch (err) {
+      console.error("Error updating score:", err);
+    }
+  };
 
   const filteredSubmissions = useMemo(() => {
     if (selectedClassId === "all") return submissions;
@@ -140,7 +181,7 @@ export function UserProgressPage() {
               : Number(currentScore) >= 75 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700";
             
             return (
-              <Card key={sub.id} className="flex flex-col overflow-hidden min-h-[300px] shadow-xl shadow-slate-200/50 border-none rounded-3xl transition-transform hover:-translate-y-1">
+              <Card key={sub.id} className="flex flex-col overflow-hidden min-h-[350px] shadow-xl shadow-slate-200/50 border-none rounded-3xl transition-transform hover:-translate-y-1">
                 {/* Header Card */}
                 <div className="h-32 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] p-6 flex flex-col justify-between relative">
                   <div className="flex justify-between items-start">
@@ -186,11 +227,30 @@ export function UserProgressPage() {
                   )}
                   
                   {sub.user_pengumpulan?.feedback && (
-                    <div className="mt-auto pt-2">
+                    <div>
                       <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-wider">Feedback Mentor</p>
                       <p className="text-xs text-slate-600 italic line-clamp-2">"{sub.user_pengumpulan.feedback}"</p>
                     </div>
                   )}
+
+                  {/* Tombol Input/Edit Nilai - DI SINI PERUBAHANNYA */}
+                  <div className="mt-auto pt-4 border-t border-slate-50">
+                    <Button 
+                      onClick={() => {
+                        setSelectedSub(sub);
+                        setInputScore(sub.user_pengumpulan.score?.toString() || "");
+                        setInputFeedback(sub.user_pengumpulan.feedback || "");
+                        setScoringOpen(true);
+                      }}
+                      className="w-full rounded-2xl font-black bg-[#0C4E8C] hover:bg-[#093d6d] shadow-md shadow-blue-100 py-6"
+                    >
+                      {hasScore ? (
+                        <><Edit3 className="mr-2 h-4 w-4" /> Edit Nilai</>
+                      ) : (
+                        <><PlusCircle className="mr-2 h-4 w-4" /> Input Nilai</>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </Card>
             );
@@ -201,6 +261,61 @@ export function UserProgressPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Penilaian (Input/Edit) */}
+      {scoringOpen && selectedSub && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl bg-white border-none animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-800">Penilaian Tugas</h3>
+              <Button variant="ghost" size="icon" onClick={() => setScoringOpen(false)} className="rounded-full">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Skor (0-100)</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  max="100"
+                  value={inputScore}
+                  onChange={(e) => setInputScore(e.target.value)}
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                  placeholder="Masukkan skor..."
+                />
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Feedback Mentor</label>
+                <textarea 
+                  value={inputFeedback}
+                  onChange={(e) => setInputFeedback(e.target.value)}
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all h-32 resize-none"
+                  placeholder="Tulis masukan mentor di sini..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <Button 
+                variant="ghost" 
+                className="flex-1 h-14 rounded-2xl font-bold text-slate-500 hover:bg-slate-50" 
+                onClick={() => setScoringOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button 
+                className="flex-1 h-14 rounded-2xl font-black bg-[#0C4E8C] hover:bg-[#093d6d] shadow-lg shadow-blue-100" 
+                onClick={handleUpdateScore}
+              >
+                Simpan Nilai
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Preview Modal */}
       {filePreviewOpen && previewFile && (
