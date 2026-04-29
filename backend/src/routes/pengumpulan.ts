@@ -90,22 +90,20 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
   }
 });
 
-// Tambahkan endpoint baru ini:
+// PUT /api/pengumpulan/score/:userId/:submissionId — input/update nilai submission
 router.put("/score/:userId/:submissionId", verifySupabaseToken, async (req: any, res) => {
   const { userId, submissionId } = req.params;
   const { score, feedback } = req.body;
 
-  // Pastikan hanya admin yang bisa akses
-  if (req.user.role !== "superadmin") {
+  if (req.user.role !== "superadmin")
     return res.status(403).json({ success: false, error: "Akses ditolak" });
-  }
 
   try {
     const { error } = await supabase
       .from("user_pengumpulan")
-      .update({ 
-        score: Number(score), 
-        feedback: feedback 
+      .update({
+        score: score !== null && score !== undefined ? Number(score) : null,
+        feedback: feedback ?? null,
       })
       .eq("id_user", Number(userId))
       .eq("id_pengumpulan", Number(submissionId));
@@ -114,7 +112,8 @@ router.put("/score/:userId/:submissionId", verifySupabaseToken, async (req: any,
 
     res.json({ success: true, message: "Nilai berhasil diperbarui" });
   } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error("Error updating score:", error);
+    res.status(500).json({ success: false, error: error.message ?? "Gagal update nilai" });
   }
 });
 
@@ -165,8 +164,6 @@ router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
       return {
         ...row,
         user: userRelation?.user ?? null,
-        score: userRelation?.score ?? null,
-        feedback: userRelation?.feedback ?? null,
         file: enrichedFile,
         file_pengumpulan: enrichedFile,
       };
@@ -294,11 +291,11 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
                 size: file.ukuran_file,
               }
             : null,
-          user_pengumpulan: 
-              {
-                score: item.score,
-                feedback: item.feedback
-              }
+          status: "pending",
+          user_pengumpulan: {
+            score: item.score ?? null,
+            feedback: item.feedback ?? null,
+          },
         };
       }),
     );

@@ -861,12 +861,11 @@ router.delete("/:userId", verifySupabaseToken, async (req: any, res) => {
   if (isNaN(userId))
     return res.status(400).json({ success: false, error: "userId harus berupa angka" });
 
-  if (req.user.role !== "superadmin") {
+  if (req.user.role !== "superadmin")
     return res.status(403).json({ success: false, error: "Akses ditolak" });
-  }
 
   try {
-    // Hapus data terkait dulu
+    // Hapus data terkait dulu (FK constraint)
     await supabase.from("user_enrollment").delete().eq("id_user", userId);
     await supabase.from("user_progress").delete().eq("id_user", userId);
     await supabase.from("user_pengumpulan").delete().eq("id_user", userId);
@@ -877,7 +876,6 @@ router.delete("/:userId", verifySupabaseToken, async (req: any, res) => {
     // Baru hapus user
     const { error } = await supabase.from("user").delete().eq("id_user", userId);
     if (error) throw error;
-
     res.json({ success: true });
   } catch (error) {
     console.error("Error deleting user:", error);
@@ -1283,7 +1281,7 @@ router.put(
   },
 );
 
-// PUT /api/users/:userId/enrollments
+// PUT /api/users/:userId/enrollments — set akses kelas & tingkatan
 router.put("/:userId/enrollments", verifySupabaseToken, async (req: any, res) => {
   const userId = Number(req.params.userId);
   if (isNaN(userId))
@@ -1310,7 +1308,7 @@ router.put("/:userId/enrollments", verifySupabaseToken, async (req: any, res) =>
     if (tingkatanError) throw tingkatanError;
 
     const levels = tingkatanList ?? [];
-    const selectedIndex = levels.findIndex((l) => l.id_tingkatan === levelId);
+    const selectedIndex = levels.findIndex((l: any) => l.id_tingkatan === levelId);
 
     if (selectedIndex === -1)
       return res.status(400).json({ success: false, error: "Tingkatan tidak ditemukan di kelas ini" });
@@ -1332,7 +1330,7 @@ router.put("/:userId/enrollments", verifySupabaseToken, async (req: any, res) =>
     const { error: insertError } = await supabase
       .from("user_enrollment")
       .insert(
-        accessibleLevels.map((level) => ({
+        accessibleLevels.map((level: any) => ({
           id_user: userId,
           id_kelas: classId,
           id_tingkatan: level.id_tingkatan,
@@ -1355,7 +1353,7 @@ router.put("/:userId/enrollments", verifySupabaseToken, async (req: any, res) =>
   }
 });
 
-// DELETE /api/users/:userId/enrollments/:classId
+// DELETE /api/users/:userId/enrollments/:classId — hapus kelas dari user
 router.delete("/:userId/enrollments/:classId", verifySupabaseToken, async (req: any, res) => {
   const userId = Number(req.params.userId);
   const classId = Number(req.params.classId);
