@@ -20,7 +20,7 @@ import usersRoutes from "./routes/users";
 import materialsRoutes from "./routes/materials";
 import tugasRoutes from "./routes/tugas";
 import uploadRoutes from "./routes/upload";
-import pengumpulanRoutes from "./routes/pengumpulan"; // ← tambah ini
+import pengumpulanRoutes from "./routes/pengumpulan"; 
 import kuisRoutes from "./routes/kuis";
 import authRoutes from "./routes/auth";
 import filesRoutes from "./routes/files";
@@ -29,7 +29,11 @@ import notificationsRoutes from "./routes/notifications";
 const PORT = Number(process.env.PORT ?? 4000);
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173', 
+  allowedHeaders: ['Content-Type', 'Authorization'], 
+  credentials: true
+}));
 app.use(bodyParser.json());
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
@@ -41,7 +45,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/materials", materialsRoutes);
 app.use("/api/tugas", tugasRoutes);
 app.use("/api/upload", uploadRoutes);
-app.use("/api/pengumpulan", pengumpulanRoutes); // ← tambah ini
+app.use("/api/pengumpulan", pengumpulanRoutes);
 app.use("/api/kuis", kuisRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/files", filesRoutes);

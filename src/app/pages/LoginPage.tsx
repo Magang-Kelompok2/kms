@@ -24,6 +24,15 @@ export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  // const handleLogin = async () => {
+  //   const res = await fetch('...');
+  //   const json = await res.json()
+
+  //   if(json.success) {
+  //     localStorage.setItem("token", json.data.token);
+  //   }
+  // }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
