@@ -134,7 +134,20 @@ export function AddQuizModal({
   };
 
   const handleSubmit = async () => {
-    // FIX: deadline dihapus dari validasi wajib
+    const sessionData = localStorage.getItem("taxacore_session");
+
+    if (!sessionData) {
+      alert("Sesi tidak aktif. Silahkan login lagi.")
+      return;
+    }
+
+    const parsedSession = JSON.parse(sessionData);
+    const actualToken = parsedSession.token
+
+    if (!actualToken) {
+      alert("Token tidak ditemukan dalam data sesi.")
+    }
+
     if (!title || !meetingNumber || !duration) {
       alert("Mohon lengkapi semua field yang wajib diisi");
       return;
@@ -170,7 +183,10 @@ export function AddQuizModal({
       // 1. Simpan kuis ke tabel tugas
       const kuisRes = await fetch(`${import.meta.env.VITE_API_URL}/api/tugas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${actualToken}`
+         },
         body: JSON.stringify({
           nama_tugas: title,
           deskripsi: "",
