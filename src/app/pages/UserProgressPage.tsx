@@ -14,6 +14,8 @@ import {
   PlusCircle,
   Edit3,
   Save,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 
@@ -66,6 +68,17 @@ export function UserProgressPage() {
   const [savingClass, setSavingClass] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
+  // State untuk hapus kelas
+  const [deletingClass, setDeletingClass] = useState<string | null>(null);
+
+  // State untuk modal tambah kelas
+  const [addClassOpen, setAddClassOpen] = useState(false);
+  const [addClassId, setAddClassId] = useState<string>("");
+  const [addTingkatanId, setAddTingkatanId] = useState<number | "">("");
+  const [addTingkatanOptions, setAddTingkatanOptions] = useState<TingkatanOption[]>([]);
+  const [addingClass, setAddingClass] = useState(false);
+  const [loadingAddTingkatan, setLoadingAddTingkatan] = useState(false);
+
   // State untuk Preview File
   const [filePreviewOpen, setFilePreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
@@ -76,26 +89,72 @@ export function UserProgressPage() {
   const [inputScore, setInputScore] = useState("");
   const [inputFeedback, setInputFeedback] = useState("");
 
+  const fetchEnrollmentsAndTingkatan = async () => {
+    if (!token || !userId) return;
+
+    const eRes = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/users/${userId}/enrollments`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    const eJson = await eRes.json();
+    const enrollmentData: EnrollmentItem[] = eJson.data ?? [];
+
+    // Grouping per kelas — ambil tingkatan tertinggi
+    const grouped: Record<string, EnrollmentItem> = {};
+    for (const e of enrollmentData) {
+      if (!grouped[e.classId] || e.level > grouped[e.classId].level) {
+        grouped[e.classId] = e;
+      }
+    }
+    const groupedEnrollments = Object.values(grouped);
+    setEnrollments(groupedEnrollments);
+
+    // Fetch tingkatan per kelas
+    const uniqueClassIds = Object.keys(grouped);
+    const tingkatanByClass: Record<string, TingkatanOption[]> = {};
+    await Promise.all(
+      uniqueClassIds.map(async (classId) => {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/kelas/${classId}/levels`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (res.ok) {
+          const json = await res.json();
+          tingkatanByClass[classId] = (json.data ?? []).map((l: any) => ({
+            id_tingkatan: Number(l.id),
+            nama_tingkatan: l.namaLevel,
+          }));
+        }
+      }),
+    );
+    setAllTingkatan(tingkatanByClass);
+
+    // Set default selected tingkatan
+    const defaultSelected: Record<string, number> = {};
+    for (const e of groupedEnrollments) {
+      const tingkatanList = tingkatanByClass[e.classId] ?? [];
+      const matched = tingkatanList.find((t) => t.nama_tingkatan === e.namaTingkatan);
+      if (matched) defaultSelected[e.classId] = matched.id_tingkatan;
+    }
+    setSelectedTingkatan(defaultSelected);
+  };
+
   useEffect(() => {
     if (!token || user?.role !== "superadmin" || !userId) return;
 
     const fetchData = async () => {
       try {
-        const [uRes, sRes, eRes] = await Promise.all([
+        const [uRes, sRes] = await Promise.all([
           fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           fetch(`${import.meta.env.VITE_API_URL}/api/pengumpulan/user/${userId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}/enrollments`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
         ]);
 
         const uJson = await uRes.json();
         const sJson = await sRes.json();
-        const eJson = await eRes.json();
 
         setTargetUser(uJson.data);
 
@@ -106,46 +165,7 @@ export function UserProgressPage() {
         }));
         setSubmissions(mappedSubmissions);
 
-        // Proses enrollments — ambil tingkatan tertinggi per kelas
-        const enrollmentData: EnrollmentItem[] = eJson.data ?? [];
-        const grouped: Record<string, EnrollmentItem> = {};
-        for (const e of enrollmentData) {
-          if (!grouped[e.classId] || e.level > grouped[e.classId].level) {
-            grouped[e.classId] = e;
-          }
-        }
-        const groupedEnrollments = Object.values(grouped);
-        setEnrollments(groupedEnrollments);
-
-        // Fetch semua tingkatan per kelas yang diikuti user
-        const uniqueClassIds = Object.keys(grouped);
-        const tingkatanByClass: Record<string, TingkatanOption[]> = {};
-
-        await Promise.all(
-          uniqueClassIds.map(async (classId) => {
-            const res = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/kelas/${classId}/levels`,
-              { headers: { Authorization: `Bearer ${token}` } },
-            );
-            if (res.ok) {
-              const json = await res.json();
-              tingkatanByClass[classId] = (json.data ?? []).map((l: any) => ({
-                id_tingkatan: Number(l.id),
-                nama_tingkatan: l.namaLevel,
-              }));
-            }
-          }),
-        );
-        setAllTingkatan(tingkatanByClass);
-
-        // Set default selected tingkatan = tingkatan tertinggi yang dimiliki user
-        const defaultSelected: Record<string, number> = {};
-        for (const e of groupedEnrollments) {
-          const tingkatanList = tingkatanByClass[e.classId] ?? [];
-          const matched = tingkatanList.find((t) => t.nama_tingkatan === e.namaTingkatan);
-          if (matched) defaultSelected[e.classId] = matched.id_tingkatan;
-        }
-        setSelectedTingkatan(defaultSelected);
+        await fetchEnrollmentsAndTingkatan();
       } catch (err: any) {
         console.error(err.message);
       } finally {
@@ -155,6 +175,72 @@ export function UserProgressPage() {
 
     fetchData();
   }, [userId, token, user, classes]);
+
+  // Kelas yang belum diikuti user (untuk dropdown modal tambah kelas)
+  const availableClasses = useMemo(() => {
+    const enrolledClassIds = new Set(enrollments.map((e) => e.classId));
+    return classes.filter((c) => !enrolledClassIds.has(String(c.id)));
+  }, [classes, enrollments]);
+
+  // Ketika pilih kelas di modal tambah, fetch tingkatannya
+  const handleAddClassChange = async (classId: string) => {
+    setAddClassId(classId);
+    setAddTingkatanId("");
+    setAddTingkatanOptions([]);
+    if (!classId || !token) return;
+
+    setLoadingAddTingkatan(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/kelas/${classId}/levels`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (res.ok) {
+        const json = await res.json();
+        setAddTingkatanOptions(
+          (json.data ?? []).map((l: any) => ({
+            id_tingkatan: Number(l.id),
+            nama_tingkatan: l.namaLevel,
+          })),
+        );
+      }
+    } finally {
+      setLoadingAddTingkatan(false);
+    }
+  };
+
+  const handleAddClass = async () => {
+    if (!addClassId || !addTingkatanId || !token || !userId) return;
+    setAddingClass(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/${userId}/enrollments`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            id_kelas: Number(addClassId),
+            id_tingkatan: addTingkatanId,
+          }),
+        },
+      );
+      if (res.ok) {
+        setAddClassOpen(false);
+        setAddClassId("");
+        setAddTingkatanId("");
+        setAddTingkatanOptions([]);
+        await fetchEnrollmentsAndTingkatan();
+      } else {
+        const errData = await res.json();
+        alert("Gagal menambah kelas: " + (errData.error || "Unknown Error"));
+      }
+    } finally {
+      setAddingClass(false);
+    }
+  };
 
   const handleSaveTingkatan = async (classId: string) => {
     if (!token || !userId) return;
@@ -176,7 +262,6 @@ export function UserProgressPage() {
       );
 
       if (res.ok) {
-        // Update local state enrollments agar label tingkatan ikut berubah
         const tingkatanList = allTingkatan[classId] ?? [];
         const matched = tingkatanList.find((t) => t.id_tingkatan === id_tingkatan);
         if (matched) {
@@ -196,6 +281,42 @@ export function UserProgressPage() {
       alert("Terjadi kesalahan.");
     } finally {
       setSavingClass(null);
+    }
+  };
+
+  const handleDeleteClass = async (classId: string, className: string) => {
+    if (!token || !userId) return;
+    if (!window.confirm(`Hapus kelas "${className}" dari user ini?`)) return;
+
+    setDeletingClass(classId);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/${userId}/enrollments/${classId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (res.ok) {
+        setEnrollments((prev) => prev.filter((e) => e.classId !== classId));
+        setAllTingkatan((prev) => {
+          const next = { ...prev };
+          delete next[classId];
+          return next;
+        });
+        setSelectedTingkatan((prev) => {
+          const next = { ...prev };
+          delete next[classId];
+          return next;
+        });
+      } else {
+        const errData = await res.json();
+        alert("Gagal menghapus kelas: " + (errData.error || "Unknown Error"));
+      }
+    } catch {
+      alert("Terjadi kesalahan.");
+    } finally {
+      setDeletingClass(null);
     }
   };
 
@@ -280,30 +401,60 @@ export function UserProgressPage() {
         </div>
       </Card>
 
-      {/* Kelola Akses Tingkatan */}
-      {enrollments.length > 0 && (
-        <div className="mb-10">
-          <h2 className="text-xl font-black text-slate-800 mb-1">Kelola Akses Tingkatan</h2>
-          <p className="text-xs text-slate-400 font-bold mb-4">
-            Atur tingkatan yang dapat diakses user per kelas
-          </p>
+      {/* Kelola Akses Kelas */}
+      <div className="mb-10">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-xl font-black text-slate-800">Kelola Akses Kelas</h2>
+          {availableClasses.length > 0 && (
+            <Button
+              onClick={() => setAddClassOpen(true)}
+              className="bg-[#0C4E8C] hover:bg-[#093d6d] rounded-xl font-black"
+            >
+              <Plus className="mr-2 h-4 w-4" /> Tambah Kelas
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-slate-400 font-bold mb-4">
+          Atur kelas dan tingkatan yang dapat diakses user
+        </p>
+
+        {enrollments.length === 0 ? (
+          <div className="py-10 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">
+            <p className="text-slate-400 font-bold text-sm">
+              User belum terdaftar di kelas manapun.
+            </p>
+          </div>
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {enrollments.map((enrollment) => {
               const tingkatanList = allTingkatan[enrollment.classId] ?? [];
               const isSaving = savingClass === enrollment.classId;
               const isSuccess = saveSuccess === enrollment.classId;
+              const isDeleting = deletingClass === enrollment.classId;
 
               return (
                 <Card
                   key={enrollment.classId}
                   className="p-5 border-none shadow-md rounded-2xl bg-white"
                 >
-                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
-                    Kelas
-                  </p>
-                  <h3 className="text-base font-black text-slate-800 mb-4">
-                    {enrollment.className}
-                  </h3>
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                        Kelas
+                      </p>
+                      <h3 className="text-base font-black text-slate-800">
+                        {enrollment.className}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteClass(enrollment.classId, enrollment.className)}
+                      disabled={isDeleting}
+                      className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      title="Hapus kelas"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
 
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
                     Tingkatan Akses
@@ -318,9 +469,7 @@ export function UserProgressPage() {
                       }))
                     }
                   >
-                    {tingkatanList.length === 0 && (
-                      <option value="">Memuat...</option>
-                    )}
+                    {tingkatanList.length === 0 && <option value="">Memuat...</option>}
                     {tingkatanList.map((t) => (
                       <option key={t.id_tingkatan} value={t.id_tingkatan}>
                         {t.nama_tingkatan}
@@ -349,8 +498,8 @@ export function UserProgressPage() {
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Filter Section */}
       <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
@@ -396,7 +545,6 @@ export function UserProgressPage() {
                 key={sub.id}
                 className="flex flex-col overflow-hidden min-h-[350px] shadow-xl shadow-slate-200/50 border-none rounded-3xl transition-transform hover:-translate-y-1"
               >
-                {/* Header Card */}
                 <div className="h-32 bg-gradient-to-br from-[#0C4E8C] to-[#11C4D4] p-6 flex flex-col justify-between relative">
                   <div className="flex justify-between items-start">
                     <span className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">
@@ -423,7 +571,6 @@ export function UserProgressPage() {
                   </h3>
                 </div>
 
-                {/* Body Card */}
                 <div className="p-6 flex flex-col flex-1 gap-5 bg-white">
                   <div>
                     <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-wider">
@@ -476,13 +623,9 @@ export function UserProgressPage() {
                       className="w-full rounded-2xl font-black bg-[#0C4E8C] hover:bg-[#093d6d] shadow-md shadow-blue-100 py-6"
                     >
                       {hasScore ? (
-                        <>
-                          <Edit3 className="mr-2 h-4 w-4" /> Edit Nilai
-                        </>
+                        <><Edit3 className="mr-2 h-4 w-4" /> Edit Nilai</>
                       ) : (
-                        <>
-                          <PlusCircle className="mr-2 h-4 w-4" /> Input Nilai
-                        </>
+                        <><PlusCircle className="mr-2 h-4 w-4" /> Input Nilai</>
                       )}
                     </Button>
                   </div>
@@ -496,6 +639,93 @@ export function UserProgressPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Tambah Kelas */}
+      {addClassOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl bg-white border-none animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-800">Tambah Kelas</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setAddClassOpen(false);
+                  setAddClassId("");
+                  setAddTingkatanId("");
+                  setAddTingkatanOptions([]);
+                }}
+                className="rounded-full"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">
+                  Pilih Kelas
+                </label>
+                <select
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+                  value={addClassId}
+                  onChange={(e) => handleAddClassChange(e.target.value)}
+                >
+                  <option value="">-- Pilih Kelas --</option>
+                  {availableClasses.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">
+                  Pilih Tingkatan
+                </label>
+                <select
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer disabled:opacity-50"
+                  value={addTingkatanId}
+                  onChange={(e) => setAddTingkatanId(Number(e.target.value))}
+                  disabled={!addClassId || loadingAddTingkatan}
+                >
+                  <option value="">
+                    {loadingAddTingkatan ? "Memuat..." : "-- Pilih Tingkatan --"}
+                  </option>
+                  {addTingkatanOptions.map((t) => (
+                    <option key={t.id_tingkatan} value={t.id_tingkatan}>
+                      {t.nama_tingkatan}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <Button
+                variant="ghost"
+                className="flex-1 h-14 rounded-2xl font-bold text-slate-500 hover:bg-slate-50"
+                onClick={() => {
+                  setAddClassOpen(false);
+                  setAddClassId("");
+                  setAddTingkatanId("");
+                  setAddTingkatanOptions([]);
+                }}
+              >
+                Batal
+              </Button>
+              <Button
+                className="flex-1 h-14 rounded-2xl font-black bg-[#0C4E8C] hover:bg-[#093d6d] shadow-lg shadow-blue-100"
+                onClick={handleAddClass}
+                disabled={!addClassId || !addTingkatanId || addingClass}
+              >
+                {addingClass ? "Menambahkan..." : "Tambah"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Modal Penilaian (Input/Edit) */}
       {scoringOpen && selectedSub && (

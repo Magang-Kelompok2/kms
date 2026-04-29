@@ -1355,4 +1355,41 @@ router.put("/:userId/enrollments", verifySupabaseToken, async (req: any, res) =>
   }
 });
 
+// DELETE /api/users/:userId/enrollments/:classId
+router.delete("/:userId/enrollments/:classId", verifySupabaseToken, async (req: any, res) => {
+  const userId = Number(req.params.userId);
+  const classId = Number(req.params.classId);
+
+  if (isNaN(userId) || isNaN(classId))
+    return res.status(400).json({ success: false, error: "Parameter tidak valid" });
+
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+
+  try {
+    // Hapus semua enrollment user di kelas ini
+    const { error: enrollError } = await supabase
+      .from("user_enrollment")
+      .delete()
+      .eq("id_user", userId)
+      .eq("id_kelas", classId);
+
+    if (enrollError) throw enrollError;
+
+    // Hapus progress user di kelas ini
+    const { error: progressError } = await supabase
+      .from("user_progress")
+      .delete()
+      .eq("id_user", userId)
+      .eq("id_kelas", classId);
+
+    if (progressError) throw progressError;
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Error removing class enrollment:", error);
+    return res.status(500).json({ success: false, error: "Gagal menghapus kelas user" });
+  }
+});
+
 export default router;
