@@ -83,16 +83,6 @@ export function UserProgressPage() {
   const [systemError, setSystemError] = useState<string | null>(null);
   const [baseLoading, setBaseLoading] = useState(true);
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
-  const [overrides, setOverrides] = useState<
-    Record<number, { status: "approved" | "rejected"; feedback?: string }>
-  >({});
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalAction, setModalAction] = useState<"approved" | "rejected" | null>(
-    null,
-  );
-  const [modalTargetId, setModalTargetId] = useState<number | null>(null);
-  const [feedbackInput, setFeedbackInput] = useState("");
-  const [isApplyingDecision, setIsApplyingDecision] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalSubmissions, setTotalSubmissions] = useState(0);
 
@@ -484,47 +474,6 @@ export function UserProgressPage() {
     );
   }
 
-  const openModal = (id: number, action: "approved" | "rejected") => {
-    setModalTargetId(id);
-    setModalAction(action);
-    setFeedbackInput("");
-    setModalOpen(true);
-  };
-
-  const closeModal = () => {
-    if (isApplyingDecision) return;
-    setModalOpen(false);
-    setModalTargetId(null);
-    setModalAction(null);
-    setFeedbackInput("");
-  };
-
-  const handleConfirm = async () => {
-    if (!modalTargetId || !modalAction) return;
-
-    setIsApplyingDecision(true);
-
-    try {
-      const nextTargetId = modalTargetId;
-      const nextAction = modalAction;
-      const nextFeedback = feedbackInput || undefined;
-
-      setOverrides((prev) => ({
-        ...prev,
-        [nextTargetId]: {
-          status: nextAction,
-          feedback: nextFeedback,
-        },
-      }));
-      setModalOpen(false);
-      setModalTargetId(null);
-      setModalAction(null);
-      setFeedbackInput("");
-    } finally {
-      setIsApplyingDecision(false);
-    }
-  };
-
   return (
     <AppLayout>
       <Button
@@ -730,11 +679,7 @@ export function UserProgressPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredSubmissions.map((submission) => {
-              const override = overrides[submission.id];
-              const status: SubmissionItem["status"] =
-                override?.status ?? submission.status;
-              const isPending = !override && submission.status === "pending";
-              const feedback = override?.feedback;
+              const status: SubmissionItem["status"] = submission.status;
               const statusConfig =
                 status === "approved"
                   ? {
@@ -813,47 +758,36 @@ export function UserProgressPage() {
                       Dikirim: {new Date(submission.createdAt).toLocaleString()}
                     </p>
 
-                    {feedback && (
-                      <p className="text-xs bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-lg text-gray-600 dark:text-gray-300">
-                        <strong>Feedback:</strong> {feedback}
-                      </p>
-                    )}
-
-                    {isPending && (
-                      <div className="flex gap-2 mt-auto pt-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs"
-                          onClick={() => openModal(submission.id, "approved")}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs"
-                          onClick={() => openModal(submission.id, "rejected")}
-                        >
-                          <XCircle className="h-3.5 w-3.5 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-
                     {/* --- TAMBAHAN: Scoring section --- */}
                     {submission.user_pengumpulan !== undefined && (
-                      <div className="border-t border-slate-100 pt-3 mt-1">
+                      <div className="border-t border-slate-100 pt-4 mt-2">
                         {submission.user_pengumpulan.score !== null && (
-                          <p className="text-xs text-slate-500 mb-2">
-                            Nilai: <span className="font-bold text-slate-700">{submission.user_pengumpulan.score}</span>
+                          <div className="mb-3 bg-gradient-to-br from-blue-50/80 to-indigo-50/80 rounded-xl border border-blue-100/50 p-3.5 flex flex-col gap-2.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-blue-600/70 uppercase tracking-widest">Nilai Akhir</span>
+                              <div className="bg-white text-[#0C4E8C] px-3 py-1 rounded-full text-sm font-black shadow-sm border border-blue-100 flex items-center gap-1">
+                                <span>{submission.user_pengumpulan.score}</span>
+                                <span className="text-[10px] text-slate-400 font-bold">/ 100</span>
+                              </div>
+                            </div>
                             {submission.user_pengumpulan.feedback && (
-                              <span className="ml-2 italic text-slate-400">"{submission.user_pengumpulan.feedback}"</span>
+                              <div className="bg-white/60 p-3 rounded-lg border border-white/40 text-xs text-slate-600 relative overflow-hidden group hover:bg-white/90 transition-colors">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-blue-300 rounded-l-lg"></div>
+                                <span className="font-bold not-italic text-slate-700 block mb-1.5 flex items-center gap-1.5">
+                                  <FileText className="h-3.5 w-3.5 text-blue-500" /> Feedback Mentor
+                                </span>
+                                <p className="leading-relaxed italic pl-1">"{submission.user_pengumpulan.feedback}"</p>
+                              </div>
                             )}
-                          </p>
+                          </div>
                         )}
                         <Button
                           size="sm"
-                          className="w-full bg-[#0C4E8C] hover:bg-[#093d6d] text-white text-xs rounded-lg"
+                          className={`w-full text-xs rounded-xl h-10 font-bold transition-all shadow-sm ${
+                            submission.user_pengumpulan.score !== null 
+                              ? "bg-white border-2 border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50" 
+                              : "bg-[#0C4E8C] hover:bg-[#093d6d] text-white hover:shadow-md"
+                          }`}
                           onClick={() => {
                             setSelectedSub(submission);
                             setInputScore(submission.user_pengumpulan?.score?.toString() || "");
@@ -862,9 +796,9 @@ export function UserProgressPage() {
                           }}
                         >
                           {submission.user_pengumpulan.score !== null ? (
-                            <><Edit3 className="h-3.5 w-3.5 mr-1" /> Edit Nilai</>
+                            <><Edit3 className="h-4 w-4 mr-2" /> Edit Nilai & Feedback</>
                           ) : (
-                            <><PlusCircle className="h-3.5 w-3.5 mr-1" /> Input Nilai</>
+                            <><PlusCircle className="h-4 w-4 mr-2" /> Input Nilai & Feedback</>
                           )}
                         </Button>
                       </div>
@@ -1057,61 +991,6 @@ export function UserProgressPage() {
         </div>
       )}
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-              {modalAction === "approved"
-                ? "Approve Pengumpulan"
-                : "Reject Pengumpulan"}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              {modalAction === "approved"
-                ? "Tambahkan feedback untuk siswa (opsional)."
-                : "Berikan alasan penolakan untuk siswa."}
-            </p>
-            <textarea
-              className="w-full border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="Tulis feedback di sini..."
-              value={feedbackInput}
-              onChange={(e) => setFeedbackInput(e.target.value)}
-              disabled={isApplyingDecision}
-            />
-            <div className="flex gap-2 mt-4 justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={closeModal}
-                disabled={isApplyingDecision}
-              >
-                Batal
-              </Button>
-              <Button
-                size="sm"
-                className={
-                  modalAction === "approved"
-                    ? "bg-green-500 hover:bg-green-600 text-white"
-                    : "bg-red-500 hover:bg-red-600 text-white"
-                }
-                onClick={handleConfirm}
-                disabled={isApplyingDecision}
-              >
-                {isApplyingDecision ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : modalAction === "approved" ? (
-                  "Approve"
-                ) : (
-                  "Reject"
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </AppLayout>
   );
 }
