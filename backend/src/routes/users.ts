@@ -859,16 +859,22 @@ router.get("/:userId/progress", verifySupabaseToken, async (req: any, res) => {
 router.delete("/:userId", verifySupabaseToken, async (req: any, res) => {
   const userId = Number(req.params.userId);
   if (isNaN(userId))
-    return res
-      .status(400)
-      .json({ success: false, error: "userId harus berupa angka" });
+    return res.status(400).json({ success: false, error: "userId harus berupa angka" });
+
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
 
   try {
-    const { error } = await supabase
-      .from("user")
-      .delete()
-      .eq("id_user", userId);
+    // Hapus data terkait dulu (FK constraint)
+    await supabase.from("user_enrollment").delete().eq("id_user", userId);
+    await supabase.from("user_progress").delete().eq("id_user", userId);
+    await supabase.from("user_pengumpulan").delete().eq("id_user", userId);
+    await supabase.from("hasil_kuis").delete().eq("id_user", userId);
+    await supabase.from("user_materi").delete().eq("id_user", userId);
+    await supabase.from("user_materi_file").delete().eq("id_user", userId);
 
+    // Baru hapus user
+    const { error } = await supabase.from("user").delete().eq("id_user", userId);
     if (error) throw error;
     res.json({ success: true });
   } catch (error) {
@@ -1274,5 +1280,114 @@ router.put(
     }
   },
 );
+
+// PUT /api/users/:userId/enrollments — set akses kelas & tingkatan
+router.put("/:userId/enrollments", verifySupabaseToken, async (req: any, res) => {
+  const userId = Number(req.params.userId);
+  if (isNaN(userId))
+    return res.status(400).json({ success: false, error: "userId harus berupa angka" });
+
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+
+  const { id_kelas, id_tingkatan } = req.body ?? {};
+  const classId = Number(id_kelas);
+  const levelId = Number(id_tingkatan);
+
+  if (!classId || !levelId)
+    return res.status(400).json({ success: false, error: "id_kelas dan id_tingkatan wajib diisi" });
+
+  try {
+    // Ambil semua tingkatan di kelas ini, urut ascending
+    const { data: tingkatanList, error: tingkatanError } = await supabase
+      .from("tingkatan")
+      .select("id_tingkatan, nama_tingkatan")
+      .eq("id_kelas", classId)
+      .order("id_tingkatan", { ascending: true });
+
+    if (tingkatanError) throw tingkatanError;
+
+    const levels = tingkatanList ?? [];
+    const selectedIndex = levels.findIndex((l: any) => l.id_tingkatan === levelId);
+
+    if (selectedIndex === -1)
+      return res.status(400).json({ success: false, error: "Tingkatan tidak ditemukan di kelas ini" });
+
+    // Tingkatan yang boleh diakses = dari index 0 sampai selectedIndex
+    const accessibleLevels = levels.slice(0, selectedIndex + 1);
+
+    // Hapus enrollment lama untuk kelas ini
+    const { error: deleteError } = await supabase
+      .from("user_enrollment")
+      .delete()
+      .eq("id_user", userId)
+      .eq("id_kelas", classId);
+
+    if (deleteError) throw deleteError;
+
+    // Insert enrollment baru
+    const now = new Date().toISOString();
+    const { error: insertError } = await supabase
+      .from("user_enrollment")
+      .insert(
+        accessibleLevels.map((level: any) => ({
+          id_user: userId,
+          id_kelas: classId,
+          id_tingkatan: level.id_tingkatan,
+          status: "approved",
+          approved_by: req.user.id_user,
+          approved_at: now,
+          enrolled_at: now,
+        }))
+      );
+
+    if (insertError) throw insertError;
+
+    // Update user_progress untuk kelas ini
+    await saveUserProgress(userId, classId, levelId, now);
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Error updating user enrollments:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengupdate tingkatan user" });
+  }
+});
+
+// DELETE /api/users/:userId/enrollments/:classId — hapus kelas dari user
+router.delete("/:userId/enrollments/:classId", verifySupabaseToken, async (req: any, res) => {
+  const userId = Number(req.params.userId);
+  const classId = Number(req.params.classId);
+
+  if (isNaN(userId) || isNaN(classId))
+    return res.status(400).json({ success: false, error: "Parameter tidak valid" });
+
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+
+  try {
+    // Hapus semua enrollment user di kelas ini
+    const { error: enrollError } = await supabase
+      .from("user_enrollment")
+      .delete()
+      .eq("id_user", userId)
+      .eq("id_kelas", classId);
+
+    if (enrollError) throw enrollError;
+
+    // Hapus progress user di kelas ini
+    const { error: progressError } = await supabase
+      .from("user_progress")
+      .delete()
+      .eq("id_user", userId)
+      .eq("id_kelas", classId);
+
+    if (progressError) throw progressError;
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Error removing class enrollment:", error);
+    return res.status(500).json({ success: false, error: "Gagal menghapus kelas user" });
+  }
+});
 
 export default router;

@@ -90,6 +90,33 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
   }
 });
 
+// PUT /api/pengumpulan/score/:userId/:submissionId — input/update nilai submission
+router.put("/score/:userId/:submissionId", verifySupabaseToken, async (req: any, res) => {
+  const { userId, submissionId } = req.params;
+  const { score, feedback } = req.body;
+
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+
+  try {
+    const { error } = await supabase
+      .from("user_pengumpulan")
+      .update({
+        score: score !== null && score !== undefined ? Number(score) : null,
+        feedback: feedback ?? null,
+      })
+      .eq("id_user", Number(userId))
+      .eq("id_pengumpulan", Number(submissionId));
+
+    if (error) throw error;
+
+    res.json({ success: true, message: "Nilai berhasil diperbarui" });
+  } catch (error: any) {
+    console.error("Error updating score:", error);
+    res.status(500).json({ success: false, error: error.message ?? "Gagal update nilai" });
+  }
+});
+
 // GET /api/pengumpulan/tugas/:tugasId
 // Ambil semua pengumpulan untuk satu tugas (untuk superadmin review)
 router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
@@ -231,7 +258,7 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
     const { data, error, count } = await supabase
       .from("user_pengumpulan")
       .select(
-        `id_pengumpulan, created_at,
+        `id_pengumpulan, created_at, score, feedback,
          pengumpulan(id_pengumpulan, answer, created_at, id_file, id_tugas,
            tugas(id_tugas, nama_tugas, id_kelas, type),
            file_pengumpulan(original_filename, ukuran_file, object_key)
@@ -265,6 +292,10 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
               }
             : null,
           status: "pending",
+          user_pengumpulan: {
+            score: item.score ?? null,
+            feedback: item.feedback ?? null,
+          },
         };
       }),
     );
