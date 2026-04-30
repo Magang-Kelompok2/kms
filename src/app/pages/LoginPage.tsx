@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
-import { Lock, User, AlertCircle } from "lucide-react";
+import { Lock, User, AlertCircle, Loader } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -21,19 +21,41 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState("");
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
+    setSuccess("");
 
-    const result = await login(email, password);
-    if (result.success) {
-      navigate("/dashboard");
-    } else {
-      setError(result.error || "Email atau password salah");
+    // const result = await login(email, password);
+    // if (result.success) {
+    //   setSuccess("Login berhasil! Mengarahkan ke halaman dashboard...");
+    //   navigate("/dashboard");
+    // } else {
+    //   setError(result.error || "Email atau password salah");
+    // }
+
+    try {
+      const response = await login(email, password);
+      setSuccess("Login berhasil! Mengarahkan ke halaman dashboard...");
+      console.log("Login successfull:", response);
+
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Login gagal. Email atau password salah.";
+      setError(errorMessage);
+      console.log("Login failed", err)
+    } finally {
+      setIsLoading(false);
     }
+
   };
 
   return (
@@ -95,14 +117,18 @@ export function LoginPage() {
                     </Alert>
                   ) : null}
 
-                  <Button type="submit" className="h-11 w-full" size="lg">
-                    Login
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading || !!success} 
+                    className="h-11 w-full" 
+                    size="lg">
+                    {isLoading ? <Loader className="animate-spin"/> : "Masuk"}
                   </Button>
                 </form>
               </CardContent>
             </Card>
 
-            <Card className="border-dashed bg-muted/30 shadow-none">
+            {/* <Card className="border-dashed bg-muted/30 shadow-none">
               <CardContent className="pt-6 text-xs text-muted-foreground">
                 <p className="mb-2 font-medium text-foreground">
                   Demo (development)
@@ -116,7 +142,7 @@ export function LoginPage() {
                   user123
                 </p>
               </CardContent>
-            </Card>
+            </Card> */}
           </div>
         </div>
 
@@ -137,10 +163,10 @@ export function LoginPage() {
                   className="text-2xl font-semibold"
                   style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
                 >
-                  TaxaCore
+                  KMS MHCorp
                 </p>
                 <p className="text-sm text-white/90">
-                  Sistem informasi pengetahuan
+                  Sistem Informasi Pengetahuan
                 </p>
               </div>
             </div>

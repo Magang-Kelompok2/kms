@@ -1,5 +1,6 @@
 import { Navigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
+import { Loader } from "lucide-react";
 import type { ReactNode } from "react";
 
 interface ProtectedRouteProps {
@@ -14,7 +15,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <div className="mx-auto size-12 animate-spin rounded-full border-2 border-muted border-t-primary" />
+          <Loader className="mx-auto size-12 animate-spin rounded-full border-2 border-muted border-t-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Memuat...</p>
         </div>
       </div>
