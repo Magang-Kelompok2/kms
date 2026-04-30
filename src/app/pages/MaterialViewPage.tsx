@@ -5,6 +5,7 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { PDFViewer } from "../components/PDFViewer";
+
 import {
   ArrowLeft,
   FileText,
@@ -13,7 +14,7 @@ import {
   Edit3,
   Trash2,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Material as MaterialType } from "../types";
 
 export function MaterialViewPage() {
@@ -24,12 +25,14 @@ export function MaterialViewPage() {
   const [completedFiles, setCompletedFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [material, setMaterial] = useState<MaterialType | null>(null);
-
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [materialLoading, setMaterialLoading] = useState(true);
   const [progressLoading, setProgressLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
-  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
+  const [completionMessage, setCompletionMessage] = useState<string | null>(
+    null,
+  );
   const [userLevel, setUserLevel] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -43,7 +46,9 @@ export function MaterialViewPage() {
   const getFileKey = (file: { id: string; type: "pdf" | "video" }) =>
     `${file.type}:${file.id}`;
   const localProgressKey =
-    user?.id && materialId ? `material-progress:${user.id}:${materialId}` : null;
+    user?.id && materialId
+      ? `material-progress:${user.id}:${materialId}`
+      : null;
 
   // ── 1. Fetch material ──────────────────────────────────────────
   useEffect(() => {
@@ -123,9 +128,7 @@ export function MaterialViewPage() {
         const completedMaterials: string[] =
           json.data?.completedMaterials ?? [];
         if (materialId && completedMaterials.includes(materialId)) {
-          setCompletedFiles(
-            material.files.map((file) => getFileKey(file)),
-          );
+          setCompletedFiles(material.files.map((file) => getFileKey(file)));
           setIsCompleted(true);
           setCompletionMessage("Materi telah diselesaikan.");
         } else {
@@ -175,6 +178,23 @@ export function MaterialViewPage() {
       });
     }
   }, [material, isEditing]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (!videoRef.current) return;
+
+      if (e.key === "ArrowRight") {
+        videoRef.current.currentTime += 10;
+      }
+
+      if (e.key === "ArrowLeft") {
+        videoRef.current.currentTime -= 10;
+      }
+    };
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -274,9 +294,8 @@ export function MaterialViewPage() {
             Akses Ditolak
           </h1>
           <p className="text-muted-foreground">
-            Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses
-            materi ini. (Level materi: {materialLevel}, Level kamu:{" "}
-            {userLevel})
+            Anda perlu menyelesaikan tingkatan sebelumnya untuk mengakses materi
+            ini. (Level materi: {materialLevel}, Level kamu: {userLevel})
           </p>
           <Button onClick={() => navigate("/dashboard")} className="mt-4">
             Kembali ke Dashboard
@@ -346,7 +365,9 @@ export function MaterialViewPage() {
         );
       }
       setError(
-        err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan progress",
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat menyimpan progress",
       );
     }
   };
@@ -364,338 +385,368 @@ export function MaterialViewPage() {
 
   return (
     <AppLayout className="max-w-7xl py-6">
-        <Button
-          variant="ghost"
-          onClick={() =>
-            navigate(
-              `/class/${material.classId}?openLevel=${material.level}&activeMaterial=${material.id}#materials`,
-            )
-          }
-          className="mb-4 text-base"
-        >
-          <ArrowLeft className="h-5 w-5 mr-2" />
-          Kembali ke Materi
-        </Button>
+      <Button
+        variant="ghost"
+        onClick={() =>
+          navigate(
+            `/class/${material.classId}?openLevel=${material.level}&activeMaterial=${material.id}#materials`,
+          )
+        }
+        className="mb-4 text-base"
+      >
+        <ArrowLeft className="h-5 w-5 mr-2" />
+        Kembali ke Materi
+      </Button>
 
-        <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-180px)]">
-          {/* ── Left Sidebar ── */}
-          <div className="w-full lg:w-96 shrink-0">
-            <Card className="h-full overflow-y-auto">
-              <div className="sticky top-0 z-10 border-b border-border bg-card/95 p-5 backdrop-blur supports-backdrop-filter:bg-card/80">
-                <h2 className="mb-1 text-lg font-semibold tracking-tight">
-                  Daftar Materi
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {material.files.length} file tersedia
-                </p>
-              </div>
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* ── Left Sidebar ── */}
+        <div className="w-full lg:w-96 shrink-0 self-stretch">
+          <Card className="h-full">
+            <div className="sticky top-0 z-10 border-b border-border bg-card/95 p-5 backdrop-blur supports-backdrop-filter:bg-card/80">
+              <h2 className="mb-1 text-lg font-semibold tracking-tight">
+                Daftar Materi
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {material.files.length} file tersedia
+              </p>
+            </div>
 
-              <div className="p-4 space-y-5">
-                  {videoFiles.length === 0 && pdfFiles.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Belum ada file materi
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    {videoFiles.length > 0 && (
-                      <div>
-                        <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-red-600 dark:text-red-400">
-                          <PlayCircle className="h-5 w-5" />
-                          Video Pembelajaran
-                        </h3>
-                        <div className="space-y-2">
-                          {videoFiles.map((file) => (
-                            <div
-                              key={file.id}
-                              className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                                selectedFile === file.id
-                                  ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                                  : completedFiles.includes(getFileKey(file))
-                                    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/10"
-                                    : "border-gray-200 dark:border-gray-700 hover:border-red-300"
-                              }`}
-                              onClick={() => setSelectedFile(file.id)}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-red-100 dark:bg-red-900/20">
-                                  <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+            <div className="p-4 space-y-5">
+              {videoFiles.length === 0 && pdfFiles.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Belum ada file materi
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {videoFiles.length > 0 && (
+                    <div>
+                      <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-red-600 dark:text-red-400">
+                        <PlayCircle className="h-5 w-5" />
+                        Video Pembelajaran
+                      </h3>
+                      <div className="space-y-2">
+                        {videoFiles.map((file) => (
+                          <div
+                            key={file.id}
+                            className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                              selectedFile === file.id
+                                ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                                : completedFiles.includes(getFileKey(file))
+                                  ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/10"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-red-300"
+                            }`}
+                            onClick={() => setSelectedFile(file.id)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-red-100 dark:bg-red-900/20">
+                                <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <h4 className="font-bold text-base leading-tight">
+                                    {file.name}
+                                  </h4>
+                                  {completedFiles.includes(
+                                    getFileKey(file),
+                                  ) && (
+                                    <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                                  )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1.5">
-                                    <h4 className="font-bold text-base leading-tight">
-                                      {file.name}
-                                    </h4>
-                                    {completedFiles.includes(getFileKey(file)) && (
-                                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                                    )}
-                                  </div>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    {file.duration || "Video"}
-                                  </p>
-                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                  {file.duration || "Video"}
+                                </p>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {pdfFiles.length > 0 && (
-                      <div>
-                        <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                          <FileText className="h-5 w-5" />
-                          Dokumen PDF
-                        </h3>
-                        <div className="space-y-2">
-                          {pdfFiles.map((file) => (
-                            <div
-                              key={file.id}
-                              className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                                selectedFile === file.id
-                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                  : completedFiles.includes(getFileKey(file))
-                                    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/10"
-                                    : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
-                              }`}
-                              onClick={() => setSelectedFile(file.id)}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-blue-100 dark:bg-blue-900/20">
-                                  <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1.5">
-                                    <h4 className="font-semibold text-base leading-tight">
-                                      {file.name}
-                                    </h4>
-                                    {completedFiles.includes(getFileKey(file)) && (
-                                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                                    )}
-                                  </div>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Dokumen
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </Card>
-          </div>
-
-          {/* ── Right Content ── */}
-          <div className="flex-1 min-w-0">
-            <div className="h-full flex flex-col gap-6">
-              {/* Header */}
-              
-
-              {/* Viewer */}
-              {selectedFile && selectedFileData && (
-                <Card className="flex-1 p-6 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                          selectedFileData.type === "video"
-                            ? "bg-red-100 dark:bg-red-900/20"
-                            : "bg-blue-100 dark:bg-blue-900/20"
-                        }`}
-                      >
-                        {selectedFileData.type === "video" ? (
-                          <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                        ) : (
-                          <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold">
-                          {selectedFileData.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                          {selectedFileData.type} •{" "}
-                          {selectedFileData.duration || "View Only"}
-                        </p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    {!isCompleted && !completedFiles.includes(getFileKey(selectedFileData)) && (
+                  )}
+
+                  {pdfFiles.length > 0 && (
+                    <div>
+                      <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                        <FileText className="h-5 w-5" />
+                        Dokumen PDF
+                      </h3>
+                      <div className="space-y-2">
+                        {pdfFiles.map((file) => (
+                          <div
+                            key={file.id}
+                            className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                              selectedFile === file.id
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                : completedFiles.includes(getFileKey(file))
+                                  ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/10"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
+                            }`}
+                            onClick={() => setSelectedFile(file.id)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-blue-100 dark:bg-blue-900/20">
+                                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <h4 className="font-semibold text-base leading-tight">
+                                    {file.name}
+                                  </h4>
+                                  {completedFiles.includes(
+                                    getFileKey(file),
+                                  ) && (
+                                    <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                  Dokumen
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* ── Right Content ── */}
+        <div className="flex-1 min-w-0">
+          <div className="h-full flex flex-col gap-6">
+            {/* Header */}
+
+            {/* Viewer */}
+            <Card className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge variant="secondary" className="text-sm">
+                      Pertemuan {material.meetingNumber}
+                    </Badge>
+                    <Badge variant="outline" className="text-sm">
+                      Level {material.level}
+                    </Badge>
+                    {isCompleted && (
+                      <Badge variant="default" className="text-sm">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Selesai
+                      </Badge>
+                    )}
+                  </div>
+                  <h1 className="text-3xl font-semibold mb-2">
+                    {material.title}
+                  </h1>
+                  <p className="text-base text-gray-600 dark:text-gray-400">
+                    {material.description}
+                  </p>
+
+                  {user?.role === "superadmin" && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleEdit}
+                        className="flex-1 max-w-fit"
+                      >
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Edit Materi
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleDelete}
+                        className="flex-1 max-w-fit"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Hapus Materi
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isEditing && (
+                <div className="mt-6 space-y-4 border-t pt-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Judul Materi
+                    </label>
+                    <input
+                      type="text"
+                      value={editDraft.title}
+                      onChange={(e) =>
+                        setEditDraft({ ...editDraft, title: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Deskripsi
+                    </label>
+                    <textarea
+                      value={editDraft.description}
+                      onChange={(e) =>
+                        setEditDraft({
+                          ...editDraft,
+                          description: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                      rows={4}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Pertemuan Ke-
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editDraft.meetingNumber}
+                      onChange={(e) =>
+                        setEditDraft({
+                          ...editDraft,
+                          meetingNumber: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button onClick={handleSaveEdit} className="flex-1">
+                      Simpan Perubahan
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditing(false)}
+                      className="flex-1"
+                    >
+                      Batal
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {selectedFile && selectedFileData && (
+              <Card className="p-6 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                        selectedFileData.type === "video"
+                          ? "bg-red-100 dark:bg-red-900/20"
+                          : "bg-blue-100 dark:bg-blue-900/20"
+                      }`}
+                    >
+                      {selectedFileData.type === "video" ? (
+                        <PlayCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                      ) : (
+                        <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">
+                        {selectedFileData.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                        {selectedFileData.type} •{" "}
+                        {selectedFileData.duration || "View Only"}
+                      </p>
+                    </div>
+                  </div>
+                  {!isCompleted &&
+                    !completedFiles.includes(getFileKey(selectedFileData)) && (
                       <Button onClick={() => handleMarkComplete(selectedFile)}>
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Tandai Selesai
                       </Button>
                     )}
-                    {isCompleted && (
-                      <Badge className="bg-emerald-600 text-white">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Materi selesai
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-h-0">
-                    {selectedFileData.type === "video" ? (
-                      <div className="h-full bg-black rounded-lg overflow-hidden">
-                        <video
-                          controls
-                          controlsList="nodownload"
-                          className="w-full h-full object-contain bg-black"
-                          src={selectedFileData.url}
-                          onContextMenu={(e) => e.preventDefault()}
-                        >
-                          Your browser does not support the video tag.
-                        </video>
-                      </div>
-                    ) : (
-                      <div className="h-full">
-                        <PDFViewer url={selectedFileData.url} />
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              )}
-
-              <Card className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Badge variant="secondary" className="text-sm">
-                        Pertemuan {material.meetingNumber}
-                      </Badge>
-                      <Badge variant="outline" className="text-sm">
-                        Level {material.level}
-                      </Badge>
-                      {isCompleted && (
-                        <Badge variant="default" className="text-sm">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Selesai
-                        </Badge>
-                      )}
-                    </div>
-                    <h1 className="text-3xl font-semibold mb-2">
-                      {material.title}
-                    </h1>
-                    <p className="text-base text-gray-600 dark:text-gray-400">
-                      {material.description}
-                    </p>
-
-                    {user?.role === "superadmin" && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleEdit}
-                          className="flex-1 max-w-fit"
-                        >
-                          <Edit3 className="h-4 w-4 mr-2" />
-                          Edit Materi
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={handleDelete}
-                          className="flex-1 max-w-fit"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Hapus Materi
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  {isCompleted && (
+                    <Badge className="bg-emerald-600 text-white">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Materi selesai
+                    </Badge>
+                  )}
                 </div>
 
-                {isEditing && (
-                  <div className="mt-6 space-y-4 border-t pt-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Judul Materi
-                      </label>
-                      <input
-                        type="text"
-                        value={editDraft.title}
-                        onChange={(e) =>
-                          setEditDraft({ ...editDraft, title: e.target.value })
-                        }
-                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                <div className="flex-1 min-h-0">
+                  {selectedFileData.type === "video" ? (
+                    <div className="w-full aspect-video mt-2 bg-black rounded-xl overflow-hidden relative">
+                      <video
+                        ref={videoRef}
+                        controls
+                        controlsList="nodownload"
+                        className="w-full h-full object-contain"
+                        src={selectedFileData.url}
+                        onContextMenu={(e) => e.preventDefault()}
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Deskripsi
-                      </label>
-                      <textarea
-                        value={editDraft.description}
-                        onChange={(e) =>
-                          setEditDraft({
-                            ...editDraft,
-                            description: e.target.value,
-                          })
-                        }
-                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                        rows={4}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Pertemuan Ke-
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={editDraft.meetingNumber}
-                        onChange={(e) =>
-                          setEditDraft({
-                            ...editDraft,
-                            meetingNumber: e.target.value,
-                          })
-                        }
-                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <Button onClick={handleSaveEdit} className="flex-1">
-                        Simpan Perubahan
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsEditing(false)}
-                        className="flex-1"
-                      >
-                        Batal
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </Card>
 
-              {/* Completion banner */}
-              {(allFilesCompleted || isCompleted || completionMessage) && (
-                <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
-                    <div>
-                      <h3 className="text-base font-bold text-green-900 dark:text-green-100">
-                        {isCompleted ? "Materi telah diselesaikan" : "Progress materi tersimpan"}
-                      </h3>
-                      <p className="text-sm text-green-700 dark:text-green-300">
-                        {completionMessage ??
-                          (isCompleted
-                            ? "Materi selesai."
-                            : "Sebagian file sudah ditandai selesai.")}
-                      </p>
+                      {/* Overlay Controls */}
+                      <div className="absolute inset-0 flex items-center justify-center gap-6 pointer-events-none">
+                        {/* BACK */}
+                        <button
+                          onClick={() => {
+                            if (videoRef.current)
+                              videoRef.current.currentTime -= 10;
+                          }}
+                          className="pointer-events-auto bg-black/60 text-white px-4 py-3 rounded-full hover:bg-black/80 transition"
+                        >
+                          ⏪ 10s
+                        </button>
+
+                        {/* FORWARD */}
+                        <button
+                          onClick={() => {
+                            if (videoRef.current)
+                              videoRef.current.currentTime += 10;
+                          }}
+                          className="pointer-events-auto bg-black/60 text-white px-4 py-3 rounded-full hover:bg-black/80 transition"
+                        >
+                          10s ⏩
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <div className="h-full">
+                      <PDFViewer url={selectedFileData.url} />
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* Completion banner */}
+            {(allFilesCompleted || isCompleted || completionMessage) && (
+              <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  <div>
+                    <h3 className="text-base font-bold text-green-900 dark:text-green-100">
+                      {isCompleted
+                        ? "Materi telah diselesaikan"
+                        : "Progress materi tersimpan"}
+                    </h3>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      {completionMessage ??
+                        (isCompleted
+                          ? "Materi selesai."
+                          : "Sebagian file sudah ditandai selesai.")}
+                    </p>
                   </div>
-                </Card>
-              )}
-            </div>
+                </div>
+              </Card>
+            )}
           </div>
         </div>
+      </div>
     </AppLayout>
   );
 }
