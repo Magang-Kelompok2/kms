@@ -41,7 +41,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/materials", materialsRoutes);
 app.use("/api/tugas", tugasRoutes);
 app.use("/api/upload", uploadRoutes);
-app.use("/api/pengumpulan", pengumpulanRoutes); // ← tambah ini
+app.use("/api/pengumpulan", pengumpulanRoutes); 
 app.use("/api/kuis", kuisRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/files", filesRoutes);

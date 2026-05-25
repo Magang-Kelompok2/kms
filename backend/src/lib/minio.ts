@@ -5,14 +5,14 @@ dotenv.config();
 export const BUCKET = process.env.MINIO_BUCKET ?? "alpha";
 
 console.log("MinIO config:", {
-  endPoint: process.env.MINIO_ENDPOINT ?? "192.168.101.143",
-  port: Number(process.env.MINIO_PORT ?? 9000),
+  endPoint: process.env.MINIO_ENDPOINT ?? "76.13.222.194",
+  port: Number(process.env.MINIO_PORT ?? 9012),
   bucket: process.env.MINIO_BUCKET,
 });
 
 export const minioClient = new Minio.Client({
-  endPoint: process.env.MINIO_ENDPOINT ?? "192.168.101.143",
-  port: Number(process.env.MINIO_PORT ?? 9000),
+  endPoint: process.env.MINIO_ENDPOINT ?? "76.13.222.194",
+  port: Number(process.env.MINIO_PORT ?? 9012),
   useSSL: false,
   accessKey: process.env.MINIO_ACCESS_KEY ?? "alpha",
   secretKey: process.env.MINIO_SECRET_KEY ?? "alpha123",
@@ -22,8 +22,8 @@ export async function getPresignedUrl(resourcePath: string): Promise<string> {
   if (!resourcePath) return resourcePath;
   const normalized = resourcePath.trim();
 
-  const minioEndpoint = process.env.MINIO_ENDPOINT ?? "192.168.101.143";
-  const minioPort = process.env.MINIO_PORT ?? "9000";
+  const minioEndpoint = process.env.MINIO_ENDPOINT ?? "76.13.222.194";
+  const minioPort = process.env.MINIO_PORT ?? "9012";
   const minioBase = `http://${minioEndpoint}:${minioPort}/`;
 
   let objectKey: string;

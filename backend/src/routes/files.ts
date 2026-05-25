@@ -4,12 +4,21 @@ import { supabase } from "../lib/supabase";
 
 const router = Router();
 
+function normalizeObjectName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\.[^.]+$/, "")
+    .replace(/\b(dan|and)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
 // ── Resolve object key (handles folder prefix → find actual file) ──────────
 async function resolveObjectKey(rawPath: string): Promise<string | null> {
   if (!rawPath) return null;
 
-  const minioEndpoint = process.env.MINIO_ENDPOINT ?? "192.168.101.143";
-  const minioPort = process.env.MINIO_PORT ?? "9000";
+  const minioEndpoint = process.env.MINIO_ENDPOINT ?? "76.13.222.194";
+  const minioPort = process.env.MINIO_PORT ?? "9012";
   const minioBase = `http://${minioEndpoint}:${minioPort}/`;
 
   let objectKey: string;
@@ -51,6 +60,46 @@ async function resolveObjectKey(rawPath: string): Promise<string | null> {
       stream.on("end", () => resolve(null));
       stream.on("error", () => resolve(null));
     });
+    if (found) return found;
+  } catch {
+    // fall through to fuzzy matching
+  }
+
+  // Fuzzy fallback: search within the same folder for a file whose normalized
+  // filename matches the stored filename. This handles renamed or reformatted
+  // filenames in the database.
+  const fileName = objectKey.split("/").pop() ?? "";
+  const target = normalizeObjectName(fileName);
+  const parentPrefix = objectKey.includes("/")
+    ? objectKey.slice(0, objectKey.lastIndexOf("/"))
+    : "";
+
+  if (!target || !parentPrefix) return null;
+
+  try {
+    const stream = minioClient.listObjects(BUCKET, parentPrefix, true);
+    const found = await new Promise<string | null>((resolve) => {
+      let resolved = false;
+      const finish = (value: string | null) => {
+        if (resolved) return;
+        resolved = true;
+        resolve(value);
+      };
+
+      stream.on("data", (obj) => {
+        if (resolved || !obj.name) return;
+
+        const candidateName = obj.name.split("/").pop() ?? obj.name;
+        if (normalizeObjectName(candidateName) === target) {
+          stream.destroy();
+          finish(obj.name);
+        }
+      });
+
+      stream.on("end", () => finish(null));
+      stream.on("error", () => finish(null));
+    });
+
     return found;
   } catch {
     return null;

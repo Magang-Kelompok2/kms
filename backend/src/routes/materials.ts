@@ -9,9 +9,25 @@ import {
 
 const router = Router();
 
+// Helper untuk mendeteksi error duplicate key pada database
 const isDuplicateKeyError = (error: any) => {
   const message = String(error?.message ?? error?.details ?? "").toLowerCase();
   return error?.code === "23505" || message.includes("duplicate key");
+};
+
+// Helper untuk memotong URL utuh menjadi relative path yang dipahami oleh Supabase Storage
+const getRelativePath = (fullPathOrUrl: string, bucketName: string): string => {
+  if (!fullPathOrUrl) return "";
+  const signMarker = `/storage/v1/object/sign/${bucketName}/`;
+  const publicMarker = `/storage/v1/object/public/${bucketName}/`;
+  
+  if (fullPathOrUrl.includes(signMarker)) {
+    return decodeURIComponent(fullPathOrUrl.split(signMarker)[1].split('?')[0]);
+  }
+  if (fullPathOrUrl.includes(publicMarker)) {
+    return decodeURIComponent(fullPathOrUrl.split(publicMarker)[1]);
+  }
+  return fullPathOrUrl;
 };
 
 // GET /api/materials
@@ -106,23 +122,67 @@ router.get("/:materialId", async (req, res) => {
       pdfs: pdfs,
     });
 
-    const apiBase =
-      process.env.VITE_API_URL ??
-      `http://localhost:${process.env.PORT ?? 4000}`;
+    // ── CONFIG SUPABASE STORAGE STREAMING ──
+    const BUCKET_NAME = "alpha"; // 
+    const EXPIRE_IN_SECONDS = 60 * 60 * 3; // Signed URL aktif selama 3 jam
 
-    const videoFiles = (videos ?? []).map((v: any) => ({
-      id: String(v.id_video),
-      name: v.title_video ?? "Untitled Video",
-      url: `${apiBase}/api/files/proxy?path=${encodeURIComponent(v.video_path)}`,
-      type: "video" as const,
-    }));
+    // 4. Generate Signed URL untuk file Video (Bypass Proxy agar mendukung Range Requests)
+    const videoFiles = await Promise.all(
+      (videos ?? []).map(async (v: any) => {
+        let finalUrl = "";
+        const cleanPath = getRelativePath(v.video_path, BUCKET_NAME);
 
-    const pdfFiles = (pdfs ?? []).map((p: any) => ({
-      id: String(p.id_pdf),
-      name: p.title_pdf ?? "Untitled PDF",
-      url: `${apiBase}/api/files/proxy?path=${encodeURIComponent(p.pdf_path)}`,
-      type: "pdf" as const,
-    }));
+        try {
+          const { data: signedData, error: signedError } = await supabase.storage
+            .from(BUCKET_NAME)
+            .createSignedUrl(cleanPath, EXPIRE_IN_SECONDS);
+
+          if (signedError) throw signedError;
+          finalUrl = signedData.signedUrl;
+        } catch (err) {
+          console.error(`Gagal membuat signed URL video ${v.id_video}:`, err);
+          // Fallback ke proxy jika generate Signed URL gagal atau file 404
+          const apiBase = process.env.VITE_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
+          finalUrl = `${apiBase}/api/files/proxy?path=${encodeURIComponent(v.video_path)}`;
+        }
+
+        return {
+          id: String(v.id_video),
+          name: v.title_video ?? "Untitled Video",
+          url: finalUrl,
+          type: "video" as const,
+        };
+      })
+    );
+
+    // 5. Generate Signed URL untuk file PDF
+    const pdfFiles = await Promise.all(
+      (pdfs ?? []).map(async (p: any) => {
+        let finalUrl = "";
+        const cleanPath = getRelativePath(p.pdf_path, BUCKET_NAME);
+
+        try {
+          const { data: signedData, error: signedError } = await supabase.storage
+            .from(BUCKET_NAME)
+            .createSignedUrl(cleanPath, EXPIRE_IN_SECONDS);
+
+          if (signedError) throw signedError;
+          finalUrl = signedData.signedUrl;
+        } catch (err) {
+          console.error(`Gagal membuat signed URL pdf ${p.id_pdf}:`, err);
+          // Fallback ke proxy jika generate Signed URL gagal atau file 404
+          const apiBase = process.env.VITE_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
+          finalUrl = `${apiBase}/api/files/proxy?path=${encodeURIComponent(p.pdf_path)}`;
+        }
+
+        return {
+          id: String(p.id_pdf),
+          name: p.title_pdf ?? "Untitled PDF",
+          url: finalUrl,
+          type: "pdf" as const,
+        };
+      })
+    );
 
     res.json({
       success: true,
@@ -132,7 +192,6 @@ router.get("/:materialId", async (req, res) => {
         description: data.deskripsi ?? "",
         classId: String(data.id_kelas),
         meetingNumber: data.pertemuan,
-        // FIX: sertakan level dari id_tingkatan agar cek akses di frontend bisa jalan
         level: data.id_tingkatan,
         isPublished: true,
         files: [...videoFiles, ...pdfFiles],
@@ -243,7 +302,6 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
 });
 
 // PUT /api/materials/:materialId
-// Body: { title_materi?, deskripsi?, pertemuan? }
 router.put("/:materialId", verifySupabaseToken, async (req: any, res) => {
   const materialId = Number(req.params.materialId);
   if (isNaN(materialId)) {
@@ -338,6 +396,7 @@ router.put("/:materialId", verifySupabaseToken, async (req: any, res) => {
   }
 });
 
+// POST /api/materials/:materialId/complete-file
 router.post(
   "/:materialId/complete-file",
   verifySupabaseToken,
