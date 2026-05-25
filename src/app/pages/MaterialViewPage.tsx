@@ -26,9 +26,10 @@ export function MaterialViewPage() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [material, setMaterial] = useState<MaterialType | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const isProgrammaticSeekRef = useRef(false);
+
   const [materialLoading, setMaterialLoading] = useState(true);
   const [progressLoading, setProgressLoading] = useState(true);
-
   const [error, setError] = useState<string | null>(null);
   const [completionMessage, setCompletionMessage] = useState<string | null>(
     null,
@@ -45,12 +46,58 @@ export function MaterialViewPage() {
 
   const getFileKey = (file: { id: string; type: "pdf" | "video" }) =>
     `${file.type}:${file.id}`;
+
+  const getMaxBufferedEnd = (video: HTMLVideoElement) => {
+    const { buffered, duration } = video;
+
+    if (!buffered || buffered.length === 0) {
+      return 0;
+    }
+
+    let maxEnd = 0;
+
+    for (let i = 0; i < buffered.length; i++) {
+      maxEnd = Math.max(maxEnd, buffered.end(i));
+    }
+
+    return Math.min(maxEnd, Number.isFinite(duration) ? duration : maxEnd);
+  };
+
+  const seekVideo = (seconds: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const currentTime = video.currentTime;
+    const duration = Number.isFinite(video.duration)
+      ? video.duration
+      : currentTime;
+
+    isProgrammaticSeekRef.current = true;
+    video.currentTime = Math.min(Math.max(currentTime + seconds, 0), duration);
+
+    window.setTimeout(() => {
+      isProgrammaticSeekRef.current = false;
+    }, 300);
+  };
+
+  const handleVideoSeeking = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isProgrammaticSeekRef.current) return;
+
+    const maxBufferedEnd = getMaxBufferedEnd(video);
+
+    if (video.currentTime > maxBufferedEnd) {
+      video.currentTime = maxBufferedEnd;
+    }
+  };
+
   const localProgressKey =
     user?.id && materialId
       ? `material-progress:${user.id}:${materialId}`
       : null;
 
-  // ── 1. Fetch material ──────────────────────────────────────────
   useEffect(() => {
     const fetchMaterial = async () => {
       if (!materialId) return;
@@ -68,7 +115,6 @@ export function MaterialViewPage() {
         setMaterial(json.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Terjadi kesalahan");
-        // FIX: Jika material gagal di-fetch, progress tidak perlu di-fetch juga
         setProgressLoading(false);
       } finally {
         setMaterialLoading(false);
@@ -78,19 +124,14 @@ export function MaterialViewPage() {
     fetchMaterial();
   }, [materialId]);
 
-  // ── 2. Fetch progress ──────────────────────────────────────────
   useEffect(() => {
-    // FIX: Jika material belum ada (termasuk jika classId tidak ada),
-    // langsung set progressLoading false agar tidak stuck loading selamanya.
     if (!material) return;
 
     if (!material.classId) {
-      // classId tidak ada — tidak bisa fetch progress, anggap level 1
       setProgressLoading(false);
       return;
     }
 
-    // Superadmin tidak butuh progress
     if (user?.role === "superadmin") {
       setProgressLoading(false);
       return;
@@ -112,8 +153,6 @@ export function MaterialViewPage() {
           },
         );
 
-        // FIX: Jika 404 atau error lain (user belum punya progress),
-        // default userLevel = 1 sehingga materi level 1 tetap bisa diakses.
         if (!res.ok) {
           setUserLevel(1);
           return;
@@ -121,12 +160,12 @@ export function MaterialViewPage() {
 
         const json = await res.json();
 
-        // FIX: Fallback eksplisit ke 1 jika data tidak ada
         const level = json.data?.tingkatanSaatIni;
         setUserLevel(typeof level === "number" && level >= 1 ? level : 1);
 
         const completedMaterials: string[] =
           json.data?.completedMaterials ?? [];
+
         if (materialId && completedMaterials.includes(materialId)) {
           setCompletedFiles(material.files.map((file) => getFileKey(file)));
           setIsCompleted(true);
@@ -136,13 +175,13 @@ export function MaterialViewPage() {
             localProgressKey && typeof window !== "undefined"
               ? window.localStorage.getItem(localProgressKey)
               : null;
+
           setCompletedFiles(
             savedLocalProgress ? JSON.parse(savedLocalProgress) : [],
           );
           setCompletionMessage(null);
         }
       } catch {
-        // Gagal fetch progress → default level 1 agar tidak langsung ditolak
         setUserLevel(1);
       } finally {
         setProgressLoading(false);
@@ -152,7 +191,6 @@ export function MaterialViewPage() {
     fetchProgress();
   }, [localProgressKey, material, user?.id, user?.role, materialId, token]);
 
-  // ── 3. Auto-select file pertama ────────────────────────────────
   useEffect(() => {
     if (
       material &&
@@ -168,7 +206,6 @@ export function MaterialViewPage() {
     }
   }, [material]);
 
-  // 4. Initialize edit draft
   useEffect(() => {
     if (material && isEditing) {
       setEditDraft({
@@ -184,11 +221,13 @@ export function MaterialViewPage() {
       if (!videoRef.current) return;
 
       if (e.key === "ArrowRight") {
-        videoRef.current.currentTime += 10;
+        e.preventDefault();
+        seekVideo(10);
       }
 
       if (e.key === "ArrowLeft") {
-        videoRef.current.currentTime -= 10;
+        e.preventDefault();
+        seekVideo(-10);
       }
     };
 
@@ -248,7 +287,6 @@ export function MaterialViewPage() {
     }
   };
 
-  // ── Loading state ──────────────────────────────────────────────
   if (materialLoading || progressLoading) {
     return (
       <AppLayout>
@@ -277,8 +315,6 @@ export function MaterialViewPage() {
     );
   }
 
-  // ── Cek akses ──────────────────────────────────────────────────
-  // FIX: Jika material.level tidak terdefinisi/null, anggap level 1
   const materialLevel =
     typeof material.level === "number" && material.level >= 1
       ? material.level
@@ -316,6 +352,7 @@ export function MaterialViewPage() {
 
     const nextCompletedFiles = [...completedFiles, fileKey];
     setCompletedFiles(nextCompletedFiles);
+
     if (localProgressKey && typeof window !== "undefined") {
       window.localStorage.setItem(
         localProgressKey,
@@ -345,6 +382,7 @@ export function MaterialViewPage() {
       );
 
       const json = await res.json();
+
       if (!res.ok || !json.success) {
         throw new Error(json.error ?? "Gagal menyimpan progress materi");
       }
@@ -353,17 +391,20 @@ export function MaterialViewPage() {
       setIsCompleted(true);
       setCompletionMessage("Materi telah diselesaikan.");
       setError(null);
+
       if (localProgressKey && typeof window !== "undefined") {
         window.localStorage.removeItem(localProgressKey);
       }
     } catch (err) {
       setCompletedFiles(completedFiles);
+
       if (localProgressKey && typeof window !== "undefined") {
         window.localStorage.setItem(
           localProgressKey,
           JSON.stringify(completedFiles),
         );
       }
+
       setError(
         err instanceof Error
           ? err.message
@@ -375,6 +416,7 @@ export function MaterialViewPage() {
   const completedCurrentMaterialFiles = material.files.filter((file) =>
     completedFiles.includes(getFileKey(file)),
   ).length;
+
   const allFilesCompleted =
     material.files.length > 0 &&
     completedCurrentMaterialFiles === material.files.length;
@@ -399,7 +441,6 @@ export function MaterialViewPage() {
       </Button>
 
       <div className="flex flex-col lg:flex-row gap-6 items-start lg:h-[calc(100vh-4rem-4rem)] lg:overflow-hidden">
-        {/* ── Left Sidebar ── */}
         <div className="w-full lg:w-96 shrink-0 lg:h-full lg:min-h-0">
           <Card className="lg:h-full lg:min-h-0 flex flex-col overflow-hidden">
             <div className="sticky top-0 z-10 border-b border-border bg-card/95 p-5 backdrop-blur supports-backdrop-filter:bg-card/80">
@@ -516,12 +557,8 @@ export function MaterialViewPage() {
           </Card>
         </div>
 
-        {/* ── Right Content ── */}
         <div className="flex-1 min-w-0 lg:h-full lg:min-h-0 lg:overflow-hidden">
           <div className="h-full flex flex-col gap-6">
-            {/* Header */}
-
-            {/* Viewer */}
             <Card className="p-6">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
@@ -586,6 +623,7 @@ export function MaterialViewPage() {
                       className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Deskripsi
@@ -602,6 +640,7 @@ export function MaterialViewPage() {
                       rows={4}
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Pertemuan Ke-
@@ -619,6 +658,7 @@ export function MaterialViewPage() {
                       className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
                     />
                   </div>
+
                   <div className="flex gap-3">
                     <Button onClick={handleSaveEdit} className="flex-1">
                       Simpan Perubahan
@@ -662,6 +702,7 @@ export function MaterialViewPage() {
                       </p>
                     </div>
                   </div>
+
                   {!isCompleted &&
                     !completedFiles.includes(getFileKey(selectedFileData)) && (
                       <Button onClick={() => handleMarkComplete(selectedFile)}>
@@ -669,6 +710,7 @@ export function MaterialViewPage() {
                         Tandai Selesai
                       </Button>
                     )}
+
                   {isCompleted && (
                     <Badge className="bg-emerald-600 text-white">
                       <CheckCircle className="h-3 w-3 mr-1" />
@@ -689,27 +731,19 @@ export function MaterialViewPage() {
                         className="w-full h-full object-contain"
                         src={selectedFileData.url}
                         onContextMenu={(e) => e.preventDefault()}
+                        onSeeking={handleVideoSeeking}
                       />
 
-                      {/* Overlay Controls */}
                       <div className="absolute inset-0 flex items-center justify-center gap-6 pointer-events-none">
-                        {/* BACK */}
                         <button
-                          onClick={() => {
-                            if (videoRef.current)
-                              videoRef.current.currentTime -= 10;
-                          }}
+                          onClick={() => seekVideo(-10)}
                           className="pointer-events-auto bg-black/60 text-white px-4 py-3 rounded-full hover:bg-black/80 transition"
                         >
                           ⏪ 10s
                         </button>
 
-                        {/* FORWARD */}
                         <button
-                          onClick={() => {
-                            if (videoRef.current)
-                              videoRef.current.currentTime += 10;
-                          }}
+                          onClick={() => seekVideo(10)}
                           className="pointer-events-auto bg-black/60 text-white px-4 py-3 rounded-full hover:bg-black/80 transition"
                         >
                           10s ⏩
@@ -725,7 +759,6 @@ export function MaterialViewPage() {
               </Card>
             )}
 
-            {/* Completion banner */}
             {(allFilesCompleted || isCompleted || completionMessage) && (
               <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
                 <div className="flex items-center gap-3">

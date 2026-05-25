@@ -20,9 +20,9 @@ const getRelativePath = (fullPathOrUrl: string, bucketName: string): string => {
   if (!fullPathOrUrl) return "";
   const signMarker = `/storage/v1/object/sign/${bucketName}/`;
   const publicMarker = `/storage/v1/object/public/${bucketName}/`;
-  
+
   if (fullPathOrUrl.includes(signMarker)) {
-    return decodeURIComponent(fullPathOrUrl.split(signMarker)[1].split('?')[0]);
+    return decodeURIComponent(fullPathOrUrl.split(signMarker)[1].split("?")[0]);
   }
   if (fullPathOrUrl.includes(publicMarker)) {
     return decodeURIComponent(fullPathOrUrl.split(publicMarker)[1]);
@@ -123,7 +123,7 @@ router.get("/:materialId", async (req, res) => {
     });
 
     // ── CONFIG SUPABASE STORAGE STREAMING ──
-    const BUCKET_NAME = "alpha"; // 
+    const BUCKET_NAME = "alpha"; //
     const EXPIRE_IN_SECONDS = 60 * 60 * 3; // Signed URL aktif selama 3 jam
 
     // 4. Generate Signed URL untuk file Video (Bypass Proxy agar mendukung Range Requests)
@@ -133,16 +133,19 @@ router.get("/:materialId", async (req, res) => {
         const cleanPath = getRelativePath(v.video_path, BUCKET_NAME);
 
         try {
-          const { data: signedData, error: signedError } = await supabase.storage
-            .from(BUCKET_NAME)
-            .createSignedUrl(cleanPath, EXPIRE_IN_SECONDS);
+          const { data: signedData, error: signedError } =
+            await supabase.storage
+              .from(BUCKET_NAME)
+              .createSignedUrl(cleanPath, EXPIRE_IN_SECONDS);
 
           if (signedError) throw signedError;
           finalUrl = signedData.signedUrl;
         } catch (err) {
           console.error(`Gagal membuat signed URL video ${v.id_video}:`, err);
           // Fallback ke proxy jika generate Signed URL gagal atau file 404
-          const apiBase = process.env.VITE_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
+          const apiBase =
+            process.env.VITE_API_URL ??
+            `http://localhost:${process.env.PORT ?? 4000}`;
           finalUrl = `${apiBase}/api/files/proxy?path=${encodeURIComponent(v.video_path)}`;
         }
 
@@ -152,7 +155,7 @@ router.get("/:materialId", async (req, res) => {
           url: finalUrl,
           type: "video" as const,
         };
-      })
+      }),
     );
 
     // 5. Generate Signed URL untuk file PDF
@@ -162,16 +165,19 @@ router.get("/:materialId", async (req, res) => {
         const cleanPath = getRelativePath(p.pdf_path, BUCKET_NAME);
 
         try {
-          const { data: signedData, error: signedError } = await supabase.storage
-            .from(BUCKET_NAME)
-            .createSignedUrl(cleanPath, EXPIRE_IN_SECONDS);
+          const { data: signedData, error: signedError } =
+            await supabase.storage
+              .from(BUCKET_NAME)
+              .createSignedUrl(cleanPath, EXPIRE_IN_SECONDS);
 
           if (signedError) throw signedError;
           finalUrl = signedData.signedUrl;
         } catch (err) {
           console.error(`Gagal membuat signed URL pdf ${p.id_pdf}:`, err);
           // Fallback ke proxy jika generate Signed URL gagal atau file 404
-          const apiBase = process.env.VITE_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
+          const apiBase =
+            process.env.VITE_API_URL ??
+            `http://localhost:${process.env.PORT ?? 4000}`;
           finalUrl = `${apiBase}/api/files/proxy?path=${encodeURIComponent(p.pdf_path)}`;
         }
 
@@ -181,7 +187,7 @@ router.get("/:materialId", async (req, res) => {
           url: finalUrl,
           type: "pdf" as const,
         };
-      })
+      }),
     );
 
     res.json({
@@ -403,7 +409,9 @@ router.post(
   async (req: any, res) => {
     const materialId = Number(req.params.materialId);
     const fileId = Number(req.body?.fileId);
-    const fileType = String(req.body?.fileType ?? "").trim().toLowerCase();
+    const fileType = String(req.body?.fileType ?? "")
+      .trim()
+      .toLowerCase();
     const userId = Number(req.user?.id_user);
 
     if (

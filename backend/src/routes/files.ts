@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { minioClient, BUCKET, getPresignedUrl } from "../lib/minio";
+import { minioClient, BUCKET } from "../lib/minio";
 import { supabase } from "../lib/supabase";
 
 const router = Router();
@@ -13,7 +13,6 @@ function normalizeObjectName(value: string) {
     .trim();
 }
 
-// ── Resolve object key (handles folder prefix → find actual file) ──────────
 async function resolveObjectKey(rawPath: string): Promise<string | null> {
   if (!rawPath) return null;
 
@@ -34,20 +33,19 @@ async function resolveObjectKey(rawPath: string): Promise<string | null> {
     return null;
   } else {
     objectKey = rawPath;
-    if (objectKey.startsWith(`${BUCKET}/`))
+    if (objectKey.startsWith(`${BUCKET}/`)) {
       objectKey = objectKey.slice(BUCKET.length + 1);
-    if (objectKey.startsWith("/")) objectKey = objectKey.slice(1);
+    }
+    if (objectKey.startsWith("/")) {
+      objectKey = objectKey.slice(1);
+    }
   }
 
-  // Try exact key first
   try {
     await minioClient.statObject(BUCKET, objectKey);
     return objectKey;
-  } catch {
-    // Object not found at exact key — try listing with key as prefix
-  }
+  } catch {}
 
-  // Try listing with this path as prefix (handles folder-path stored as key)
   try {
     const stream = minioClient.listObjects(BUCKET, objectKey, true);
     const found = await new Promise<string | null>((resolve) => {
@@ -60,14 +58,10 @@ async function resolveObjectKey(rawPath: string): Promise<string | null> {
       stream.on("end", () => resolve(null));
       stream.on("error", () => resolve(null));
     });
-    if (found) return found;
-  } catch {
-    // fall through to fuzzy matching
-  }
 
-  // Fuzzy fallback: search within the same folder for a file whose normalized
-  // filename matches the stored filename. This handles renamed or reformatted
-  // filenames in the database.
+    if (found) return found;
+  } catch {}
+
   const fileName = objectKey.split("/").pop() ?? "";
   const target = normalizeObjectName(fileName);
   const parentPrefix = objectKey.includes("/")
@@ -78,8 +72,10 @@ async function resolveObjectKey(rawPath: string): Promise<string | null> {
 
   try {
     const stream = minioClient.listObjects(BUCKET, parentPrefix, true);
+
     const found = await new Promise<string | null>((resolve) => {
       let resolved = false;
+
       const finish = (value: string | null) => {
         if (resolved) return;
         resolved = true;
@@ -90,6 +86,7 @@ async function resolveObjectKey(rawPath: string): Promise<string | null> {
         if (resolved || !obj.name) return;
 
         const candidateName = obj.name.split("/").pop() ?? obj.name;
+
         if (normalizeObjectName(candidateName) === target) {
           stream.destroy();
           finish(obj.name);
@@ -106,36 +103,102 @@ async function resolveObjectKey(rawPath: string): Promise<string | null> {
   }
 }
 
+function getContentType(objectKey: string, metaContentType?: string) {
+  if (metaContentType) return metaContentType;
+
+  const lower = objectKey.toLowerCase();
+
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".webm")) return "video/webm";
+  if (lower.endsWith(".mov")) return "video/quicktime";
+  if (lower.endsWith(".pdf")) return "application/pdf";
+
+  return "application/octet-stream";
+}
+
 // ── GET /api/files/proxy?path=<stored-path> ────────────────────────────────
-// Streams a MinIO file through the backend (handles expired or wrong paths)
 router.get("/proxy", async (req: Request, res: Response) => {
   const rawPath = req.query.path as string;
+
   if (!rawPath) {
     return res.status(400).json({ error: "path wajib diisi" });
   }
 
   const objectKey = await resolveObjectKey(rawPath);
+
   if (!objectKey) {
     return res.status(404).json({ error: "File tidak ditemukan di MinIO" });
   }
 
   try {
     const stat = await minioClient.statObject(BUCKET, objectKey);
-    const stream = await minioClient.getObject(BUCKET, objectKey);
+    const fileSize = Number(stat.size);
+    const range = req.headers.range;
+    const contentType = getContentType(
+      objectKey,
+      stat.metaData?.["content-type"],
+    );
+    const filename = objectKey.split("/").pop() ?? "file";
 
-    res.setHeader(
-      "Content-Type",
-      stat.metaData?.["content-type"] ?? "application/octet-stream",
-    );
-    res.setHeader("Content-Length", String(stat.size));
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${objectKey.split("/").pop()}"`,
-    );
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
     res.setHeader("Cache-Control", "private, max-age=3600");
 
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = Number.parseInt(parts[0], 10);
+      const end = parts[1] ? Number.parseInt(parts[1], 10) : fileSize - 1;
+
+      if (
+        Number.isNaN(start) ||
+        Number.isNaN(end) ||
+        start >= fileSize ||
+        end >= fileSize ||
+        start > end
+      ) {
+        res.setHeader("Content-Range", `bytes */${fileSize}`);
+        return res.status(416).end();
+      }
+
+      const chunkSize = end - start + 1;
+
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+      res.setHeader("Content-Length", String(chunkSize));
+
+      const stream = await minioClient.getPartialObject(
+        BUCKET,
+        objectKey,
+        start,
+        chunkSize,
+      );
+
+      stream.pipe(res);
+      stream.on("error", () => {
+        if (!res.headersSent) {
+          res.status(500).end();
+        } else {
+          res.end();
+        }
+      });
+
+      return;
+    }
+
+    res.status(200);
+    res.setHeader("Content-Length", String(fileSize));
+
+    const stream = await minioClient.getObject(BUCKET, objectKey);
+
     stream.pipe(res);
-    stream.on("error", () => res.status(500).end());
+    stream.on("error", () => {
+      if (!res.headersSent) {
+        res.status(500).end();
+      } else {
+        res.end();
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ error: err?.message ?? "Gagal mengambil file" });
   }
@@ -144,11 +207,13 @@ router.get("/proxy", async (req: Request, res: Response) => {
 // ── GET /api/files/download?path=<stored-path> ─────────────────────────────
 router.get("/download", async (req: Request, res: Response) => {
   const rawPath = req.query.path as string;
+
   if (!rawPath) {
     return res.status(400).json({ error: "path wajib diisi" });
   }
 
   const objectKey = await resolveObjectKey(rawPath);
+
   if (!objectKey) {
     return res.status(404).json({ error: "File tidak ditemukan di MinIO" });
   }
@@ -157,10 +222,7 @@ router.get("/download", async (req: Request, res: Response) => {
     const stream = await minioClient.getObject(BUCKET, objectKey);
     const filename = objectKey.split("/").pop() ?? "file";
 
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${filename}"`,
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Cache-Control", "private, max-age=3600");
 
     stream.pipe(res);
@@ -171,14 +233,15 @@ router.get("/download", async (req: Request, res: Response) => {
 });
 
 // ── GET /api/files/signed-url?path=<stored-path> ──────────────────────────
-// Resolves the real objectKey (even if stored as folder) and returns fresh URL
 router.get("/signed-url", async (req: Request, res: Response) => {
   const rawPath = req.query.path as string;
+
   if (!rawPath) {
     return res.status(400).json({ error: "path wajib diisi" });
   }
 
   const objectKey = await resolveObjectKey(rawPath);
+
   if (!objectKey) {
     return res
       .status(404)
@@ -191,41 +254,59 @@ router.get("/signed-url", async (req: Request, res: Response) => {
       objectKey,
       7 * 24 * 60 * 60,
     );
+
     return res.json({ success: true, url, objectKey });
   } catch (err: any) {
-    return res
-      .status(500)
-      .json({ error: err?.message ?? "Gagal membuat URL" });
+    return res.status(500).json({ error: err?.message ?? "Gagal membuat URL" });
   }
 });
 
 // ── GET /api/files/debug/list?prefix= ──────────────────────────────────────
-// List objects in MinIO bucket (for debugging)
 router.get("/debug/list", async (req: Request, res: Response) => {
   const prefix = (req.query.prefix as string) ?? "";
   const objects: any[] = [];
 
   try {
     const stream = minioClient.listObjects(BUCKET, prefix, true);
+
     await new Promise<void>((resolve, reject) => {
-      stream.on("data", (obj) => objects.push({ key: obj.name, size: obj.size, lastModified: obj.lastModified }));
+      stream.on("data", (obj) =>
+        objects.push({
+          key: obj.name,
+          size: obj.size,
+          lastModified: obj.lastModified,
+        }),
+      );
       stream.on("end", resolve);
       stream.on("error", reject);
     });
-    res.json({ success: true, bucket: BUCKET, prefix, count: objects.length, objects });
+
+    res.json({
+      success: true,
+      bucket: BUCKET,
+      prefix,
+      count: objects.length,
+      objects,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err?.message });
   }
 });
 
 // ── GET /api/files/debug/db-paths ──────────────────────────────────────────
-// Show raw stored paths in pdf, video, and tugas tables
 router.get("/debug/db-paths", async (_req: Request, res: Response) => {
   try {
     const [pdfs, videos, tugasList] = await Promise.all([
       supabase.from("pdf").select("id_pdf, title_pdf, pdf_path").limit(20),
-      supabase.from("video").select("id_video, title_video, video_path").limit(20),
-      supabase.from("tugas").select("id_tugas, nama_tugas, file_path").not("file_path", "is", null).limit(20),
+      supabase
+        .from("video")
+        .select("id_video, title_video, video_path")
+        .limit(20),
+      supabase
+        .from("tugas")
+        .select("id_tugas, nama_tugas, file_path")
+        .not("file_path", "is", null)
+        .limit(20),
     ]);
 
     res.json({
