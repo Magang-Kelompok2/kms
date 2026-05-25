@@ -25,8 +25,10 @@ export function MaterialViewPage() {
   const [completedFiles, setCompletedFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [material, setMaterial] = useState<MaterialType | null>(null);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const isProgrammaticSeekRef = useRef(false);
+  const videoContainerRef = useRef<HTMLDivElement | null>(null);
+  const hideControlsTimeoutRef = useRef<number | null>(null);
 
   const [materialLoading, setMaterialLoading] = useState(true);
   const [progressLoading, setProgressLoading] = useState(true);
@@ -44,8 +46,31 @@ export function MaterialViewPage() {
     meetingNumber: "",
   });
 
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [videoBufferedEnd, setVideoBufferedEnd] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showVideoControls, setShowVideoControls] = useState(true);
+
   const getFileKey = (file: { id: string; type: "pdf" | "video" }) =>
     `${file.type}:${file.id}`;
+
+  const formatTime = (time: number) => {
+    if (!Number.isFinite(time)) return "0:00";
+
+    const hours = Math.floor(time / 3600);
+    const minutes = Math.floor((time % 3600) / 60);
+    const seconds = Math.floor(time % 60);
+
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, "0")}:${String(
+        seconds,
+      ).padStart(2, "0")}`;
+    }
+
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  };
 
   const getMaxBufferedEnd = (video: HTMLVideoElement) => {
     const { buffered, duration } = video;
@@ -63,33 +88,93 @@ export function MaterialViewPage() {
     return Math.min(maxEnd, Number.isFinite(duration) ? duration : maxEnd);
   };
 
+  const syncVideoState = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+    const bufferedEnd = getMaxBufferedEnd(video);
+
+    setVideoCurrentTime(video.currentTime);
+    setVideoDuration(duration);
+    setVideoBufferedEnd(bufferedEnd);
+    setIsPlaying(!video.paused);
+  };
+
+  const showControlsTemporarily = () => {
+    setShowVideoControls(true);
+
+    if (hideControlsTimeoutRef.current) {
+      window.clearTimeout(hideControlsTimeoutRef.current);
+    }
+
+    const video = videoRef.current;
+
+    if (video && !video.paused) {
+      hideControlsTimeoutRef.current = window.setTimeout(() => {
+        setShowVideoControls(false);
+      }, 2000);
+    }
+  };
+
   const seekVideo = (seconds: number) => {
     const video = videoRef.current;
     if (!video) return;
 
-    const currentTime = video.currentTime;
     const duration = Number.isFinite(video.duration)
       ? video.duration
-      : currentTime;
+      : video.currentTime;
 
-    isProgrammaticSeekRef.current = true;
-    video.currentTime = Math.min(Math.max(currentTime + seconds, 0), duration);
+    video.currentTime = Math.min(
+      Math.max(video.currentTime + seconds, 0),
+      duration,
+    );
 
-    window.setTimeout(() => {
-      isProgrammaticSeekRef.current = false;
-    }, 300);
+    syncVideoState();
+    showControlsTemporarily();
   };
 
-  const handleVideoSeeking = () => {
+  const handleSliderChange = (value: string) => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (isProgrammaticSeekRef.current) return;
+    const targetTime = Number(value);
+    const maxAllowedTime = Math.max(videoBufferedEnd, video.currentTime);
 
-    const maxBufferedEnd = getMaxBufferedEnd(video);
+    video.currentTime = Math.min(targetTime, maxAllowedTime);
+    syncVideoState();
+    showControlsTemporarily();
+  };
 
-    if (video.currentTime > maxBufferedEnd) {
-      video.currentTime = maxBufferedEnd;
+  const togglePlay = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      await video.play();
+      showControlsTemporarily();
+    } else {
+      video.pause();
+      setShowVideoControls(true);
+
+      if (hideControlsTimeoutRef.current) {
+        window.clearTimeout(hideControlsTimeoutRef.current);
+      }
+    }
+
+    syncVideoState();
+  };
+
+  const toggleFullscreen = async () => {
+    const container = videoContainerRef.current;
+    if (!container) return;
+
+    if (!document.fullscreenElement) {
+      await container.requestFullscreen();
+      showControlsTemporarily();
+    } else {
+      await document.exitFullscreen();
+      setShowVideoControls(true);
     }
   };
 
@@ -97,6 +182,27 @@ export function MaterialViewPage() {
     user?.id && materialId
       ? `material-progress:${user.id}:${materialId}`
       : null;
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+      showControlsTemporarily();
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hideControlsTimeoutRef.current) {
+        window.clearTimeout(hideControlsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchMaterial = async () => {
@@ -204,7 +310,7 @@ export function MaterialViewPage() {
       console.log("No files available in material");
       setSelectedFile(null);
     }
-  }, [material]);
+  }, [material, selectedFile]);
 
   useEffect(() => {
     if (material && isEditing) {
@@ -219,6 +325,7 @@ export function MaterialViewPage() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (!videoRef.current) return;
+      if (e.repeat) return;
 
       if (e.key === "ArrowRight") {
         e.preventDefault();
@@ -229,11 +336,17 @@ export function MaterialViewPage() {
         e.preventDefault();
         seekVideo(-10);
       }
+
+      if (e.key === " ") {
+        e.preventDefault();
+        togglePlay();
+      }
     };
 
     window.addEventListener("keydown", handleKey);
+
     return () => window.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [videoBufferedEnd]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -425,6 +538,18 @@ export function MaterialViewPage() {
   const pdfFiles = material.files.filter((f) => f.type === "pdf");
   const selectedFileData = material.files.find((f) => f.id === selectedFile);
 
+  const bufferedPercent =
+    videoDuration > 0
+      ? Math.min((videoBufferedEnd / videoDuration) * 100, 100)
+      : 0;
+
+  const playedPercent =
+    videoDuration > 0
+      ? Math.min((videoCurrentTime / videoDuration) * 100, 100)
+      : 0;
+
+  const sliderMax = Math.max(videoBufferedEnd, videoCurrentTime, 0);
+
   return (
     <AppLayout className="max-w-7xl py-6" mainClassName="overflow-hidden">
       <Button
@@ -607,72 +732,6 @@ export function MaterialViewPage() {
                   )}
                 </div>
               </div>
-
-              {isEditing && (
-                <div className="mt-6 space-y-4 border-t pt-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Judul Materi
-                    </label>
-                    <input
-                      type="text"
-                      value={editDraft.title}
-                      onChange={(e) =>
-                        setEditDraft({ ...editDraft, title: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Deskripsi
-                    </label>
-                    <textarea
-                      value={editDraft.description}
-                      onChange={(e) =>
-                        setEditDraft({
-                          ...editDraft,
-                          description: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                      rows={4}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Pertemuan Ke-
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={editDraft.meetingNumber}
-                      onChange={(e) =>
-                        setEditDraft({
-                          ...editDraft,
-                          meetingNumber: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
-                    />
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button onClick={handleSaveEdit} className="flex-1">
-                      Simpan Perubahan
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsEditing(false)}
-                      className="flex-1"
-                    >
-                      Batal
-                    </Button>
-                  </div>
-                </div>
-              )}
             </Card>
 
             {selectedFile && selectedFileData && (
@@ -721,20 +780,44 @@ export function MaterialViewPage() {
 
                 <div className="flex-1 min-h-0">
                   {selectedFileData.type === "video" ? (
-                    <div className="w-full aspect-video mt-2 bg-black rounded-xl overflow-hidden relative">
+                    <div
+                      ref={videoContainerRef}
+                      onMouseMove={showControlsTemporarily}
+                      onMouseLeave={() => {
+                        const video = videoRef.current;
+                        if (video && !video.paused) {
+                          setShowVideoControls(false);
+                        }
+                      }}
+                      className="w-full aspect-video mt-2 bg-black rounded-xl overflow-hidden relative"
+                    >
                       <video
                         key={selectedFileData.id}
                         ref={videoRef}
-                        controls
-                        controlsList="nodownload"
+                        controls={false}
                         preload="metadata"
                         className="w-full h-full object-contain"
                         src={selectedFileData.url}
                         onContextMenu={(e) => e.preventDefault()}
-                        onSeeking={handleVideoSeeking}
+                        onLoadedMetadata={syncVideoState}
+                        onTimeUpdate={syncVideoState}
+                        onProgress={syncVideoState}
+                        onPlay={() => {
+                          syncVideoState();
+                          showControlsTemporarily();
+                        }}
+                        onPause={() => {
+                          syncVideoState();
+                          setShowVideoControls(true);
+                        }}
+                        onClick={togglePlay}
                       />
 
-                      <div className="absolute inset-0 flex items-center justify-center gap-6 pointer-events-none">
+                      <div
+                        className={`absolute inset-0 flex items-center justify-center gap-6 pointer-events-none transition-opacity duration-300 ${
+                          showVideoControls ? "opacity-100" : "opacity-0"
+                        }`}
+                      >
                         <button
                           onClick={() => seekVideo(-10)}
                           className="pointer-events-auto bg-black/60 text-white px-4 py-3 rounded-full hover:bg-black/80 transition"
@@ -748,6 +831,61 @@ export function MaterialViewPage() {
                         >
                           10s ⏩
                         </button>
+                      </div>
+
+                      <div
+                        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 transition-opacity duration-300 ${
+                          showVideoControls
+                            ? "opacity-100"
+                            : "opacity-0 pointer-events-none"
+                        }`}
+                      >
+                        <div className="relative mb-3">
+                          <div className="relative h-1.5 w-full rounded-full bg-white/20 overflow-hidden">
+                            <div
+                              className="absolute left-0 top-0 h-full bg-white/40"
+                              style={{ width: `${bufferedPercent}%` }}
+                            />
+
+                            <div
+                              className="absolute left-0 top-0 h-full bg-white"
+                              style={{ width: `${playedPercent}%` }}
+                            />
+                          </div>
+
+                          <input
+                            type="range"
+                            min={0}
+                            max={sliderMax || 0}
+                            step={0.1}
+                            value={Math.min(videoCurrentTime, sliderMax || 0)}
+                            onChange={(e) => handleSliderChange(e.target.value)}
+                            className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3 text-white">
+                          <button
+                            onClick={togglePlay}
+                            className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-white/20 transition"
+                          >
+                            {isPlaying ? "⏸" : "▶"}
+                          </button>
+
+                          <span className="text-sm whitespace-nowrap">
+                            {formatTime(videoCurrentTime)} /{" "}
+                            {formatTime(videoDuration)}
+                          </span>
+
+                          <div className="flex-1" />
+
+                          <button
+                            onClick={toggleFullscreen}
+                            className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-white/20 transition"
+                          >
+                            ⛶
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
