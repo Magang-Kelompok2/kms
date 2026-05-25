@@ -384,7 +384,7 @@ export function MaterialViewPage() {
   const selectedFileData = material.files.find((f) => f.id === selectedFile);
 
   return (
-    <AppLayout className="max-w-7xl py-6">
+    <AppLayout className="max-w-7xl py-6" mainClassName="overflow-hidden">
       <Button
         variant="ghost"
         onClick={() =>
@@ -398,10 +398,10 @@ export function MaterialViewPage() {
         Kembali ke Materi
       </Button>
 
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 items-start lg:h-[calc(100vh-4rem-4rem)] lg:overflow-hidden">
         {/* ── Left Sidebar ── */}
-        <div className="w-full lg:w-96 shrink-0 self-stretch">
-          <Card className="h-full">
+        <div className="w-full lg:w-96 shrink-0 lg:h-full lg:min-h-0">
+          <Card className="lg:h-full lg:min-h-0 flex flex-col overflow-hidden">
             <div className="sticky top-0 z-10 border-b border-border bg-card/95 p-5 backdrop-blur supports-backdrop-filter:bg-card/80">
               <h2 className="mb-1 text-lg font-semibold tracking-tight">
                 Daftar Materi
@@ -411,7 +411,7 @@ export function MaterialViewPage() {
               </p>
             </div>
 
-            <div className="p-4 space-y-5">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-5">
               {videoFiles.length === 0 && pdfFiles.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
@@ -517,7 +517,7 @@ export function MaterialViewPage() {
         </div>
 
         {/* ── Right Content ── */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 lg:h-full lg:min-h-0 lg:overflow-hidden">
           <div className="h-full flex flex-col gap-6">
             {/* Header */}
 
@@ -681,9 +681,11 @@ export function MaterialViewPage() {
                   {selectedFileData.type === "video" ? (
                     <div className="w-full aspect-video mt-2 bg-black rounded-xl overflow-hidden relative">
                       <video
+                        key={selectedFileData.id}
                         ref={videoRef}
                         controls
                         controlsList="nodownload"
+                        preload="metadata"
                         className="w-full h-full object-contain"
                         src={selectedFileData.url}
                         onContextMenu={(e) => e.preventDefault()}
