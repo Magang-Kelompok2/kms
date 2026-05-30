@@ -50,7 +50,7 @@ export function MaterialViewPage() {
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoBufferedEnd, setVideoBufferedEnd] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [, setIsFullscreen] = useState(false);
   const [showVideoControls, setShowVideoControls] = useState(true);
 
   const getFileKey = (file: { id: string; type: "pdf" | "video" }) =>
@@ -350,34 +350,6 @@ export function MaterialViewPage() {
 
   const handleEdit = () => {
     setIsEditing(true);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!material) return;
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/materials/${material.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            title: editDraft.title,
-            description: editDraft.description,
-            meetingNumber:
-              parseInt(editDraft.meetingNumber) || material.meetingNumber,
-          }),
-        },
-      );
-      if (!res.ok) throw new Error("Gagal mengupdate materi");
-      const json = await res.json();
-      setMaterial(json.data);
-      setIsEditing(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
-    }
   };
 
   const handleDelete = async () => {
