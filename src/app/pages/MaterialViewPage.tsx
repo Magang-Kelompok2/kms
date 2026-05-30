@@ -40,7 +40,7 @@ export function MaterialViewPage() {
   const [isCompleted, setIsCompleted] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState({
+  const [, setEditDraft] = useState({
     title: "",
     description: "",
     meetingNumber: "",
