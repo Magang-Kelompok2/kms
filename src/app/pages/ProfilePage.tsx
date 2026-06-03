@@ -59,11 +59,6 @@ type RecentActivity = {
 export function ProfilePage() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentSummary[]>([]);
@@ -72,14 +67,6 @@ export function ProfilePage() {
   const [levelCountByClass, setLevelCountByClass] = useState<Record<string, number>>(
     {},
   );
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    setFormData({
-      name: user?.name || "",
-      email: user?.email || "",
-    });
-  }, [user?.name, user?.email]);
 
   useEffect(() => {
     if (!user?.id || !token) {
@@ -131,15 +118,23 @@ export function ProfilePage() {
         const progressJson = await progressRes.json();
         const activityJson = await activityRes.json();
 
-        const nextEnrollments = enrollmentJson.data ?? [];
+        const rawEnrollments: EnrollmentSummary[] = enrollmentJson.data ?? [];
+        const deduped = Object.values(
+          rawEnrollments.reduce<Record<string, EnrollmentSummary>>((acc, item) => {
+            if (!acc[item.classId] || item.level > acc[item.classId].level) {
+              acc[item.classId] = item;
+            }
+            return acc;
+          }, {}),
+        );
         const nextProgress = progressJson.data ?? [];
-        setEnrollments(nextEnrollments);
+        setEnrollments(deduped);
         setProgressRows(nextProgress);
         setRecentActivity(activityJson.data ?? []);
 
         const classIds = [
           ...new Set(
-            [...nextEnrollments, ...nextProgress]
+            [...deduped, ...nextProgress]
               .map((item: EnrollmentSummary | ProgressSummary) => item.classId)
               .filter(Boolean),
           ),
@@ -190,7 +185,7 @@ export function ProfilePage() {
         const progress = progressByClass[item.classId];
         const currentLevel = progress?.currentLevel ?? 1;
         const totalLevels =
-          progress?.totalLevels ?? levelCountByClass[item.classId] ?? item.level ?? 0;
+          progress?.totalLevels ?? levelCountByClass[item.classId] ?? 0;
         const completedItems =
           (progress?.completedMaterialCount ?? 0) +
           (progress?.completedAssignmentCount ?? 0) +
@@ -232,14 +227,6 @@ export function ProfilePage() {
     };
   }, [enrollmentCards]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 600));
-    alert("Profil berhasil diperbarui!");
-    setIsEditing(false);
-    setIsSaving(false);
-  };
-
   if (loading && enrollments.length === 0 && progressRows.length === 0) {
     return (
       <AppLayout className="max-w-6xl">
@@ -260,7 +247,7 @@ export function ProfilePage() {
       </Button>
 
       <Card className="mb-6 overflow-hidden shadow-sm">
-        <CardHeader className="gap-6 bg-linear-to-br from-slate-900 via-sky-900 to-cyan-700 py-8 text-white sm:flex-row sm:items-start sm:justify-between">
+        <CardHeader className="bg-linear-to-br from-slate-900 via-sky-900 to-cyan-700 py-10 text-white">
           <div className="flex items-center gap-5">
             <div className="flex size-24 shrink-0 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur">
               <User className="size-12" />
@@ -281,13 +268,6 @@ export function ProfilePage() {
               </Badge>
             </div>
           </div>
-          <Button
-            onClick={() => setIsEditing(!isEditing)}
-            variant="secondary"
-            className="border-white/20 bg-white/15 text-white hover:bg-white/20"
-          >
-            {isEditing ? "Batal" : "Edit Profil"}
-          </Button>
         </CardHeader>
       </Card>
 
@@ -348,12 +328,9 @@ export function ProfilePage() {
                   <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    disabled={!isEditing}
-                    className="pl-10"
+                    value={user?.name ?? ""}
+                    disabled
+                    className="bg-muted/50 pl-10"
                   />
                 </div>
               </div>
@@ -365,12 +342,9 @@ export function ProfilePage() {
                   <Input
                     id="email"
                     type="email"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    disabled={!isEditing}
-                    className="pl-10"
+                    value={user?.email ?? ""}
+                    disabled
+                    className="bg-muted/50 pl-10"
                   />
                 </div>
               </div>
@@ -407,27 +381,6 @@ export function ProfilePage() {
                 </div>
               </div>
 
-              {isEditing && (
-                <div className="flex gap-3 pt-4">
-                  <Button onClick={handleSave} className="flex-1" disabled={isSaving}>
-                    {isSaving ? "Processing..." : "Simpan Perubahan"}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setFormData({
-                        name: user?.name || "",
-                        email: user?.email || "",
-                      });
-                      setIsEditing(false);
-                    }}
-                    variant="outline"
-                    className="flex-1"
-                    disabled={isSaving}
-                  >
-                    Batal
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
 

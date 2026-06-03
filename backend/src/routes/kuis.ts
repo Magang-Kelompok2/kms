@@ -156,7 +156,7 @@ router.get("/:tugasId/soal", async (req, res) => {
 });
 
 // ── GET /api/kuis/:tugasId/hasil/:userId ──────────────────────────────────
-router.get("/:tugasId/hasil/:userId", async (req, res) => {
+router.get("/:tugasId/hasil/:userId", verifySupabaseToken, async (req: any, res) => {
   const tugasId = Number(req.params.tugasId);
   const userId = Number(req.params.userId);
 
@@ -164,6 +164,9 @@ router.get("/:tugasId/hasil/:userId", async (req, res) => {
     return res
       .status(400)
       .json({ success: false, error: "Parameter tidak valid" });
+
+  if (req.user.role !== "superadmin" && Number(req.user.id_user) !== userId)
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
 
   try {
     const state = await getQuizAttemptState(tugasId, userId);

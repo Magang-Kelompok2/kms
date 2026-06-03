@@ -85,6 +85,7 @@ export function UserProgressPage() {
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalSubmissions, setTotalSubmissions] = useState(0);
+  const [submissionsRefreshKey, setSubmissionsRefreshKey] = useState(0);
 
   // --- TAMBAHAN: State enrollment management ---
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
@@ -119,11 +120,11 @@ export function UserProgressPage() {
   const totalPages = Math.max(1, Math.ceil(totalSubmissions / PAGE_SIZE));
 
   // --- TAMBAHAN: Fungsi fetch enrollments & tingkatan ---
-  const fetchEnrollmentsAndTingkatan = async () => {
+  const fetchEnrollmentsAndTingkatan = async (signal?: AbortSignal) => {
     if (!token || !userId) return;
     const eRes = await fetch(
       `${import.meta.env.VITE_API_URL}/api/users/${userId}/enrollments`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, signal },
     );
     if (!eRes.ok) {
       setEnrollments([]);
@@ -151,7 +152,7 @@ export function UserProgressPage() {
       uniqueClassIds.map(async (classId) => {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/kelas/${classId}/levels`,
-          { headers: { Authorization: `Bearer ${token}` } },
+          { headers: { Authorization: `Bearer ${token}` }, signal },
         );
         if (res.ok) {
           const json = await res.json();
@@ -309,6 +310,7 @@ export function UserProgressPage() {
       );
       if (res.ok) {
         setScoringOpen(false);
+        setSubmissionsRefreshKey((k) => k + 1);
       } else {
         let msg = `Status ${res.status}`;
         try { const d = await res.json(); msg = d.error || d.message || msg; } catch { /* HTML response */ }
@@ -365,7 +367,7 @@ export function UserProgressPage() {
         setTargetUser(userJson.data ?? null);
         setProgress(progressJson.data ?? []);
         try {
-          await fetchEnrollmentsAndTingkatan();
+          await fetchEnrollmentsAndTingkatan(controller.signal);
         } catch {
           // Enrollment fetch gagal — tidak ganggu tampilan utama
           setEnrollments([]);
@@ -420,7 +422,7 @@ export function UserProgressPage() {
 
     fetchSubmissions();
     return () => controller.abort();
-  }, [offset, token, user?.role, userId]);
+  }, [offset, token, user?.role, userId, submissionsRefreshKey]);
 
   const classNameMap = useMemo(
     () =>

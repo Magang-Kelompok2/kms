@@ -909,8 +909,7 @@ router.get(
       res.json({
         success: true,
         data: {
-          tingkatanSaatIni:
-            summary?.currentLevel ?? extractProgressLevel(progressRow),
+          tingkatanSaatIni: summary?.currentLevel ?? 1,
           progressPercent: summary?.progressPercent ?? 0,
           completedMaterials: summary?.completedMaterials ?? [],
           completedAssignments: summary?.completedAssignments ?? [],

@@ -83,7 +83,8 @@ router.get("/:materialId", async (req, res) => {
       .from("materi")
       .select(
         `id_materi, title_materi, deskripsi, materi_path,
-         id_kelas, id_tingkatan, pertemuan`,
+         id_kelas, id_tingkatan, pertemuan,
+         tingkatan(level_urutan)`,
       )
       .eq("id_materi", materialId)
       .single();
@@ -198,7 +199,7 @@ router.get("/:materialId", async (req, res) => {
         description: data.deskripsi ?? "",
         classId: String(data.id_kelas),
         meetingNumber: data.pertemuan,
-        level: data.id_tingkatan,
+        level: (data as any).tingkatan?.level_urutan ?? 1,
         isPublished: true,
         files: [...videoFiles, ...pdfFiles],
       },
@@ -332,7 +333,7 @@ router.put("/:materialId", verifySupabaseToken, async (req: any, res) => {
         `id_materi, title_materi, deskripsi, materi_path,
          id_kelas, id_tingkatan, pertemuan,
          kelas(nama_kelas),
-         tingkatan(id_tingkatan, nama_tingkatan),
+         tingkatan(id_tingkatan, nama_tingkatan, level_urutan),
          video(id_video, title_video, video_path),
          pdf(id_pdf, title_pdf, pdf_path)`,
       )
@@ -359,7 +360,7 @@ router.put("/:materialId", verifySupabaseToken, async (req: any, res) => {
         title: data.title_materi,
         description: data.deskripsi ?? "",
         classId: String(data.id_kelas),
-        level: data.id_tingkatan,
+        level: (data as any).tingkatan?.level_urutan ?? 1,
         meetingNumber: data.pertemuan,
         isPublished: true,
         files: [

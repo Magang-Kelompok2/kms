@@ -105,6 +105,7 @@ export function DashboardPage() {
   const [progressByClass, setProgressByClass] = useState<
     Record<string, number>
   >({});
+  const [enrolledClassIds, setEnrolledClassIds] = useState<Set<string> | null>(null);
 
   const tugasByClass = useMemo(() => {
     const stats = new Map<number, { materi: number; tugas: number; kuis: number }>();
@@ -127,20 +128,37 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!user?.id || user.role === "superadmin" || !token) return;
-    fetch(
-      `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    )
-      .then((r) => r.json())
-      .then((json) => {
-        if (!json.success) return;
-        const map: Record<string, number> = {};
-        for (const item of json.data ?? []) {
-          map[item.classId] = item.progressPercent ?? 0;
+
+    const controller = new AbortController();
+
+    Promise.all([
+      fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }).then((r) => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/enrollments`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }).then((r) => r.json()),
+    ])
+      .then(([progressJson, enrollmentJson]) => {
+        if (progressJson.success) {
+          const map: Record<string, number> = {};
+          for (const item of progressJson.data ?? []) {
+            map[item.classId] = item.progressPercent ?? 0;
+          }
+          setProgressByClass(map);
         }
-        setProgressByClass(map);
+        if (enrollmentJson.success) {
+          const ids = new Set<string>(
+            (enrollmentJson.data ?? []).map((e: { classId: string }) => e.classId),
+          );
+          setEnrolledClassIds(ids);
+        }
       })
       .catch(() => {});
+
+    return () => controller.abort();
   }, [user?.id, user?.role, token]);
 
   const handleDeleteUser = async (userId: number, role: string) => {
@@ -166,6 +184,11 @@ export function DashboardPage() {
       ),
     [searchQuery, users],
   );
+  const visibleClasses = useMemo(() => {
+    if (user?.role === "superadmin" || enrolledClassIds === null) return classes;
+    return classes.filter((cls) => enrolledClassIds.has(String(cls.id)));
+  }, [classes, enrolledClassIds, user?.role]);
+
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const currentUsers = useMemo(
     () =>
@@ -252,7 +275,7 @@ export function DashboardPage() {
         </h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {classes.map((cls) => {
+          {visibleClasses.map((cls) => {
             const classStats = tugasByClass.get(cls.id) ?? {
               materi: 0,
               tugas: 0,

@@ -71,7 +71,7 @@ router.get("/:tugasId", async (req, res) => {
       (data.materi as any)?.id_tingkatan ??
       1;
     const apiBase =
-      process.env.VITE_API_URL ??
+      process.env.API_BASE_URL ?? process.env.VITE_API_URL ??
       `http://localhost:${process.env.PORT ?? 4000}`;
 
     // Convert path_tugas to file attachment (similar to materials)
@@ -241,7 +241,7 @@ router.put("/:tugasId", verifySupabaseToken, async (req: any, res) => {
       (data.materi as any)?.id_tingkatan ??
       1;
     const apiBase =
-      process.env.VITE_API_URL ??
+      process.env.API_BASE_URL ?? process.env.VITE_API_URL ??
       `http://localhost:${process.env.PORT ?? 4000}`;
 
     // Convert path_tugas to file attachment (similar to materials)

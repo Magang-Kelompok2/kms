@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
 const API_BASE =
-  process.env.VITE_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
+  process.env.API_BASE_URL ?? process.env.VITE_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`;
 import { verifySupabaseToken, AuthenticatedRequest } from "../middleware/auth";
 import {
   buildErrorNotificationMessage,
@@ -186,7 +186,7 @@ router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
 
 // GET /api/pengumpulan/user/:userId/tugas/:tugasId
 // Cek apakah user sudah mengumpulkan tugas tertentu (ambil submission terbaru)
-router.get("/user/:userId/tugas/:tugasId", async (req: any, res) => {
+router.get("/user/:userId/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
   const userId = Number(req.params.userId);
   const tugasId = Number(req.params.tugasId);
 
@@ -194,6 +194,9 @@ router.get("/user/:userId/tugas/:tugasId", async (req: any, res) => {
     return res
       .status(400)
       .json({ success: false, error: "Parameter tidak valid" });
+
+  if (req.user.role !== "superadmin" && Number(req.user.id_user) !== userId)
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
 
   try {
     // Query user_pengumpulan untuk user ini, join dengan pengumpulan, filter task
@@ -291,7 +294,7 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
                 size: file.ukuran_file,
               }
             : null,
-          status: "pending",
+          status: item.score !== null ? "approved" : "pending",
           user_pengumpulan: {
             score: item.score ?? null,
             feedback: item.feedback ?? null,
