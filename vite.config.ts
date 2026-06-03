@@ -5,8 +5,8 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: 3010, // Pakai 3001 supaya tidak bentrok dengan app-magang (3000) dan Backend (4000)
-    strictPort: true,
+    port: 3012,
+    strictPort: false,
     host: true,
   },
 });

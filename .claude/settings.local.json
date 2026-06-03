@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(grep -rn \"plaintext\\\\|plain.*text\\\\|isHashed\\\\|startsWith.*\\\\$2\" /root/kms/backend/src/routes/auth.ts)",
+      "Bash(curl -s http://localhost:4001/)",
+      "Bash(curl -v http://0.0.0.0:4001/api/users/1/progress)",
+      "Bash(curl -s http://localhost:4000/api/users/1/progress)",
+      "Bash(curl -s http://localhost:4000/api/users/1/progress -H \"Authorization: Bearer fake\")",
+      "Bash(kill 510219 510205 510200 510170 510167)",
+      "Bash(curl -s http://localhost:4001/api/health)",
+      "Bash(curl -s http://localhost:4001/api/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"email\":\"test\",\"password\":\"test\"}')"
     ]
   }
 }
