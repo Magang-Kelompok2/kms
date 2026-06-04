@@ -10,7 +10,8 @@
       "Bash(kill 510219 510205 510200 510170 510167)",
       "Bash(curl -s http://localhost:4001/api/health)",
       "Bash(curl -s http://localhost:4001/api/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"email\":\"test\",\"password\":\"test\"}')",
-      "Bash(dir /s /b \"d:\\\\KMS\\\\kms\")"
+      "Bash(dir /s /b \"d:\\\\KMS\\\\kms\")",
+      "Bash(npx tsc *)"
     ]
   }
 }

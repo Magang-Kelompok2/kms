@@ -21,6 +21,8 @@ import {
   Save,
   Trash2,
   Plus,
+  Trophy,
+  RotateCcw,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -58,6 +60,19 @@ interface SubmissionItem {
   user_pengumpulan?: { score: number | null; feedback: string | null };
 }
 
+interface RiwayatKuisItem {
+  id_tugas: number;
+  nama_tugas: string;
+  pertemuan: number | null;
+  id_kelas: number | null;
+  nama_kelas: string | null;
+  nama_tingkatan: string | null;
+  level_urutan: number | null;
+  best_skor: number;
+  jumlah_percobaan: number;
+  lulus: boolean;
+}
+
 interface EnrollmentItem {
   classId: string;
   className: string;
@@ -78,6 +93,7 @@ export function UserProgressPage() {
   const navigate = useNavigate();
   const { classes } = useClasses();
   const [targetUser, setTargetUser] = useState<UserData | null>(null);
+  const [userNotFound, setUserNotFound] = useState(false);
   const [progress, setProgress] = useState<ProgressEntry[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
   const [systemError, setSystemError] = useState<string | null>(null);
@@ -115,6 +131,11 @@ export function UserProgressPage() {
 
   // --- TAMBAHAN: State class filter submissions ---
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
+
+  // --- Riwayat Kuis ---
+  const [riwayatKuis, setRiwayatKuis] = useState<RiwayatKuisItem[]>([]);
+  const [riwayatLoading, setRiwayatLoading] = useState(false);
+  const [resettingTugasId, setResettingTugasId] = useState<number | null>(null);
 
   const offset = (currentPage - 1) * PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(totalSubmissions / PAGE_SIZE));
@@ -293,6 +314,29 @@ export function UserProgressPage() {
     }
   };
 
+  // --- Reset percobaan kuis untuk user ini ---
+  const handleResetKuisPercobaan = async (idTugas: number, namaTugas: string) => {
+    if (!confirm(`Reset percobaan "${namaTugas}"?\nUser akan mendapat +5 percobaan tambahan.`)) return;
+    setResettingTugasId(idTugas);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/kuis/${idTugas}/reset-percobaan`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id_user: Number(userId) }),
+        },
+      );
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error ?? "Gagal reset percobaan");
+      alert(`Berhasil! User mendapat +5 percobaan tambahan untuk "${namaTugas}".`);
+    } catch (err: any) {
+      alert(err?.message ?? "Terjadi kesalahan");
+    } finally {
+      setResettingTugasId(null);
+    }
+  };
+
   // --- TAMBAHAN: Simpan nilai submission ---
   const handleUpdateScore = async () => {
     if (!selectedSub || !token || !userId) return;
@@ -338,6 +382,8 @@ export function UserProgressPage() {
     const fetchBaseData = async () => {
       setBaseLoading(true);
       setSystemError(null);
+      setUserNotFound(false);
+      setTargetUser(null);
 
       try {
         const [userRes, progressRes] = await Promise.all([
@@ -364,6 +410,7 @@ export function UserProgressPage() {
         const userJson = await userRes.json();
         const progressJson = await progressRes.json();
 
+        if (!userJson.data) setUserNotFound(true);
         setTargetUser(userJson.data ?? null);
         setProgress(progressJson.data ?? []);
         try {
@@ -371,6 +418,25 @@ export function UserProgressPage() {
         } catch {
           // Enrollment fetch gagal — tidak ganggu tampilan utama
           setEnrollments([]);
+        }
+
+        // Fetch riwayat kuis user ini
+        setRiwayatLoading(true);
+        try {
+          const riwayatRes = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/kuis/user/${userId}/riwayat`,
+            { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal },
+          );
+          const riwayatJson = await riwayatRes.json();
+          if (riwayatRes.ok) {
+            setRiwayatKuis(riwayatJson.data ?? []);
+          } else {
+            console.error("Riwayat kuis error:", riwayatJson);
+          }
+        } catch (err) {
+          console.error("Riwayat kuis fetch failed:", err);
+        } finally {
+          setRiwayatLoading(false);
         }
       } catch (error: any) {
         if (error.name !== "AbortError") {
@@ -471,7 +537,14 @@ export function UserProgressPage() {
   if (!targetUser) {
     return (
       <AppLayout>
-        <Card className="p-6 text-center">Pengguna tidak ditemukan.</Card>
+        {userNotFound ? (
+          <Card className="p-6 text-center text-muted-foreground">Pengguna tidak ditemukan.</Card>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <div className="size-12 animate-spin rounded-full border-4 border-muted border-t-primary" />
+            <p className="text-sm text-muted-foreground">Memuat data pengguna...</p>
+          </div>
+        )}
       </AppLayout>
     );
   }
@@ -642,6 +715,96 @@ export function UserProgressPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* --- Riwayat Kuis --- */}
+      <div className="mb-10">
+        <h2 className="text-xl font-black text-slate-800 mb-1">Riwayat Kuis</h2>
+        <p className="text-xs text-slate-400 font-bold mb-4">
+          Semua kuis yang pernah dikerjakan oleh user ini
+        </p>
+
+        {riwayatLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 rounded-2xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : riwayatKuis.length === 0 ? (
+          <div className="py-10 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">
+            <Trophy className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+            <p className="text-slate-400 font-bold text-sm">Belum ada kuis yang dikerjakan.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {riwayatKuis.map((item) => (
+              <Card key={item.id_tugas} className="p-4 border-none shadow-md rounded-2xl bg-white">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  {/* Info kuis */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                      {item.nama_kelas && (
+                        <span className="text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                          {item.nama_kelas}
+                        </span>
+                      )}
+                      {item.nama_tingkatan && (
+                        <span className="text-[10px] font-black uppercase tracking-widest bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full">
+                          {item.nama_tingkatan}
+                        </span>
+                      )}
+                      {item.pertemuan != null && (
+                        <span className="text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                          Pertemuan {item.pertemuan}
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-black text-slate-800 text-sm truncate">{item.nama_tugas}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{item.jumlah_percobaan}× percobaan</p>
+                  </div>
+
+                  {/* Skor & status */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div
+                      className={`w-14 h-14 rounded-full flex items-center justify-center text-lg font-black ${
+                        item.lulus
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-600"
+                      }`}
+                    >
+                      {item.best_skor}
+                    </div>
+                    <div className="flex flex-col items-center gap-1.5">
+                      <span
+                        className={`text-xs font-black px-3 py-1 rounded-full ${
+                          item.lulus
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-600"
+                        }`}
+                      >
+                        {item.lulus ? "Lulus" : "Tidak Lulus"}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={resettingTugasId === item.id_tugas}
+                        onClick={() => handleResetKuisPercobaan(item.id_tugas, item.nama_tugas)}
+                        className="text-xs h-7 px-2 gap-1 rounded-lg"
+                      >
+                        {resettingTugasId === item.id_tugas ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3 w-3" />
+                        )}
+                        +5 Percobaan
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* --- TAMBAHAN: Filter kelas untuk submission --- */}

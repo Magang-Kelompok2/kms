@@ -26,6 +26,44 @@ const isDuplicateKeyError = (error: any) => {
   return error?.code === "23505" || message.includes("duplicate key");
 };
 
+// Cek apakah user sudah lulus kuis tertentu
+async function checkUserLulusKuis(tugasId: number, userId: number): Promise<boolean> {
+  const { data: rows, error } = await supabase
+    .from("hasil_kuis")
+    .select("skor, jumlah_percobaan")
+    .eq("id_tugas", tugasId)
+    .eq("id_user", userId)
+    .order("created_at", { ascending: true });
+
+  if (error || !rows || rows.length === 0) return false;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const percobaan = Number((row as any).jumlah_percobaan ?? (i + 1));
+    const threshold = percobaan === 1 ? 70 : 80;
+    if (row.skor >= threshold) return true;
+  }
+  return false;
+}
+
+
+// Ambil bonus percobaan dari tabel kuis_reset_percobaan (0 jika tabel belum ada)
+async function getBonusPercobaan(tugasId: number, userId: number): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from("kuis_reset_percobaan")
+      .select("bonus_percobaan")
+      .eq("id_tugas", tugasId)
+      .eq("id_user", userId)
+      .maybeSingle();
+
+    if (error) return 0;
+    return data?.bonus_percobaan ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function getQuizAttemptState(tugasId: number, userId: number) {
   const { data, error } = await supabase
     .from("hasil_kuis")
@@ -37,17 +75,15 @@ async function getQuizAttemptState(tugasId: number, userId: number) {
   if (!error) {
     const rows = data ?? [];
     const latest = rows[0] ?? null;
+    const bestRow = rows.length > 0
+      ? rows.reduce((best, row) => row.skor > best.skor ? row : best, rows[0])
+      : null;
     const totalAttempts =
       rows.length > 1
         ? rows.length
         : Number(latest?.jumlah_percobaan ?? (latest ? 1 : 0));
 
-    return {
-      rows,
-      latest,
-      totalAttempts,
-      hasAttemptCounterColumn: true,
-    };
+    return { rows, latest, bestRow, totalAttempts, hasAttemptCounterColumn: true };
   }
 
   if (!isMissingColumnError(error, "jumlah_percobaan")) throw error;
@@ -62,12 +98,10 @@ async function getQuizAttemptState(tugasId: number, userId: number) {
   if (legacyError) throw legacyError;
 
   const rows = legacyData ?? [];
-  return {
-    rows,
-    latest: rows[0] ?? null,
-    totalAttempts: rows.length,
-    hasAttemptCounterColumn: false,
-  };
+  const bestRow = rows.length > 0
+    ? rows.reduce((best, row) => row.skor > best.skor ? row : best, rows[0])
+    : null;
+  return { rows, latest: rows[0] ?? null, bestRow, totalAttempts: rows.length, hasAttemptCounterColumn: false };
 }
 
 // ── POST /api/kuis/:tugasId/soal ───────────────────────────────────────────
@@ -169,26 +203,32 @@ router.get("/:tugasId/hasil/:userId", verifySupabaseToken, async (req: any, res)
     return res.status(403).json({ success: false, error: "Akses ditolak" });
 
   try {
-    const state = await getQuizAttemptState(tugasId, userId);
+    const [state, bonus] = await Promise.all([
+      getQuizAttemptState(tugasId, userId),
+      getBonusPercobaan(tugasId, userId),
+    ]);
+    const maxPercobaan = MAX_PERCOBAAN_KUIS + bonus;
 
     if (!state.latest)
       return res.json({
         success: true,
         sudahMengerjakan: false,
         jumlahPercobaan: 0,
+        maxPercobaan,
         data: null,
       });
 
-    const latest = state.latest;
+    const best = state.bestRow ?? state.latest;
     res.json({
       success: true,
       sudahMengerjakan: true,
       jumlahPercobaan: state.totalAttempts,
+      maxPercobaan,
       data: {
-        skor: latest.skor,
-        benar: latest.benar,
-        total: latest.total,
-        createdAt: latest.created_at,
+        skor: best.skor,
+        benar: best.benar,
+        total: best.total,
+        createdAt: state.latest.created_at,
       },
     });
   } catch (error: any) {
@@ -239,8 +279,12 @@ router.post("/:tugasId/submit", verifySupabaseToken, async (req: any, res) => {
 
     // 3. Selalu insert percobaan baru (mendukung pengerjaan ulang maks. 5×)
     const numericUserId = Number(req.user?.id_user ?? id_user);
-    const currentState = await getQuizAttemptState(tugasId, numericUserId);
-    if (currentState.totalAttempts >= MAX_PERCOBAAN_KUIS) {
+    const [currentState, bonusPercobaan] = await Promise.all([
+      getQuizAttemptState(tugasId, numericUserId),
+      getBonusPercobaan(tugasId, numericUserId),
+    ]);
+    const maxPercobaan = MAX_PERCOBAAN_KUIS + bonusPercobaan;
+    if (currentState.totalAttempts >= maxPercobaan) {
       return res.status(400).json({
         success: false,
         error: `Kuis hanya dapat dikerjakan maksimal ${MAX_PERCOBAAN_KUIS} kali`,
@@ -263,7 +307,7 @@ router.post("/:tugasId/submit", verifySupabaseToken, async (req: any, res) => {
 
     const { error: hasilError } = await supabase.from("hasil_kuis").insert({
       ...basePayload,
-      jumlah_percobaan: 1,
+      jumlah_percobaan: nextAttemptCount,
     });
 
     if (hasilError) {
@@ -321,7 +365,7 @@ router.post("/:tugasId/submit", verifySupabaseToken, async (req: any, res) => {
 
     const { data: tugas } = await supabase
       .from("tugas")
-      .select("nama_tugas, id_kelas, id_tingkatan")
+      .select("nama_tugas")
       .eq("id_tugas", tugasId)
       .maybeSingle();
 
@@ -337,84 +381,12 @@ router.post("/:tugasId/submit", verifySupabaseToken, async (req: any, res) => {
       ),
     });
 
-    // ── Auto-update progress jika lulus ──────────────────────────
-    // Attempt 1: lulus jika skor >= 70. Attempt 2+: skor >= 80
-    const passingScore = persistedAttempts === 1 ? 70 : 80;
-    if (skor >= passingScore && tugas?.id_kelas && tugas?.id_tingkatan) {
-      try {
-        const idKelas = Number(tugas.id_kelas);
-
-        // Cari level_urutan dari tingkatan kuis ini
-        const { data: thisLevel } = await supabase
-          .from("tingkatan")
-          .select("level_urutan")
-          .eq("id_tingkatan", tugas.id_tingkatan)
-          .maybeSingle();
-
-        if (thisLevel?.level_urutan != null) {
-          // Cari tingkatan berikutnya di kelas yang sama
-          const { data: nextLevel } = await supabase
-            .from("tingkatan")
-            .select("id_tingkatan, level_urutan")
-            .eq("id_kelas", idKelas)
-            .eq("level_urutan", thisLevel.level_urutan + 1)
-            .maybeSingle();
-
-          if (nextLevel?.id_tingkatan) {
-            const updatedAt = new Date().toISOString();
-
-            // Cek progress user saat ini
-            const { data: existingProg } = await supabase
-              .from("user_progress")
-              .select("id_progress, id_tingkatan")
-              .eq("id_user", numericUserId)
-              .eq("id_kelas", idKelas)
-              .maybeSingle();
-
-            if (!existingProg?.id_progress) {
-              // Belum ada progress → insert
-              await supabase.from("user_progress").insert({
-                id_user: numericUserId,
-                id_kelas: idKelas,
-                id_tingkatan: nextLevel.id_tingkatan,
-                updated_at: updatedAt,
-              });
-            } else {
-              // Cek level_urutan user saat ini — hanya advance, jangan downgrade
-              const { data: userCurrentLevel } = await supabase
-                .from("tingkatan")
-                .select("level_urutan")
-                .eq("id_tingkatan", existingProg.id_tingkatan ?? 0)
-                .maybeSingle();
-
-              const currentUrutan = userCurrentLevel?.level_urutan ?? 0;
-
-              if (nextLevel.level_urutan > currentUrutan) {
-                const { error: updateErr } = await supabase
-                  .from("user_progress")
-                  .update({ id_tingkatan: nextLevel.id_tingkatan, updated_at: updatedAt })
-                  .eq("id_progress", existingProg.id_progress);
-
-                // Fallback ke kolom lama jika skema belum diupdate
-                if (updateErr && isMissingColumnError(updateErr, "id_tingkatan")) {
-                  await supabase
-                    .from("user_progress")
-                    .update({ tingkatan_saat_ini: nextLevel.id_tingkatan, updated_at: updatedAt })
-                    .eq("id_progress", existingProg.id_progress);
-                }
-              }
-            }
-          }
-        }
-      } catch (progressErr) {
-        console.error("Gagal update progress setelah submit kuis:", progressErr);
-        // Tidak gagalkan response — hasil kuis sudah tersimpan
-      }
-    }
+    const previousBestSkor = currentState.rows.reduce((max, r) => Math.max(max, r.skor), 0);
+    const bestSkor = Math.max(skor, previousBestSkor);
 
     res.json({
       success: true,
-      data: { skor, benar, total, jumlahPercobaan: persistedAttempts },
+      data: { skor, benar, total, jumlahPercobaan: persistedAttempts, bestSkor, maxPercobaan },
     });
   } catch (error: any) {
     console.error("Error submitting kuis:", error);
@@ -454,29 +426,29 @@ router.get("/:tugasId/hasil", verifySupabaseToken, async (req: any, res) => {
   }
 
   try {
-    const limit = Math.min(Number(req.query.limit ?? 20), 100);
-    const offset = Math.max(Number(req.query.offset ?? 0), 0);
-
-    const { data: hasilList, error: hasilError, count } = await supabase
+    // Fetch ALL rows for this quiz (no pagination here — we need all to compute best per user)
+    const { data: hasilList, error: hasilError } = await supabase
       .from("hasil_kuis")
-      .select("id_hasil, id_user, skor, benar, total, created_at", {
-        count: "exact",
-      })
+      .select("id_hasil, id_user, skor, benar, total, created_at")
       .eq("id_tugas", tugasId)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order("created_at", { ascending: false });
 
     if (hasilError) throw hasilError;
     if (!hasilList || hasilList.length === 0)
-      return res.json({
-        success: true,
-        data: [],
-        total: count ?? 0,
-        limit,
-        offset,
-      });
+      return res.json({ success: true, data: [], total: 0 });
 
-    const userIds = [...new Set(hasilList.map((h) => h.id_user))];
+    // Group by user — keep best score row per user
+    const bestPerUser = new Map<number, typeof hasilList[0]>();
+    const attemptCountPerUser = new Map<number, number>();
+    for (const h of hasilList) {
+      attemptCountPerUser.set(h.id_user, (attemptCountPerUser.get(h.id_user) ?? 0) + 1);
+      const existing = bestPerUser.get(h.id_user);
+      if (!existing || h.skor > existing.skor) {
+        bestPerUser.set(h.id_user, h);
+      }
+    }
+
+    const userIds = [...bestPerUser.keys()];
     const { data: users, error: userError } = await supabase
       .from("user")
       .select("id_user, username, email")
@@ -488,25 +460,219 @@ router.get("/:tugasId/hasil", verifySupabaseToken, async (req: any, res) => {
       (users ?? []).map((u) => [u.id_user, u]),
     );
 
-    const result = hasilList.map((h) => ({
+    const result = [...bestPerUser.values()].map((h) => ({
       id_hasil: h.id_hasil,
       skor: h.skor,
       benar: h.benar,
       total: h.total,
       created_at: h.created_at,
+      jumlahPercobaan: attemptCountPerUser.get(h.id_user) ?? 1,
       user: userMap[h.id_user] ?? null,
     }));
 
     res.json({
       success: true,
       data: result,
-      total: count ?? 0,
-      limit,
-      offset,
+      total: result.length,
     });
   } catch (error: any) {
     console.error("Error fetching semua hasil:", error);
     res.status(500).json({ success: false, error: "Failed to fetch hasil" });
+  }
+});
+
+// ── GET /api/kuis/user/:userId/riwayat ───────────────────────────────────
+// Admin: semua kuis yang pernah dikerjakan oleh user tertentu
+router.get("/user/:userId/riwayat", verifySupabaseToken, async (req: any, res) => {
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+
+  const userId = Number(req.params.userId);
+  if (!Number.isFinite(userId))
+    return res.status(400).json({ success: false, error: "userId tidak valid" });
+
+  try {
+    // 1. Semua hasil kuis user ini (diurutkan asc untuk hitung percobaan ke-berapa)
+    // Tidak select jumlah_percobaan karena kolom mungkin belum ada di semua environment
+    const { data: hasilList, error: hasilError } = await supabase
+      .from("hasil_kuis")
+      .select("id_tugas, skor, created_at")
+      .eq("id_user", userId)
+      .order("created_at", { ascending: true });
+
+    if (hasilError) throw hasilError;
+    if (!hasilList || hasilList.length === 0)
+      return res.json({ success: true, data: [] });
+
+    // 2. Group by id_tugas — hitung percobaan aktual (jumlah baris) & best skor
+    const tugasStats = new Map<number, {
+      rows: typeof hasilList;
+      bestSkor: number;
+      count: number;
+    }>();
+    for (const row of hasilList) {
+      const s = tugasStats.get(row.id_tugas);
+      if (!s) {
+        tugasStats.set(row.id_tugas, { rows: [row], bestSkor: row.skor, count: 1 });
+      } else {
+        s.rows.push(row);
+        s.count++;
+        if (row.skor > s.bestSkor) s.bestSkor = row.skor;
+      }
+    }
+
+    const tugasIds = [...tugasStats.keys()];
+
+    // 3. Detail tugas — ID sudah dari hasil_kuis jadi pasti kuis, tidak perlu filter type
+    const { data: tugasList, error: tugasError } = await supabase
+      .from("tugas")
+      .select("id_tugas, nama_tugas, pertemuan, id_materi, id_kelas")
+      .in("id_tugas", tugasIds);
+
+    if (tugasError) throw tugasError;
+    if (!tugasList || tugasList.length === 0)
+      return res.json({ success: true, data: [] });
+
+    // 4. Ambil id_tingkatan via materi (tugas → id_materi → materi → id_tingkatan)
+    const materiIds = [...new Set(tugasList.map((t) => t.id_materi).filter(Boolean))];
+    let materiMap: Record<number, number> = {}; // id_materi → id_tingkatan
+    if (materiIds.length > 0) {
+      const { data: materiList } = await supabase
+        .from("materi")
+        .select("id_materi, id_tingkatan")
+        .in("id_materi", materiIds);
+      for (const m of materiList ?? []) {
+        if (m.id_tingkatan) materiMap[m.id_materi] = m.id_tingkatan;
+      }
+    }
+
+    // 5. Detail tingkatan
+    const tingkatanIds = [...new Set(Object.values(materiMap))];
+    let tingkatanMap: Record<number, { nama_tingkatan: string; level_urutan: number }> = {};
+    if (tingkatanIds.length > 0) {
+      const { data: tingkatanList } = await supabase
+        .from("tingkatan")
+        .select("id_tingkatan, nama_tingkatan, level_urutan")
+        .in("id_tingkatan", tingkatanIds);
+      for (const t of tingkatanList ?? [])
+        tingkatanMap[t.id_tingkatan] = { nama_tingkatan: t.nama_tingkatan, level_urutan: t.level_urutan };
+    }
+
+    // 6. Nama kelas
+    const kelasIds = [...new Set(tugasList.map((t) => t.id_kelas).filter(Boolean))];
+    let kelasMap: Record<number, string> = {};
+    if (kelasIds.length > 0) {
+      const { data: kelasList } = await supabase
+        .from("kelas")
+        .select("id_kelas, nama_kelas")
+        .in("id_kelas", kelasIds);
+      for (const k of kelasList ?? []) kelasMap[k.id_kelas] = k.nama_kelas;
+    }
+
+    // 7. Gabungkan semua data
+    const result = tugasList.map((tugas) => {
+      const stats = tugasStats.get(tugas.id_tugas);
+      const rows = stats?.rows ?? [];
+      const bestSkor = stats?.bestSkor ?? 0;
+      const count = stats?.count ?? 0;
+
+      // Tentukan lulus — rows sudah sorted asc, index 0 = percobaan ke-1
+      let lulus = false;
+      for (let i = 0; i < rows.length; i++) {
+        const threshold = i === 0 ? 70 : 80;
+        if (rows[i].skor >= threshold) { lulus = true; break; }
+      }
+
+      const idTingkatan = tugas.id_materi ? materiMap[tugas.id_materi] : undefined;
+      const tingkatan = idTingkatan ? tingkatanMap[idTingkatan] : null;
+
+      return {
+        id_tugas: tugas.id_tugas,
+        nama_tugas: tugas.nama_tugas,
+        pertemuan: tugas.pertemuan,
+        id_kelas: tugas.id_kelas,
+        nama_kelas: tugas.id_kelas ? (kelasMap[tugas.id_kelas] ?? null) : null,
+        id_tingkatan: idTingkatan ?? null,
+        nama_tingkatan: tingkatan?.nama_tingkatan ?? null,
+        level_urutan: tingkatan?.level_urutan ?? null,
+        best_skor: bestSkor,
+        jumlah_percobaan: count,
+        lulus,
+      };
+    });
+
+    // Urutkan: kelas → level → pertemuan
+    result.sort((a, b) => {
+      if ((a.id_kelas ?? 0) !== (b.id_kelas ?? 0)) return (a.id_kelas ?? 0) - (b.id_kelas ?? 0);
+      if ((a.level_urutan ?? 0) !== (b.level_urutan ?? 0)) return (a.level_urutan ?? 0) - (b.level_urutan ?? 0);
+      return (a.pertemuan ?? 0) - (b.pertemuan ?? 0);
+    });
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error("Error fetching riwayat kuis:", error);
+    res.status(500).json({ success: false, error: "Gagal mengambil riwayat kuis", detail: error?.message });
+  }
+});
+
+// ── POST /api/kuis/:tugasId/reset-percobaan ───────────────────────────────
+// Admin: tambah 5 percobaan lagi untuk user tertentu
+router.post("/:tugasId/reset-percobaan", verifySupabaseToken, async (req: any, res) => {
+  const tugasId = Number(req.params.tugasId);
+  if (isNaN(tugasId))
+    return res.status(400).json({ success: false, error: "tugasId tidak valid" });
+
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+
+  const { id_user } = req.body;
+  if (!id_user)
+    return res.status(400).json({ success: false, error: "id_user wajib diisi" });
+
+  const numericUserId = Number(id_user);
+  if (!Number.isFinite(numericUserId))
+    return res.status(400).json({ success: false, error: "id_user tidak valid" });
+
+  try {
+    const { data: existing, error: selectError } = await supabase
+      .from("kuis_reset_percobaan")
+      .select("id, bonus_percobaan")
+      .eq("id_tugas", tugasId)
+      .eq("id_user", numericUserId)
+      .maybeSingle();
+
+    if (selectError) throw selectError;
+
+    if (existing) {
+      const { error: updateError } = await supabase
+        .from("kuis_reset_percobaan")
+        .update({
+          bonus_percobaan: existing.bonus_percobaan + MAX_PERCOBAAN_KUIS,
+          reset_by: req.user.id_user,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from("kuis_reset_percobaan")
+        .insert({
+          id_tugas: tugasId,
+          id_user: numericUserId,
+          bonus_percobaan: MAX_PERCOBAAN_KUIS,
+          reset_by: req.user.id_user,
+          updated_at: new Date().toISOString(),
+        });
+      if (insertError) throw insertError;
+    }
+
+    res.json({
+      success: true,
+      message: `Berhasil menambah ${MAX_PERCOBAAN_KUIS} percobaan untuk user ${numericUserId}`,
+    });
+  } catch (error: any) {
+    console.error("Error reset percobaan:", error);
+    res.status(500).json({ success: false, error: "Gagal mereset percobaan", detail: error?.message });
   }
 });
 

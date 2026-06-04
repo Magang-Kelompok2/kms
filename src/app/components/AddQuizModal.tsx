@@ -135,6 +135,11 @@ export function AddQuizModal({
     setError(null);
   };
 
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
   const handleSubmit = async () => {
     const sessionData = localStorage.getItem("taxacore_session");
 
@@ -269,7 +274,7 @@ export function AddQuizModal({
         <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between z-10">
           <h2 className="text-2xl font-bold">Tambah Kuis - Level {level}</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
           >
             <X className="h-5 w-5" />
@@ -496,7 +501,7 @@ export function AddQuizModal({
           </Button>
           <Button
             variant="outline"
-            onClick={onClose}
+            onClick={handleClose}
             className="text-base py-6"
           >
             Batal

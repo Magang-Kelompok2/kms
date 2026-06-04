@@ -92,6 +92,7 @@ export function QuizViewPage() {
   const [sudahMengerjakan, setSudahMengerjakan] = useState(false);
   const [skorSebelumnya, setSkorSebelumnya] = useState<number | null>(null);
   const [jumlahPercobaan, setJumlahPercobaan] = useState(0);
+  const [maxPercobaan, setMaxPercobaan] = useState(5);
 
   // State soal yang sudah diacak (soal & opsi) — dibuat saat klik Mulai Kuis
   const [soalAcakList, setSoalAcakList] = useState<SoalAcak[]>([]);
@@ -159,9 +160,11 @@ export function QuizViewPage() {
         try {
           const res = await fetch(
             `${import.meta.env.VITE_API_URL}/api/kuis/${quizId}/hasil/${user.id}`,
+            { headers: { Authorization: `Bearer ${token}` } },
           );
           if (res.ok) {
             const json = await res.json();
+            if (json.maxPercobaan) setMaxPercobaan(json.maxPercobaan);
             if (json.sudahMengerjakan) {
               setSudahMengerjakan(true);
               setSkorSebelumnya(json.data.skor);
@@ -221,8 +224,13 @@ export function QuizViewPage() {
 
       setHasilSkor(json.data);
       setSudahMengerjakan(true);
-      setSkorSebelumnya(json.data.skor);
-      setJumlahPercobaan(json.data.jumlahPercobaan ?? jumlahPercobaan + 1);
+      // Selalu simpan nilai terbaik (bukan nilai percobaan terakhir)
+      setSkorSebelumnya((prev) => Math.max(prev ?? 0, json.data.bestSkor ?? json.data.skor));
+      setJumlahPercobaan((prev) => {
+        const backend = json.data.jumlahPercobaan;
+        return typeof backend === "number" && backend > prev ? backend : prev + 1;
+      });
+      if (json.data.maxPercobaan) setMaxPercobaan(json.data.maxPercobaan);
       setTahap("selesai");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Gagal mengumpulkan jawaban");
@@ -331,14 +339,13 @@ export function QuizViewPage() {
     );
   }
 
-  const MAX_PERCOBAAN = 5;
   const SKOR_LULUS_ULANG = 80;
 
   // Bisa mengerjakan ulang jika skor < 80 dan belum mencapai batas percobaan
   const bisaUlang =
     sudahMengerjakan &&
     (skorSebelumnya ?? 0) < SKOR_LULUS_ULANG &&
-    jumlahPercobaan < MAX_PERCOBAAN;
+    jumlahPercobaan < maxPercobaan;
 
   // Gunakan soalAcakList saat mengerjakan, fallback ke soalList
   const soalAktifData = soalAcakList[soalAktif] ?? soalList[soalAktif];
@@ -515,8 +522,10 @@ export function QuizViewPage() {
     const lulusThreshold = jumlahPercobaan <= 1 ? 70 : SKOR_LULUS_ULANG;
     const lulus = hasilSkor.skor >= lulusThreshold;
     const salah = hasilSkor.total - hasilSkor.benar;
-    const bolehUlang = hasilSkor.skor < SKOR_LULUS_ULANG && jumlahPercobaan < MAX_PERCOBAAN;
-    const sisaPercobaan = MAX_PERCOBAAN - jumlahPercobaan;
+    // Pakai nilai terbaik (bukan percobaan ini saja) untuk cek boleh ulang
+    const nilaiTerbaik = Math.max(hasilSkor.skor, skorSebelumnya ?? 0);
+    const bolehUlang = nilaiTerbaik < SKOR_LULUS_ULANG && jumlahPercobaan < maxPercobaan;
+    const sisaPercobaan = maxPercobaan - jumlahPercobaan;
 
     return (
       <AppLayout className="max-w-2xl py-10">
@@ -545,12 +554,12 @@ export function QuizViewPage() {
                   : "Sayang sekali, kamu belum mencapai nilai minimum."}
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-8">
-                Percobaan ke-{jumlahPercobaan} dari {MAX_PERCOBAAN}
+                Percobaan ke-{jumlahPercobaan} dari {maxPercobaan}
               </p>
 
-              {/* Skor */}
+              {/* Skor percobaan ini */}
               <div
-                className={`inline-flex flex-col items-center justify-center w-36 h-36 rounded-full text-5xl font-extrabold mb-8 shadow-inner ${
+                className={`inline-flex flex-col items-center justify-center w-36 h-36 rounded-full text-5xl font-extrabold mb-2 shadow-inner ${
                   lulus
                     ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 ring-4 ring-emerald-200 dark:ring-emerald-800"
                     : "bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-400 ring-4 ring-red-200 dark:ring-red-800"
@@ -561,6 +570,14 @@ export function QuizViewPage() {
                   / 100
                 </span>
               </div>
+              {/* Label nilai terbaik jika berbeda dari percobaan ini */}
+              {nilaiTerbaik > hasilSkor.skor ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-6">
+                  Nilai terbaik kamu: <strong>{nilaiTerbaik}/100</strong>
+                </p>
+              ) : (
+                <div className="mb-6" />
+              )}
 
               {/* Statistik */}
               <div className="grid grid-cols-3 gap-3 mb-6 max-w-sm mx-auto">
@@ -592,11 +609,11 @@ export function QuizViewPage() {
               >
                 {lulus ? (
                   <>
-                    <Star className="h-4 w-4" /> Lulus (min. 70)
+                    <Star className="h-4 w-4" /> Lulus (min. {lulusThreshold})
                   </>
                 ) : (
                   <>
-                    <AlertCircle className="h-4 w-4" /> Belum lulus (min. 70)
+                    <AlertCircle className="h-4 w-4" /> Belum lulus (min. {lulusThreshold})
                   </>
                 )}
               </div>
@@ -734,8 +751,8 @@ export function QuizViewPage() {
                           : "text-emerald-700 dark:text-emerald-300"
                       }`}
                     >
-                      Skor terakhir: <strong>{skorSebelumnya}/100</strong>
-                      {" · "}Percobaan {jumlahPercobaan}/{MAX_PERCOBAAN}
+                      Nilai terbaik: <strong>{skorSebelumnya}/100</strong>
+                      {" · "}Percobaan {jumlahPercobaan}/{maxPercobaan}
                     </p>
                   </div>
                 </div>
@@ -754,7 +771,7 @@ export function QuizViewPage() {
                         "Timer mulai berjalan saat kamu klik Mulai Kuis",
                         "Urutan soal dan pilihan jawaban diacak setiap sesi",
                         "Kuis otomatis dikumpulkan saat waktu habis",
-                        `Kuis bisa dikerjakan ulang maksimal ${MAX_PERCOBAAN}× jika nilai di bawah ${SKOR_LULUS_ULANG}`,
+                        `Kuis bisa dikerjakan ulang maksimal ${maxPercobaan}× jika nilai di bawah ${SKOR_LULUS_ULANG}`,
                       ].map((item, i) => (
                         <li
                           key={i}
@@ -784,7 +801,7 @@ export function QuizViewPage() {
                         className="w-full py-6 text-base font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-200 dark:shadow-none"
                       >
                         <Trophy className="h-5 w-5 mr-2" />
-                        Kerjakan Ulang ({MAX_PERCOBAAN - jumlahPercobaan} kesempatan tersisa)
+                        Kerjakan Ulang ({maxPercobaan - jumlahPercobaan} kesempatan tersisa)
                       </Button>
                     ) : (
                       <div className="w-full py-4 px-6 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-center">
@@ -792,7 +809,7 @@ export function QuizViewPage() {
                         <p className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">
                           {(skorSebelumnya ?? 0) >= SKOR_LULUS_ULANG
                             ? `Kuis selesai — Nilai ${skorSebelumnya}/100`
-                            : `Percobaan habis (${MAX_PERCOBAAN}/${MAX_PERCOBAAN})`}
+                            : `Percobaan habis (${maxPercobaan}/${maxPercobaan})`}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                           {(skorSebelumnya ?? 0) >= SKOR_LULUS_ULANG

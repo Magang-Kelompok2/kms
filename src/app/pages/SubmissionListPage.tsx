@@ -14,6 +14,7 @@ import {
   FileText,
   Trophy,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -46,6 +47,7 @@ interface HasilKuisItem {
   benar: number;
   total: number;
   created_at: string;
+  jumlahPercobaan?: number;
   user: { id_user: number; username: string; email: string } | null;
 }
 
@@ -68,6 +70,7 @@ export function SubmissionListPage() {
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [resettingUserId, setResettingUserId] = useState<number | null>(null);
 
   const offset = (currentPage - 1) * PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -100,6 +103,34 @@ export function SubmissionListPage() {
       }
     },
     [],
+  );
+
+  const handleResetPercobaan = useCallback(
+    async (userId: number, username: string) => {
+      if (!confirm(`Reset percobaan kuis untuk ${username}? User akan mendapat +5 percobaan tambahan.`)) return;
+      setResettingUserId(userId);
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/kuis/${tugasId}/reset-percobaan`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ id_user: userId }),
+          },
+        );
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error ?? "Gagal reset percobaan");
+        alert(`Berhasil! ${username} mendapat +5 percobaan tambahan.`);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Gagal mereset percobaan");
+      } finally {
+        setResettingUserId(null);
+      }
+    },
+    [tugasId, token],
   );
 
   useEffect(() => {
@@ -383,6 +414,11 @@ export function SubmissionListPage() {
                     <p className="text-sm font-semibold">
                       {item.benar}/{item.total}
                     </p>
+                    {item.jumlahPercobaan != null && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {item.jumlahPercobaan}× percobaan
+                      </p>
+                    )}
                   </div>
                   <div
                     className={`w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold ${
@@ -398,6 +434,22 @@ export function SubmissionListPage() {
                   >
                     {item.skor >= 70 ? "Lulus" : "Tidak Lulus"}
                   </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={resettingUserId === item.user?.id_user}
+                    onClick={() =>
+                      item.user && handleResetPercobaan(item.user.id_user, item.user.username)
+                    }
+                    className="shrink-0 text-xs gap-1.5"
+                  >
+                    {resettingUserId === item.user?.id_user ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-3 w-3" />
+                    )}
+                    Reset Percobaan
+                  </Button>
                 </div>
               </div>
             </Card>
