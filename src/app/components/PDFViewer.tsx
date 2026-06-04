@@ -230,16 +230,6 @@ export function PDFViewer({ url }: PDFViewerProps) {
         )}
       </div>
 
-      {/* Footer / Info */}
-      <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border-t border-border flex justify-between items-center shrink-0">
-        <span className="text-[10px] font-medium text-gray-400 flex items-center gap-1.5 uppercase tracking-tighter">
-          <div className="w-1 h-1 rounded-full bg-green-500" />
-          Secure Viewer • Read Only
-        </span>
-        <p className="text-[11px] text-gray-400 italic">
-          Gunakan mouse wheel untuk scroll halaman
-        </p>
-      </div>
     </div>
   );
 }

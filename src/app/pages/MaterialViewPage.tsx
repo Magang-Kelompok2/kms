@@ -12,6 +12,8 @@ import {
   PlayCircle,
   CheckCircle,
   Trash2,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import type { Material as MaterialType } from "../types";
@@ -33,9 +35,6 @@ export function MaterialViewPage() {
   const [progressLoading, setProgressLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [materialRetryKey, setMaterialRetryKey] = useState(0);
-  const [completionMessage, setCompletionMessage] = useState<string | null>(
-    null,
-  );
   const [userLevel, setUserLevel] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -132,10 +131,7 @@ export function MaterialViewPage() {
     const video = videoRef.current;
     if (!video) return;
 
-    const targetTime = Number(value);
-    const maxAllowedTime = Math.max(videoBufferedEnd, video.currentTime);
-
-    video.currentTime = Math.min(targetTime, maxAllowedTime);
+    video.currentTime = Number(value);
     syncVideoState();
     showControlsTemporarily();
   };
@@ -270,7 +266,6 @@ export function MaterialViewPage() {
         if (materialId && completedMaterials.includes(materialId)) {
           setCompletedFiles(material.files.map((file) => getFileKey(file)));
           setIsCompleted(true);
-          setCompletionMessage("Materi telah diselesaikan.");
         } else {
           const savedLocalProgress =
             localProgressKey && typeof window !== "undefined"
@@ -438,7 +433,6 @@ export function MaterialViewPage() {
     }
 
     if (nextCompletedFiles.length < material.files.length) {
-      setCompletionMessage("Progress materi disimpan di perangkat ini.");
       return;
     }
 
@@ -494,9 +488,6 @@ export function MaterialViewPage() {
     completedFiles.includes(getFileKey(file)),
   ).length;
 
-  const allFilesCompleted =
-    material.files.length > 0 &&
-    completedCurrentMaterialFiles === material.files.length;
 
   const videoFiles = material.files.filter((f) => f.type === "video");
   const pdfFiles = material.files.filter((f) => f.type === "pdf");
@@ -512,7 +503,7 @@ export function MaterialViewPage() {
       ? Math.min((videoCurrentTime / videoDuration) * 100, 100)
       : 0;
 
-  const sliderMax = Math.max(videoBufferedEnd, videoCurrentTime, 0);
+  const sliderMax = videoDuration > 0 ? videoDuration : 0;
 
   return (
     <AppLayout className="max-w-7xl py-6" mainClassName="overflow-hidden">
@@ -529,7 +520,7 @@ export function MaterialViewPage() {
         Kembali ke Materi
       </Button>
 
-      <div className="flex flex-col lg:flex-row gap-6 items-start lg:h-[calc(100vh-4rem-4rem)] lg:overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-6 items-start lg:h-[calc(100vh-4rem-6rem)] lg:overflow-hidden">
         <div className="w-full lg:w-96 shrink-0 lg:h-full lg:min-h-0">
           <Card className="lg:h-full lg:min-h-0 flex flex-col overflow-hidden">
             <div className="sticky top-0 z-10 border-b border-border bg-card/95 p-5 backdrop-blur supports-backdrop-filter:bg-card/80">
@@ -541,7 +532,7 @@ export function MaterialViewPage() {
               </p>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-5">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pr-3 space-y-5">
               {videoFiles.length === 0 && pdfFiles.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
@@ -646,9 +637,9 @@ export function MaterialViewPage() {
           </Card>
         </div>
 
-        <div className="flex-1 min-w-0 lg:h-full lg:min-h-0 lg:overflow-hidden">
-          <div className="h-full flex flex-col gap-6">
-            <Card className="p-6">
+        <div className="flex-1 min-w-0 lg:h-full lg:min-h-0 lg:overflow-y-auto">
+          <div className="h-full flex flex-col gap-4">
+            <Card className="px-6 py-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-3">
@@ -744,7 +735,7 @@ export function MaterialViewPage() {
                           setShowVideoControls(false);
                         }
                       }}
-                      className="w-full aspect-video mt-2 bg-black rounded-xl overflow-hidden relative"
+                      className="w-full h-full mt-2 bg-black rounded-xl overflow-hidden relative"
                     >
                       <video
                         key={selectedFileData.id}
@@ -775,16 +766,18 @@ export function MaterialViewPage() {
                       >
                         <button
                           onClick={() => seekVideo(-10)}
-                          className="pointer-events-auto bg-black/60 text-white px-4 py-3 rounded-full hover:bg-black/80 transition"
+                          className="pointer-events-auto bg-black/60 text-white px-4 py-2.5 rounded-full hover:bg-black/80 transition flex items-center gap-1.5"
                         >
-                          ⏪ 10s
+                          <ChevronsLeft className="h-4 w-4" />
+                          <span className="text-sm font-medium">10s</span>
                         </button>
 
                         <button
                           onClick={() => seekVideo(10)}
-                          className="pointer-events-auto bg-black/60 text-white px-4 py-3 rounded-full hover:bg-black/80 transition"
+                          className="pointer-events-auto bg-black/60 text-white px-4 py-2.5 rounded-full hover:bg-black/80 transition flex items-center gap-1.5"
                         >
-                          10s ⏩
+                          <span className="text-sm font-medium">10s</span>
+                          <ChevronsRight className="h-4 w-4" />
                         </button>
                       </div>
 
@@ -852,26 +845,6 @@ export function MaterialViewPage() {
               </Card>
             )}
 
-            {(allFilesCompleted || isCompleted || completionMessage) && (
-              <Card className="p-5 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
-                  <div>
-                    <h3 className="text-base font-bold text-green-900 dark:text-green-100">
-                      {isCompleted
-                        ? "Materi telah diselesaikan"
-                        : "Progress materi tersimpan"}
-                    </h3>
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      {completionMessage ??
-                        (isCompleted
-                          ? "Materi selesai."
-                          : "Sebagian file sudah ditandai selesai.")}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            )}
           </div>
         </div>
       </div>
