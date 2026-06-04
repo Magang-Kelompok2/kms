@@ -49,6 +49,12 @@ export function MaterialViewPage() {
   const getFileKey = (file: { id: string; type: "pdf" | "video" }) =>
     `${file.type}:${file.id}`;
 
+  const getYouTubeEmbedUrl = (url: string): string | null => {
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+    if (!match) return null;
+    return `https://www.youtube.com/embed/${match[1]}?rel=0`;
+  };
+
   const formatTime = (time: number) => {
     if (!Number.isFinite(time)) return "0:00";
 
@@ -577,7 +583,7 @@ export function MaterialViewPage() {
                                   )}
                                 </div>
                                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                                  {file.duration || "Video"}
+                                  {getYouTubeEmbedUrl(file.url) ? "YouTube" : (file.duration || "Video")}
                                 </p>
                               </div>
                             </div>
@@ -726,6 +732,24 @@ export function MaterialViewPage() {
 
                 <div className="flex-1 min-h-0">
                   {selectedFileData.type === "video" ? (
+                    (() => {
+                      const ytEmbedUrl = getYouTubeEmbedUrl(selectedFileData.url);
+                      if (ytEmbedUrl) {
+                        return (
+                          <div className="w-full mt-2 rounded-xl overflow-hidden bg-black" style={{ aspectRatio: "16/9" }}>
+                            <iframe
+                              key={selectedFileData.id}
+                              src={ytEmbedUrl}
+                              className="w-full h-full"
+                              frameBorder="0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              allowFullScreen
+                              title={selectedFileData.name}
+                            />
+                          </div>
+                        );
+                      }
+                      return (
                     <div
                       ref={videoContainerRef}
                       onMouseMove={showControlsTemporarily}
@@ -836,6 +860,8 @@ export function MaterialViewPage() {
                         </div>
                       </div>
                     </div>
+                      );
+                    })()
                   ) : (
                     <div className="h-full">
                       <PDFViewer url={selectedFileData.url} />

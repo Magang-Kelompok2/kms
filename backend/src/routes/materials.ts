@@ -144,10 +144,21 @@ router.get("/:materialId", verifySupabaseToken, async (req: any, res) => {
     // ── CONFIG SUPABASE STORAGE STREAMING ──
     const BUCKET_NAME = "alpha"; //
     const EXPIRE_IN_SECONDS = 60 * 60 * 3; // Signed URL aktif selama 3 jam
+    const isYouTubeUrl = (url: string) => /(?:youtube\.com|youtu\.be)/i.test(url);
 
     // 4. Generate Signed URL untuk file Video (Bypass Proxy agar mendukung Range Requests)
     const videoFiles = await Promise.all(
       (videos ?? []).map(async (v: any) => {
+        // YouTube URLs dikembalikan langsung, tidak perlu signed URL
+        if (isYouTubeUrl(v.video_path)) {
+          return {
+            id: String(v.id_video),
+            name: v.title_video ?? "Untitled Video",
+            url: v.video_path,
+            type: "video" as const,
+          };
+        }
+
         let finalUrl = "";
         const cleanPath = getRelativePath(v.video_path, BUCKET_NAME);
 
