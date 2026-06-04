@@ -512,11 +512,21 @@ export function UserProgressPage() {
     return classes.filter((c) => !enrolledClassIds.has(String(c.id)));
   }, [classes, enrollments]);
 
-  // --- TAMBAHAN: Filter submission berdasarkan kelas ---
+  // Filter semua section berdasarkan kelas yang dipilih
   const filteredSubmissions = useMemo(() => {
     if (selectedClassFilter === "all") return normalizedSubmissions;
     return normalizedSubmissions.filter((s) => String(s.classId) === selectedClassFilter);
   }, [normalizedSubmissions, selectedClassFilter]);
+
+  const filteredProgress = useMemo(() => {
+    if (selectedClassFilter === "all") return progress;
+    return progress.filter((p) => String(p.classId) === selectedClassFilter);
+  }, [progress, selectedClassFilter]);
+
+  const filteredRiwayat = useMemo(() => {
+    if (selectedClassFilter === "all") return riwayatKuis;
+    return riwayatKuis.filter((r) => String(r.id_kelas) === selectedClassFilter);
+  }, [riwayatKuis, selectedClassFilter]);
 
   if (baseLoading) {
     return (
@@ -585,6 +595,23 @@ export function UserProgressPage() {
           </div>
         </div>
       </Card>
+
+      {/* Filter kelas — berlaku untuk semua section di bawah kecuali Kelola Akses Kelas */}
+      <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-80 mb-8">
+        <Filter className="h-4 w-4 text-[#0C4E8C]" />
+        <select
+          className="text-sm font-bold w-full outline-none bg-transparent cursor-pointer text-slate-600"
+          value={selectedClassFilter}
+          onChange={(e) => setSelectedClassFilter(e.target.value)}
+        >
+          <option value="all">Semua Mata Kuliah</option>
+          {classes.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* --- TAMBAHAN: Kelola Akses Kelas --- */}
       <div className="mb-10">
@@ -673,7 +700,7 @@ export function UserProgressPage() {
         <h2 className="text-2xl font-bold mb-4">Progress Kelas</h2>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {progress.map((item) => (
+          {filteredProgress.map((item) => (
             <Card key={item.id} className="p-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-4">
@@ -704,7 +731,7 @@ export function UserProgressPage() {
               </div>
             </Card>
           ))}
-          {progress.length === 0 && (
+          {filteredProgress.length === 0 && (
             <div className="col-span-full">
               <Card className="p-12 text-center">
                 <TrendingUp className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-4" />
@@ -730,14 +757,14 @@ export function UserProgressPage() {
               <div key={i} className="h-20 rounded-2xl bg-muted animate-pulse" />
             ))}
           </div>
-        ) : riwayatKuis.length === 0 ? (
+        ) : filteredRiwayat.length === 0 ? (
           <div className="py-10 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">
             <Trophy className="h-8 w-8 mx-auto text-slate-300 mb-2" />
             <p className="text-slate-400 font-bold text-sm">Belum ada kuis yang dikerjakan.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {riwayatKuis.map((item) => (
+            {filteredRiwayat.map((item) => (
               <Card key={item.id_tugas} className="p-4 border-none shadow-md rounded-2xl bg-white">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   {/* Info kuis */}
@@ -805,23 +832,6 @@ export function UserProgressPage() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* --- TAMBAHAN: Filter kelas untuk submission --- */}
-      <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-80 mb-6">
-        <Filter className="h-4 w-4 text-[#0C4E8C]" />
-        <select
-          className="text-sm font-bold w-full outline-none bg-transparent cursor-pointer text-slate-600"
-          value={selectedClassFilter}
-          onChange={(e) => setSelectedClassFilter(e.target.value)}
-        >
-          <option value="all">Semua Mata Kuliah</option>
-          {classes.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.name}
-            </option>
-          ))}
-        </select>
       </div>
 
       <div>
