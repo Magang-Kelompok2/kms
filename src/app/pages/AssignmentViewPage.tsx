@@ -109,12 +109,13 @@ export function AssignmentViewPage() {
   }, [assignment, user?.id, user?.role, token]);
 
   useEffect(() => {
-    if (!user?.id || !assignmentId || user.role === "superadmin") return;
+    if (!user?.id || !assignmentId || user.role === "superadmin" || !token) return;
 
     const checkSubmission = async () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/pengumpulan/user/${user.id}/tugas/${assignmentId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         if (res.ok) {
           const json = await res.json();
@@ -130,7 +131,7 @@ export function AssignmentViewPage() {
     };
 
     checkSubmission();
-  }, [user?.id, assignmentId, user?.role]);
+  }, [user?.id, assignmentId, user?.role, token]);
 
   useEffect(() => {
     if (assignment && isEditing) {
@@ -294,7 +295,16 @@ export function AssignmentViewPage() {
           },
         );
         const submitJson = await submitRes.json();
-        if (!submitJson.success) throw new Error("Gagal mengumpulkan tugas");
+        if (!submitJson.success) {
+          if (submitRes.status === 409) {
+            // Sudah submit sebelumnya (badge hilang karena refresh) — anggap berhasil
+            setIsSubmitted(true);
+            setSubmissionData({ created_at: new Date().toISOString() });
+            setSubmissionFiles([]);
+            return;
+          }
+          throw new Error("Gagal mengumpulkan tugas");
+        }
       }
 
       setIsSubmitted(true);

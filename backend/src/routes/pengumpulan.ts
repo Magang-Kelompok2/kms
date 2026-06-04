@@ -25,6 +25,22 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
   }
 
   try {
+    // 0. Cek apakah user sudah pernah submit tugas ini
+    const { data: existingSubmission } = await supabase
+      .from("user_pengumpulan")
+      .select("id_pengumpulan, pengumpulan!inner(id_tugas)")
+      .eq("id_user", actingUserId)
+      .eq("pengumpulan.id_tugas", Number(id_tugas))
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSubmission) {
+      return res.status(409).json({
+        success: false,
+        error: "Kamu sudah pernah mengumpulkan tugas ini",
+      });
+    }
+
     // 1. Insert pengumpulan
     const { data: pengumpulan, error: pengumpulanError } = await supabase
       .from("pengumpulan")

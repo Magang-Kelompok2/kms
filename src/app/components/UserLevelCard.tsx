@@ -14,6 +14,8 @@ interface UserLevelCardProps {
   defaultOpen?: boolean;
   activeMaterialId?: string;
   completedMaterialIds?: Set<string>;
+  completedAssignmentIds?: Set<string>;
+  completedQuizIds?: Set<string>;
 }
 
 export function UserLevelCard({
@@ -26,6 +28,8 @@ export function UserLevelCard({
   defaultOpen = false,
   activeMaterialId,
   completedMaterialIds,
+  completedAssignmentIds,
+  completedQuizIds,
 }: UserLevelCardProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">("materi");
@@ -81,6 +85,7 @@ export function UserLevelCard({
         subtitle: assignment.description ?? "",
         badge: `Pertemuan ${assignment.meetingNumber}`,
         number: assignment.meetingNumber,
+        isCompleted: completedAssignmentIds?.has(assignment.id) ?? false,
       })),
     kuis: [...quizzes]
       .sort((a, b) => a.meetingNumber - b.meetingNumber)
@@ -89,8 +94,9 @@ export function UserLevelCard({
         type: "kuis",
         title: quiz.title,
         subtitle: quiz.description ?? "",
-        badge: `Durasi ${quiz.duration ?? (quiz as any).durasi ?? 0}m`,
+        badge: `Pertemuan ${quiz.meetingNumber}`,
         number: quiz.meetingNumber,
+        isCompleted: completedQuizIds?.has(quiz.id) ?? false,
       })),
   };
 

@@ -252,6 +252,8 @@ export function ClassDetailPage() {
   const [userLevel, setUserLevel] = useState(1);
   const [isEnrolledInClass, setIsEnrolledInClass] = useState(false);
   const [completedMaterialIds, setCompletedMaterialIds] = useState<Set<string>>(new Set());
+  const [completedAssignmentIds, setCompletedAssignmentIds] = useState<Set<string>>(new Set());
+  const [completedQuizIds, setCompletedQuizIds] = useState<Set<string>>(new Set());
   const [classProgress, setClassProgress] = useState({
     progressPercent: 0,
     completedMaterialCount: 0,
@@ -275,6 +277,8 @@ export function ClassDetailPage() {
         setIsEnrolledInClass(json.data.isEnrolled ?? false);
         setUserLevel(json.data.tingkatanSaatIni ?? 1);
         setCompletedMaterialIds(new Set<string>(json.data.completedMaterials ?? []));
+        setCompletedAssignmentIds(new Set<string>(json.data.completedAssignments ?? []));
+        setCompletedQuizIds(new Set<string>(json.data.completedQuizzes ?? []));
         setClassProgress({
           progressPercent: json.data.progressPercent ?? 0,
           completedMaterialCount: json.data.completedMaterialCount ?? 0,
@@ -531,6 +535,8 @@ export function ClassDetailPage() {
             defaultOpen={openLevel === lvl.level}
             activeMaterialId={activeMaterialId}
             completedMaterialIds={completedMaterialIds}
+            completedAssignmentIds={completedAssignmentIds}
+            completedQuizIds={completedQuizIds}
           />
         ))}
       </div>
