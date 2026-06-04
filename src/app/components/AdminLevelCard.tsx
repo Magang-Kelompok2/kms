@@ -10,6 +10,7 @@ import { AddQuizModal } from "./AddQuizModal";
 
 interface AdminLevelCardProps {
   level: number;
+  levelId: string;
   namaLevel: string;
   materials: Material[];
   assignments: Assignment[];
@@ -22,6 +23,7 @@ interface AdminLevelCardProps {
 
 export function AdminLevelCard({
   level,
+  levelId,
   namaLevel,
   materials,
   assignments,
@@ -258,6 +260,7 @@ export function AdminLevelCard({
         onClose={() => setShowMaterialModal(false)}
         classId={classId}
         level={level}
+        levelId={levelId}
         onAdd={onAddMaterial}
       />
       <AddAssignmentModal
@@ -265,6 +268,7 @@ export function AdminLevelCard({
         onClose={() => setShowAssignmentModal(false)}
         classId={classId}
         level={level}
+        levelId={levelId}
         onAdd={onAddAssignment}
       />
       <AddQuizModal
@@ -272,6 +276,7 @@ export function AdminLevelCard({
         onClose={() => setShowQuizModal(false)}
         classId={classId}
         level={level}
+        levelId={levelId}
         onAdd={onAddQuiz}
       />
     </>

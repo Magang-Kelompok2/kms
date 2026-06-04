@@ -18,6 +18,7 @@ interface AddMaterialModalProps {
   onClose: () => void;
   classId: string;
   level: number;
+  levelId: string;
   onAdd: (material: any) => void;
 }
 
@@ -36,6 +37,7 @@ export function AddMaterialModal({
   onClose,
   classId,
   level,
+  levelId,
   onAdd,
 }: AddMaterialModalProps) {
   const { token } = useAuth();
@@ -141,7 +143,7 @@ export function AddMaterialModal({
           title_materi: title,
           deskripsi: description,
           id_kelas: Number(classId),
-          id_tingkatan: level,
+          id_tingkatan: Number(levelId),
           pertemuan: parseInt(meetingNumber),
           videos: youtubeVideos,
           pdfs: [],

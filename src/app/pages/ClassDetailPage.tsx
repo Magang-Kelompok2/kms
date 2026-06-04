@@ -441,6 +441,7 @@ export function ClassDetailPage() {
             <AdminLevelCard
               key={lvl.id}
               level={lvl.level}
+              levelId={lvl.id}
               namaLevel={lvl.namaLevel}
               materials={[
                 ...lvl.materials,

@@ -12,6 +12,7 @@ interface AddQuizModalProps {
   onClose: () => void;
   classId: string;
   level: number;
+  levelId: string;
   onAdd: (quiz: any) => void;
 }
 
@@ -27,6 +28,7 @@ export function AddQuizModal({
   onClose,
   classId,
   level,
+  levelId,
   onAdd,
 }: AddQuizModalProps) {
   const [title, setTitle] = useState("");
@@ -48,12 +50,12 @@ export function AddQuizModal({
       setMateriLoading(true);
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/materials?classId=${classId}`,
+          `${import.meta.env.VITE_API_URL}/api/materials?classId=${classId}&limit=100`,
         );
         const json = await res.json();
         if (json.success) {
           const filtered = (json.data as any[])
-            .filter((m) => m.id_tingkatan === level)
+            .filter((m) => m.id_tingkatan === Number(levelId))
             .map((m) => ({
               id_materi: m.id_materi,
               title_materi: m.title_materi,
@@ -67,7 +69,7 @@ export function AddQuizModal({
       }
     };
     fetchMateri();
-  }, [isOpen, classId, level]);
+  }, [isOpen, classId, levelId]);
 
   if (!isOpen) return null;
 
