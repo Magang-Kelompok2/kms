@@ -217,7 +217,7 @@ router.put("/:tugasId", verifySupabaseToken, async (req: any, res) => {
       .select(
         `id_tugas, nama_tugas, deskripsi, type, id_materi, id_kelas,
          pertemuan, deadline, durasi, path_tugas, created_at,
-         materi!inner(id_tingkatan, pertemuan, tingkatan(level_urutan))`,
+         materi(id_tingkatan, pertemuan, tingkatan(level_urutan))`,
       )
       .single();
 

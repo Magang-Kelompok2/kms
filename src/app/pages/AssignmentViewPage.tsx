@@ -19,6 +19,7 @@ import {
 import { useState, useEffect } from "react";
 import type { Assignment as AssignmentType } from "../types";
 import { PdfViewerModal } from "../components/PdfViewerModal";
+import { invalidateCache } from "../hooks/useQueryCache";
 
 export function AssignmentViewPage() {
   const { assignmentId } = useParams();
@@ -156,10 +157,10 @@ export function AssignmentViewPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            title: editDraft.title,
-            description: editDraft.description,
-            dueDate: editDraft.dueDate,
-            meetingNumber:
+            nama_tugas: editDraft.title,
+            deskripsi: editDraft.description,
+            deadline: editDraft.dueDate,
+            pertemuan:
               parseInt(editDraft.meetingNumber) || assignment.meetingNumber,
           }),
         },
@@ -168,6 +169,7 @@ export function AssignmentViewPage() {
       const json = await res.json();
       setAssignment(json.data);
       setIsEditing(false);
+      invalidateCache(`levels:${assignment.classId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan");
     }
@@ -182,6 +184,7 @@ export function AssignmentViewPage() {
         { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error("Gagal menghapus tugas");
+      invalidateCache(`levels:${assignment.classId}`);
       navigate(`/class/${assignment.classId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan");
