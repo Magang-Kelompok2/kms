@@ -217,24 +217,7 @@ export function QuizViewPage() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? "Gagal submit");
 
-      // Update progress jika lulus (skor >= 70)
-      if (json.data.skor >= 70 && quiz?.classId && quiz?.level) {
-        try {
-          await fetch(
-            `${import.meta.env.VITE_API_URL}/api/users/${user.id}/progress/${quiz.classId}`,
-            {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ tingkatanSaatIni: quiz.level + 1 }),
-            },
-          );
-        } catch {
-          // abaikan error progress, tetap tampilkan hasil
-        }
-      }
+      // Progress update sudah ditangani di backend — tidak perlu call terpisah
 
       setHasilSkor(json.data);
       setSudahMengerjakan(true);
@@ -528,7 +511,9 @@ export function QuizViewPage() {
 
   // ── TAHAP: SELESAI ─────────────────────────────────────────────
   if (tahap === "selesai" && hasilSkor) {
-    const lulus = hasilSkor.skor >= 70;
+    // Attempt 1: lulus jika >= 70. Attempt 2+: lulus jika >= 80
+    const lulusThreshold = jumlahPercobaan <= 1 ? 70 : SKOR_LULUS_ULANG;
+    const lulus = hasilSkor.skor >= lulusThreshold;
     const salah = hasilSkor.total - hasilSkor.benar;
     const bolehUlang = hasilSkor.skor < SKOR_LULUS_ULANG && jumlahPercobaan < MAX_PERCOBAAN;
     const sisaPercobaan = MAX_PERCOBAAN - jumlahPercobaan;

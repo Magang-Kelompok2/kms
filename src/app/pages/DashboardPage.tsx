@@ -1,6 +1,7 @@
 import { useAuth } from "../context/AuthContext";
 import { AppLayout } from "../components/AppLayout";
 import { Card, CardContent } from "../components/ui/card";
+import { Skeleton } from "../components/ui/skeleton";
 import {
   BookOpen,
   FileText,
@@ -106,6 +107,8 @@ export function DashboardPage() {
     Record<string, number>
   >({});
   const [enrolledClassIds, setEnrolledClassIds] = useState<Set<string> | null>(null);
+  const [completedMaterialIds, setCompletedMaterialIds] = useState<Set<string>>(new Set());
+  const [enrollmentsLoaded, setEnrollmentsLoaded] = useState(false);
 
   const tugasByClass = useMemo(() => {
     const stats = new Map<number, { materi: number; tugas: number; kuis: number }>();
@@ -127,7 +130,12 @@ export function DashboardPage() {
   }, [materi, tugas]);
 
   useEffect(() => {
-    if (!user?.id || user.role === "superadmin" || !token) return;
+    if (user?.role === "superadmin") {
+      setEnrolledClassIds(new Set());
+      setEnrollmentsLoaded(true);
+      return;
+    }
+    if (!user?.id || !token) return;
 
     const controller = new AbortController();
 
@@ -144,10 +152,15 @@ export function DashboardPage() {
       .then(([progressJson, enrollmentJson]) => {
         if (progressJson.success) {
           const map: Record<string, number> = {};
+          const completedIds = new Set<string>();
           for (const item of progressJson.data ?? []) {
             map[item.classId] = item.progressPercent ?? 0;
+            for (const id of item.completedMaterials ?? []) {
+              completedIds.add(String(id));
+            }
           }
           setProgressByClass(map);
+          setCompletedMaterialIds(completedIds);
         }
         if (enrollmentJson.success) {
           const ids = new Set<string>(
@@ -155,8 +168,11 @@ export function DashboardPage() {
           );
           setEnrolledClassIds(ids);
         }
+        setEnrollmentsLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        setEnrollmentsLoaded(true);
+      });
 
     return () => controller.abort();
   }, [user?.id, user?.role, token]);
@@ -179,14 +195,17 @@ export function DashboardPage() {
     () =>
       users.filter(
         (u) =>
-          u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          u.email.toLowerCase().includes(searchQuery.toLowerCase()),
+          u.role !== "superadmin" &&
+          u.role !== "admin" &&
+          (u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            u.email.toLowerCase().includes(searchQuery.toLowerCase())),
       ),
     [searchQuery, users],
   );
   const visibleClasses = useMemo(() => {
-    if (user?.role === "superadmin" || enrolledClassIds === null) return classes;
-    return classes.filter((cls) => enrolledClassIds.has(String(cls.id)));
+    if (user?.role === "superadmin") return classes;
+    if (enrolledClassIds === null) return [];
+    return classes.filter((cls) => enrolledClassIds!.has(String(cls.id)));
   }, [classes, enrolledClassIds, user?.role]);
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -198,7 +217,16 @@ export function DashboardPage() {
       ),
     [currentPage, filteredUsers],
   );
-  const latestMateri = useMemo(() => materi.slice(0, 5), [materi]);
+  const nextMateri = useMemo(() => {
+    if (!enrolledClassIds) return [];
+    return materi
+      .filter(
+        (m) =>
+          enrolledClassIds.has(String(m.id_kelas)) &&
+          !completedMaterialIds.has(String(m.id_materi)),
+      )
+      .slice(0, 5);
+  }, [materi, enrolledClassIds, completedMaterialIds]);
   const isInitialLoading =
     classesLoading ||
     materiLoading ||
@@ -275,7 +303,22 @@ export function DashboardPage() {
         </h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {visibleClasses.map((cls) => {
+          {enrolledClassIds === null ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i} className="overflow-hidden border-0 shadow-lg">
+                <Skeleton className="h-52 w-full rounded-none" />
+                <CardContent className="space-y-3 pt-4">
+                  <div className="flex gap-2">
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-2 w-full rounded-full" />
+                </CardContent>
+              </Card>
+            ))
+          ) : visibleClasses.map((cls) => {
             const classStats = tugasByClass.get(cls.id) ?? {
               materi: 0,
               tugas: 0,
@@ -355,6 +398,7 @@ export function DashboardPage() {
       </div>
 
       {/* ── Manajemen Pengguna (Superadmin) ── */}
+
       {user?.role === "superadmin" && (
         <div>
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -483,7 +527,7 @@ export function DashboardPage() {
               </Button>
               <div className="text-sm text-muted-foreground">
                 Halaman {currentPage} dari {Math.max(totalPages, 1)}
-                {total > 0 ? ` • ${total} user` : ""}
+                {filteredUsers.length > 0 ? ` • ${filteredUsers.length} user` : ""}
               </div>
               <Button
                 size="sm"
@@ -500,15 +544,37 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* ── Materi Terbaru (User) ── */}
+      {/* ── Materi Selanjutnya (User) ── */}
       {user?.role !== "superadmin" && (
         <div>
           <h2 className="mb-6 text-xl font-semibold tracking-tight">
-            Materi Terbaru
+            Materi Selanjutnya
           </h2>
 
           <div className="grid gap-3">
-            {latestMateri.map((m) => {
+            {enrolledClassIds === null ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden shadow-sm border border-border">
+                  <div className="flex items-stretch">
+                    <Skeleton className="w-36 sm:w-44 h-24 rounded-none shrink-0" />
+                    <div className="flex flex-1 items-center gap-4 px-5 py-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex gap-2">
+                          <Skeleton className="h-5 w-20 rounded-full" />
+                          <Skeleton className="h-5 w-24 rounded-full" />
+                        </div>
+                        <Skeleton className="h-5 w-48" />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            ) : nextMateri.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Semua materi sudah diselesaikan. Kerja bagus!
+              </p>
+            ) : null}
+            {enrolledClassIds !== null && nextMateri.map((m) => {
               const cls = classes.find((c) => c.id === m.id_kelas);
               const classImage = cls ? getClassImage(cls.name) : "/akuntansi.jpg";
 

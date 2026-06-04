@@ -4,7 +4,7 @@ import { AppLayout } from "../components/AppLayout";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { Users, Plus, TrendingUp, Loader, Search } from "lucide-react";
+import { Users, Plus, TrendingUp, Loader, Search, Trash2 } from "lucide-react";
 import { useUsers } from "../hooks/useUsers";
 import { useState, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -114,11 +114,26 @@ export function UserManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
   const offset = (currentPage - 1) * pageSize;
-  const { users, loading, error, total } = useUsers(pageSize, offset);
+  const { users, loading, error, total, deleteUser } = useUsers(pageSize, offset);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [profiles, setProfiles] = useState<Record<number, UserProfileData>>({});
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [classFilter, setClassFilter] = useState<ClassFilter>("Semua");
+
+  const handleDeleteUser = async (userId: number, role: string) => {
+    if (role === "superadmin") {
+      alert("Tidak bisa menghapus akun superadmin!");
+      return;
+    }
+    if (confirm("Apakah Anda yakin ingin menghapus pengguna ini?")) {
+      setDeletingUserId(userId);
+      const success = await deleteUser(userId);
+      setDeletingUserId(null);
+      if (success) alert("Pengguna berhasil dihapus!");
+      else alert("Gagal menghapus pengguna.");
+    }
+  };
 
   useEffect(() => {
     if (!token || users.length === 0) {
@@ -178,7 +193,12 @@ export function UserManagementPage() {
     };
   }, [token, users]);
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const adminUsers = useMemo(
+    () => users.filter((u) => u.role === "superadmin" || u.role === "admin"),
+    [users],
+  );
+
+  const totalPages = Math.max(1, Math.ceil((total - adminUsers.length) / pageSize));
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -190,6 +210,7 @@ export function UserManagementPage() {
     () =>
       users
         .filter((u) => {
+          if (u.role === "superadmin" || u.role === "admin") return false;
           const q = searchQuery.trim().toLowerCase();
           if (q && !u.username.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) {
             return false;
@@ -359,7 +380,7 @@ export function UserManagementPage() {
 
       <div className="mb-4 flex items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400">
         <span>
-          Menampilkan {users.length} user pada halaman {currentPage} dari {totalPages}
+          Menampilkan {usersWithMetrics.length} user pada halaman {currentPage} dari {totalPages}
         </span>
         {profilesLoading && (
           <span className="inline-flex items-center gap-2">
@@ -370,7 +391,7 @@ export function UserManagementPage() {
       </div>
 
       {/* Content */}
-      {users.length === 0 ? (
+      {usersWithMetrics.length === 0 && !loading ? (
         <Card className="p-8 text-center">
           <Users className="mx-auto mb-4 h-12 w-12 text-slate-300" />
           <p className="text-slate-600 dark:text-slate-400">
@@ -419,6 +440,21 @@ export function UserManagementPage() {
                       >
                         <TrendingUp className="h-3 w-3 mr-1" />
                         Lihat Progres
+                      </Button>
+                    )}
+                    {u.role !== "superadmin" && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="mt-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteUser(u.id, u.role);
+                        }}
+                        disabled={deletingUserId === u.id}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        {deletingUserId === u.id ? "Menghapus..." : "Hapus"}
                       </Button>
                     )}
                   </div>
@@ -560,7 +596,7 @@ export function UserManagementPage() {
             Sebelumnya
           </Button>
           <span className="text-sm text-slate-500 dark:text-slate-400">
-            Total {total} user
+            Total {total - adminUsers.length} user
           </span>
           <Button
             variant="outline"
@@ -573,6 +609,48 @@ export function UserManagementPage() {
           </Button>
         </div>
         </>
+      )}
+
+      {/* Admin Section */}
+      {adminUsers.length > 0 && (
+        <div className="mt-10">
+          <div className="mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+              Daftar Admin
+            </h2>
+            <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+              {adminUsers.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {adminUsers.map((u) => (
+              <Card
+                key={u.id}
+                className="p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-4"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-700 text-white text-base font-semibold">
+                    {u.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {u.username}
+                      </h3>
+                      <Badge variant="default" className="text-xs">
+                        {u.role === "superadmin" ? "Super Admin" : "Admin"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-500">{u.email}</p>
+                  </div>
+                </div>
+                <span className="text-xs text-slate-400 shrink-0">
+                  Bergabung {new Date(u.created_at).toLocaleDateString("id-ID")}
+                </span>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
     </AppLayout>
   );

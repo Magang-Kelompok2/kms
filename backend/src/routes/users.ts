@@ -909,6 +909,7 @@ router.get(
       res.json({
         success: true,
         data: {
+          isEnrolled: !!summary,
           tingkatanSaatIni: summary?.currentLevel ?? 1,
           progressPercent: summary?.progressPercent ?? 0,
           completedMaterials: summary?.completedMaterials ?? [],

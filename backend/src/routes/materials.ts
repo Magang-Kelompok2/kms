@@ -70,7 +70,7 @@ router.get("/", async (_req, res) => {
 });
 
 // GET /api/materials/:materialId
-router.get("/:materialId", async (req, res) => {
+router.get("/:materialId", verifySupabaseToken, async (req: any, res) => {
   const materialId = Number(req.params.materialId);
   if (isNaN(materialId))
     return res
@@ -94,7 +94,25 @@ router.get("/:materialId", async (req, res) => {
       throw error;
     }
 
-    // 2. Fetch videos dengan filter id_materi
+    // 2. Cek enrollment — user biasa harus terdaftar di kelas ini
+    if (req.user.role !== "superadmin") {
+      const { data: enrollment } = await supabase
+        .from("user_enrollment")
+        .select("id_tingkatan")
+        .eq("id_user", req.user.id_user)
+        .eq("id_kelas", data.id_kelas)
+        .eq("status", "approved")
+        .limit(1);
+
+      if (!enrollment || enrollment.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: "Anda tidak terdaftar di kelas ini",
+        });
+      }
+    }
+
+    // 3. Fetch videos dengan filter id_materi
     const { data: videos, error: videoError } = await supabase
       .from("video")
       .select("id_video, title_video, video_path")
@@ -104,7 +122,7 @@ router.get("/:materialId", async (req, res) => {
       console.error("Video fetch error:", videoError);
     }
 
-    // 3. Fetch pdfs dengan filter id_materi
+    // 4. Fetch pdfs dengan filter id_materi
     const { data: pdfs, error: pdfError } = await supabase
       .from("pdf")
       .select("id_pdf, title_pdf, pdf_path")

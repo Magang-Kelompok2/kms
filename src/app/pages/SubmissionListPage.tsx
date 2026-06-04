@@ -299,8 +299,13 @@ export function SubmissionListPage() {
             <CheckCircle className="h-6 w-6 mx-auto text-green-600 mb-2" />
             <p className="text-2xl font-bold">{pageStats.secondary}</p>
             <p className="text-sm text-gray-500">
-              {isKuis ? "Lulus di Halaman Ini" : "Ada Jawaban Teks"}
+              {isKuis ? "Lulus" : "Jawaban Teks"}
             </p>
+            {isKuis && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                dari {hasilKuisList.length} di halaman ini
+              </p>
+            )}
           </div>
           <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/10 rounded-lg">
             {isKuis ? (
@@ -310,8 +315,13 @@ export function SubmissionListPage() {
             )}
             <p className="text-2xl font-bold">{pageStats.tertiary}</p>
             <p className="text-sm text-gray-500">
-              {isKuis ? "Rata-rata Halaman Ini" : "Ada File"}
+              {isKuis ? "Rata-rata Nilai" : "Ada Lampiran"}
             </p>
+            {isKuis && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                dari {hasilKuisList.length} di halaman ini
+              </p>
+            )}
           </div>
         </div>
       </Card>

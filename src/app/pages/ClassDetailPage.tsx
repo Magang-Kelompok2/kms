@@ -217,9 +217,11 @@ export function ClassDetailPage() {
 
   const [currentClass, setCurrentClass] = useState<KelasData | null>(null);
   const [classLoading, setClassLoading] = useState(true);
+  const [classRetryKey, setClassRetryKey] = useState(0);
 
   useEffect(() => {
     if (!classId) return;
+    setClassLoading(true);
     const fetchClass = async () => {
       try {
         const res = await fetch(
@@ -235,18 +237,21 @@ export function ClassDetailPage() {
       }
     };
     fetchClass();
-  }, [classId]);
+  }, [classId, classRetryKey]);
 
   const {
     levels,
     loading: levelsLoading,
     error: levelsError,
+    refetch,
   } = useLevels(classId);
 
   const [localMaterials, setLocalMaterials] = useState<Material[]>([]);
   const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
   const [localQuizzes, setLocalQuizzes] = useState<Quiz[]>([]);
   const [userLevel, setUserLevel] = useState(1);
+  const [isEnrolledInClass, setIsEnrolledInClass] = useState(false);
+  const [completedMaterialIds, setCompletedMaterialIds] = useState<Set<string>>(new Set());
   const [classProgress, setClassProgress] = useState({
     progressPercent: 0,
     completedMaterialCount: 0,
@@ -255,7 +260,10 @@ export function ClassDetailPage() {
   });
 
   useEffect(() => {
-    if (!user?.id || !classId || user.role === "superadmin") return;
+    if (!user?.id || !classId || user.role === "superadmin") {
+      if (user?.role === "superadmin") setIsEnrolledInClass(true);
+      return;
+    }
     const fetchProgress = async () => {
       try {
         const res = await fetch(
@@ -264,7 +272,9 @@ export function ClassDetailPage() {
         );
         if (!res.ok) return;
         const json = await res.json();
+        setIsEnrolledInClass(json.data.isEnrolled ?? false);
         setUserLevel(json.data.tingkatanSaatIni ?? 1);
+        setCompletedMaterialIds(new Set<string>(json.data.completedMaterials ?? []));
         setClassProgress({
           progressPercent: json.data.progressPercent ?? 0,
           completedMaterialCount: json.data.completedMaterialCount ?? 0,
@@ -272,7 +282,7 @@ export function ClassDetailPage() {
           completedQuizCount: json.data.completedQuizCount ?? 0,
         });
       } catch {
-        // default tetap 1
+        // default: tidak enrolled
       }
     };
     fetchProgress();
@@ -280,6 +290,7 @@ export function ClassDetailPage() {
 
   const canAccessLevel = (level: number) => {
     if (user?.role === "superadmin") return true;
+    if (!isEnrolledInClass) return false;
     return level <= userLevel;
   };
 
@@ -317,7 +328,10 @@ export function ClassDetailPage() {
     return (
       <AppLayout>
         <Card className="p-8 text-center shadow-sm">
-          <p className="text-destructive">Kelas tidak ditemukan</p>
+          <p className="text-destructive mb-4">Kelas tidak ditemukan atau gagal dimuat</p>
+          <Button variant="outline" onClick={() => setClassRetryKey((k) => k + 1)}>
+            Coba Lagi
+          </Button>
         </Card>
       </AppLayout>
     );
@@ -328,7 +342,10 @@ export function ClassDetailPage() {
       <AppLayout>
         <Card className="p-8 text-center shadow-sm">
           <p className="mb-2 text-destructive">Gagal memuat data tingkatan</p>
-          <p className="text-sm text-muted-foreground">{levelsError}</p>
+          <p className="text-sm text-muted-foreground mb-4">{levelsError}</p>
+          <Button variant="outline" onClick={() => refetch()}>
+            Coba Lagi
+          </Button>
         </Card>
       </AppLayout>
     );
@@ -510,8 +527,10 @@ export function ClassDetailPage() {
             assignments={lvl.assignments}
             quizzes={lvl.quizzes}
             isLocked={!canAccessLevel(lvl.level)}
+            lockReason={!isEnrolledInClass ? "not-enrolled" : "level"}
             defaultOpen={openLevel === lvl.level}
             activeMaterialId={activeMaterialId}
+            completedMaterialIds={completedMaterialIds}
           />
         ))}
       </div>

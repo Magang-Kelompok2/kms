@@ -115,6 +115,10 @@ export function AddMaterialModal({
       alert("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
+    if (parseInt(meetingNumber) < 1) {
+      alert("Nomor pertemuan harus dimulai dari 1");
+      return;
+    }
 
     setLoading(true);
     setSubmitError(null);

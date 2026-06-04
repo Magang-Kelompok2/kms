@@ -321,7 +321,7 @@ router.post("/:tugasId/submit", verifySupabaseToken, async (req: any, res) => {
 
     const { data: tugas } = await supabase
       .from("tugas")
-      .select("nama_tugas")
+      .select("nama_tugas, id_kelas, id_tingkatan")
       .eq("id_tugas", tugasId)
       .maybeSingle();
 
@@ -336,6 +336,81 @@ router.post("/:tugasId/submit", verifySupabaseToken, async (req: any, res) => {
         `Kuis ${tugas?.nama_tugas ?? tugasId} telah dikumpulkan dengan skor ${skor}`,
       ),
     });
+
+    // ── Auto-update progress jika lulus ──────────────────────────
+    // Attempt 1: lulus jika skor >= 70. Attempt 2+: skor >= 80
+    const passingScore = persistedAttempts === 1 ? 70 : 80;
+    if (skor >= passingScore && tugas?.id_kelas && tugas?.id_tingkatan) {
+      try {
+        const idKelas = Number(tugas.id_kelas);
+
+        // Cari level_urutan dari tingkatan kuis ini
+        const { data: thisLevel } = await supabase
+          .from("tingkatan")
+          .select("level_urutan")
+          .eq("id_tingkatan", tugas.id_tingkatan)
+          .maybeSingle();
+
+        if (thisLevel?.level_urutan != null) {
+          // Cari tingkatan berikutnya di kelas yang sama
+          const { data: nextLevel } = await supabase
+            .from("tingkatan")
+            .select("id_tingkatan, level_urutan")
+            .eq("id_kelas", idKelas)
+            .eq("level_urutan", thisLevel.level_urutan + 1)
+            .maybeSingle();
+
+          if (nextLevel?.id_tingkatan) {
+            const updatedAt = new Date().toISOString();
+
+            // Cek progress user saat ini
+            const { data: existingProg } = await supabase
+              .from("user_progress")
+              .select("id_progress, id_tingkatan")
+              .eq("id_user", numericUserId)
+              .eq("id_kelas", idKelas)
+              .maybeSingle();
+
+            if (!existingProg?.id_progress) {
+              // Belum ada progress → insert
+              await supabase.from("user_progress").insert({
+                id_user: numericUserId,
+                id_kelas: idKelas,
+                id_tingkatan: nextLevel.id_tingkatan,
+                updated_at: updatedAt,
+              });
+            } else {
+              // Cek level_urutan user saat ini — hanya advance, jangan downgrade
+              const { data: userCurrentLevel } = await supabase
+                .from("tingkatan")
+                .select("level_urutan")
+                .eq("id_tingkatan", existingProg.id_tingkatan ?? 0)
+                .maybeSingle();
+
+              const currentUrutan = userCurrentLevel?.level_urutan ?? 0;
+
+              if (nextLevel.level_urutan > currentUrutan) {
+                const { error: updateErr } = await supabase
+                  .from("user_progress")
+                  .update({ id_tingkatan: nextLevel.id_tingkatan, updated_at: updatedAt })
+                  .eq("id_progress", existingProg.id_progress);
+
+                // Fallback ke kolom lama jika skema belum diupdate
+                if (updateErr && isMissingColumnError(updateErr, "id_tingkatan")) {
+                  await supabase
+                    .from("user_progress")
+                    .update({ tingkatan_saat_ini: nextLevel.id_tingkatan, updated_at: updatedAt })
+                    .eq("id_progress", existingProg.id_progress);
+                }
+              }
+            }
+          }
+        }
+      } catch (progressErr) {
+        console.error("Gagal update progress setelah submit kuis:", progressErr);
+        // Tidak gagalkan response — hasil kuis sudah tersimpan
+      }
+    }
 
     res.json({
       success: true,

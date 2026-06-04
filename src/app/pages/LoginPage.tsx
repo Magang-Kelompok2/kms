@@ -40,21 +40,16 @@ export function LoginPage() {
     //   setError(result.error || "Email atau password salah");
     // }
 
-    try {
-      const response = await login(email, password);
+    const result = await login(email, password);
+    if (result.success) {
       setSuccess("Login berhasil! Mengarahkan ke halaman dashboard...");
-      console.log("Login successfull:", response);
-
       setTimeout(() => {
         navigate("/dashboard");
       }, 1000);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Login gagal. Email atau password salah.";
-      setError(errorMessage);
-      console.log("Login failed", err)
-    } finally {
-      setIsLoading(false);
+    } else {
+      setError(result.error || "Email atau password salah.");
     }
+    setIsLoading(false);
 
   };
 

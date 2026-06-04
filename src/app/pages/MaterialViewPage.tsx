@@ -11,7 +11,6 @@ import {
   FileText,
   PlayCircle,
   CheckCircle,
-  Edit3,
   Trash2,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
@@ -33,18 +32,13 @@ export function MaterialViewPage() {
   const [materialLoading, setMaterialLoading] = useState(true);
   const [progressLoading, setProgressLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [materialRetryKey, setMaterialRetryKey] = useState(0);
   const [completionMessage, setCompletionMessage] = useState<string | null>(
     null,
   );
   const [userLevel, setUserLevel] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [, setEditDraft] = useState({
-    title: "",
-    description: "",
-    meetingNumber: "",
-  });
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
@@ -213,10 +207,11 @@ export function MaterialViewPage() {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/materials/${materialId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
+        if (res.status === 403) throw new Error("Anda tidak terdaftar di kelas ini");
         if (!res.ok) throw new Error("Gagal mengambil data materi");
         const json = await res.json();
-        console.log("Material response:", json);
         if (!json.success || !json.data) throw new Error("Material not found");
         setMaterial(json.data);
       } catch (err) {
@@ -228,7 +223,7 @@ export function MaterialViewPage() {
     };
 
     fetchMaterial();
-  }, [materialId]);
+  }, [materialId, materialRetryKey]);
 
   useEffect(() => {
     if (!material) return;
@@ -304,23 +299,11 @@ export function MaterialViewPage() {
       material.files.length > 0 &&
       !selectedFile
     ) {
-      console.log("Auto-selecting first file:", material.files[0]);
       setSelectedFile(material.files[0].id);
     } else if (material && (!material.files || material.files.length === 0)) {
-      console.log("No files available in material");
       setSelectedFile(null);
     }
   }, [material, selectedFile]);
-
-  useEffect(() => {
-    if (material && isEditing) {
-      setEditDraft({
-        title: material.title,
-        description: material.description,
-        meetingNumber: material.meetingNumber.toString(),
-      });
-    }
-  }, [material, isEditing]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -347,10 +330,6 @@ export function MaterialViewPage() {
 
     return () => window.removeEventListener("keydown", handleKey);
   }, [videoBufferedEnd]);
-
-  const handleEdit = () => {
-    setIsEditing(true);
-  };
 
   const handleDelete = async () => {
     if (!material) return;
@@ -381,10 +360,20 @@ export function MaterialViewPage() {
   }
 
   if (error) {
+    const isNotEnrolled = error === "Anda tidak terdaftar di kelas ini";
     return (
       <AppLayout>
         <Card className="p-8 text-center shadow-sm">
-          <p className="text-destructive">{error}</p>
+          <p className="text-destructive mb-4">{error}</p>
+          {isNotEnrolled ? (
+            <Button variant="outline" onClick={() => navigate("/dashboard")}>
+              Kembali ke Dashboard
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => setMaterialRetryKey((k) => k + 1)}>
+              Coba Lagi
+            </Button>
+          )}
         </Card>
       </AppLayout>
     );
@@ -394,7 +383,10 @@ export function MaterialViewPage() {
     return (
       <AppLayout>
         <Card className="p-8 text-center shadow-sm">
-          <p className="text-destructive">Material tidak ditemukan</p>
+          <p className="text-destructive mb-4">Material tidak ditemukan</p>
+          <Button variant="outline" onClick={() => navigate("/dashboard")}>
+            Kembali ke Dashboard
+          </Button>
         </Card>
       </AppLayout>
     );
@@ -682,15 +674,6 @@ export function MaterialViewPage() {
 
                   {user?.role === "superadmin" && (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleEdit}
-                        className="flex-1 max-w-fit"
-                      >
-                        <Edit3 className="h-4 w-4 mr-2" />
-                        Edit Materi
-                      </Button>
                       <Button
                         size="sm"
                         variant="destructive"

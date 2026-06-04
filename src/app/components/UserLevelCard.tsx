@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "./ui/card";
-import { ChevronDown, ChevronUp, Lock, BookOpen, ClipboardCheck, HelpCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, Lock, BookOpen, ClipboardCheck, HelpCircle, CheckCircle2 } from "lucide-react";
 import type { Assignment, Quiz, Material } from "../types";
 
 interface UserLevelCardProps {
@@ -10,8 +10,10 @@ interface UserLevelCardProps {
   assignments: Assignment[];
   quizzes: Quiz[];
   isLocked: boolean;
+  lockReason?: "not-enrolled" | "level";
   defaultOpen?: boolean;
   activeMaterialId?: string;
+  completedMaterialIds?: Set<string>;
 }
 
 export function UserLevelCard({
@@ -20,8 +22,10 @@ export function UserLevelCard({
   assignments,
   quizzes,
   isLocked,
+  lockReason = "level",
   defaultOpen = false,
   activeMaterialId,
+  completedMaterialIds,
 }: UserLevelCardProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [activeTab, setActiveTab] = useState<"materi" | "tugas" | "kuis">("materi");
@@ -53,33 +57,41 @@ export function UserLevelCard({
     badge: string;
     number: number;
     extra?: string;
+    isCompleted?: boolean;
   };
 
   const itemsByTab: Record<"materi" | "tugas" | "kuis", TabItem[]> = {
-    materi: materials.map((material) => ({
-      id: material.id,
-      type: "materi",
-      title: material.title,
-      subtitle: material.description ?? "",
-      badge: `${material.files?.length || 0} files`,
-      number: material.meetingNumber,
-    })),
-    tugas: assignments.map((assignment) => ({
-      id: assignment.id,
-      type: "tugas",
-      title: assignment.title,
-      subtitle: assignment.description ?? "",
-      badge: `Pertemuan ${assignment.meetingNumber}`,
-      number: assignment.meetingNumber,
-    })),
-    kuis: quizzes.map((quiz) => ({
-      id: quiz.id,
-      type: "kuis",
-      title: quiz.title,
-      subtitle: quiz.description ?? "",
-      badge: `Durasi ${quiz.duration ?? (quiz as any).durasi ?? 0}m`,
-      number: quiz.meetingNumber,
-    })),
+    materi: [...materials]
+      .sort((a, b) => a.meetingNumber - b.meetingNumber)
+      .map((material) => ({
+        id: material.id,
+        type: "materi",
+        title: material.title,
+        subtitle: material.description ?? "",
+        badge: `${material.files?.length || 0} files`,
+        number: material.meetingNumber,
+        isCompleted: completedMaterialIds?.has(material.id) ?? false,
+      })),
+    tugas: [...assignments]
+      .sort((a, b) => a.meetingNumber - b.meetingNumber)
+      .map((assignment) => ({
+        id: assignment.id,
+        type: "tugas",
+        title: assignment.title,
+        subtitle: assignment.description ?? "",
+        badge: `Pertemuan ${assignment.meetingNumber}`,
+        number: assignment.meetingNumber,
+      })),
+    kuis: [...quizzes]
+      .sort((a, b) => a.meetingNumber - b.meetingNumber)
+      .map((quiz) => ({
+        id: quiz.id,
+        type: "kuis",
+        title: quiz.title,
+        subtitle: quiz.description ?? "",
+        badge: `Durasi ${quiz.duration ?? (quiz as any).durasi ?? 0}m`,
+        number: quiz.meetingNumber,
+      })),
   };
 
   const tabs: { key: "materi" | "tugas" | "kuis"; label: string; count: number }[] = [
@@ -165,7 +177,9 @@ export function UserLevelCard({
             <Lock className="h-5 w-5 text-white" />
           </div>
           <p className="text-sm font-medium text-muted-foreground">
-            Selesaikan tingkatan sebelumnya untuk membuka konten ini
+            {lockReason === "not-enrolled"
+              ? "Anda tidak terdaftar di kelas ini"
+              : "Selesaikan tingkatan sebelumnya untuk membuka konten ini"}
           </p>
         </div>
       )}
@@ -205,7 +219,11 @@ export function UserLevelCard({
                     <div
                       id={item.id}
                       key={item.id}
-                      className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background p-4 hover:shadow-md transition-all cursor-pointer hover:border-blue-200 dark:hover:border-blue-900"
+                      className={`flex items-center justify-between gap-4 rounded-xl border p-4 hover:shadow-md transition-all cursor-pointer ${
+                        item.isCompleted
+                          ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-900/10 hover:border-emerald-300 dark:hover:border-emerald-700"
+                          : "border-border bg-background hover:border-blue-200 dark:hover:border-blue-900"
+                      }`}
                       onClick={() => {
                         if (item.type === "materi") navigate(`/material/${item.id}`);
                         if (item.type === "tugas") navigate(`/assignment/${item.id}`);
@@ -216,12 +234,20 @@ export function UserLevelCard({
                         {/* Number badge */}
                         <div
                           className="w-10 h-10 rounded-xl text-white grid place-items-center font-bold text-sm shrink-0 shadow-sm"
-                          style={{ background: typeGradient[item.type] }}
+                          style={{
+                            background: item.isCompleted
+                              ? "linear-gradient(135deg, #10b981, #059669)"
+                              : typeGradient[item.type],
+                          }}
                         >
-                          {item.number}
+                          {item.isCompleted ? (
+                            <CheckCircle2 className="h-5 w-5" />
+                          ) : (
+                            item.number
+                          )}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-foreground leading-snug">
+                          <h4 className={`font-semibold leading-snug ${item.isCompleted ? "text-emerald-800 dark:text-emerald-300" : "text-foreground"}`}>
                             {item.title}
                           </h4>
                           {item.subtitle && (
@@ -233,7 +259,12 @@ export function UserLevelCard({
                       </div>
 
                       {/* Badge */}
-                      <div className="shrink-0">
+                      <div className="shrink-0 flex items-center gap-2">
+                        {item.isCompleted && (
+                          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-full px-2.5 py-1 whitespace-nowrap">
+                            Selesai
+                          </span>
+                        )}
                         <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 rounded-full px-3 py-1 whitespace-nowrap">
                           {item.badge}
                         </span>
