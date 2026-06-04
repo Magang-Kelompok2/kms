@@ -74,7 +74,7 @@ export function AdminLevelCard({
       type: "kuis",
       title: quiz.title,
       subtitle: quiz.description ?? "",
-      badge: `Durasi ${quiz.duration ?? (quiz as any).durasi ?? 0}m`,
+      badge: `Pertemuan ${quiz.meetingNumber}`,
       number: quiz.meetingNumber,
     })),
   };

@@ -741,72 +741,76 @@ export function QuizViewPage() {
                 </div>
               )}
 
-              {/* Petunjuk */}
-              <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-5 mb-6 border border-gray-100 dark:border-gray-800">
-                <p className="mb-3 text-sm font-semibold text-foreground">
-                  Petunjuk pengerjaan
-                </p>
-                <ul className="space-y-2">
-                  {[
-                    "Pastikan koneksi internet stabil sebelum memulai",
-                    "Timer mulai berjalan saat kamu klik Mulai Kuis",
-                    "Urutan soal dan pilihan jawaban diacak setiap sesi",
-                    "Kuis otomatis dikumpulkan saat waktu habis",
-                    `Kuis bisa dikerjakan ulang maksimal ${MAX_PERCOBAAN}× jika nilai di bawah ${SKOR_LULUS_ULANG}`,
-                  ].map((item, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
-                    >
-                      <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                        {i + 1}
-                      </span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Tombol mulai / coba ulang / selesai */}
-              {soalList.length > 0 ? (
-                !sudahMengerjakan ? (
-                  <Button
-                    onClick={handleMulaiKuis}
-                    className="w-full py-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white shadow-lg shadow-blue-200 dark:shadow-none"
-                  >
-                    <Trophy className="h-5 w-5 mr-2" /> Mulai Kuis
-                  </Button>
-                ) : bisaUlang ? (
-                  <Button
-                    onClick={handleMulaiKuis}
-                    className="w-full py-6 text-base font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-200 dark:shadow-none"
-                  >
-                    <Trophy className="h-5 w-5 mr-2" />
-                    Kerjakan Ulang ({MAX_PERCOBAAN - jumlahPercobaan} kesempatan tersisa)
-                  </Button>
-                ) : (
-                  <div className="w-full py-4 px-6 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-center">
-                    <CheckCircle className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
-                    <p className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">
-                      {(skorSebelumnya ?? 0) >= SKOR_LULUS_ULANG
-                        ? `Kuis selesai — Nilai ${skorSebelumnya}/100`
-                        : `Percobaan habis (${MAX_PERCOBAAN}/${MAX_PERCOBAAN})`}
+              {/* Petunjuk & Tombol Mulai — hanya untuk user biasa */}
+              {user?.role !== "superadmin" && (
+                <>
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-5 mb-6 border border-gray-100 dark:border-gray-800">
+                    <p className="mb-3 text-sm font-semibold text-foreground">
+                      Petunjuk pengerjaan
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {(skorSebelumnya ?? 0) >= SKOR_LULUS_ULANG
-                        ? "Kamu sudah mencapai nilai minimum pengerjaan ulang"
-                        : "Kamu telah menggunakan semua kesempatan pengerjaan ulang"}
-                    </p>
+                    <ul className="space-y-2">
+                      {[
+                        "Pastikan koneksi internet stabil sebelum memulai",
+                        "Timer mulai berjalan saat kamu klik Mulai Kuis",
+                        "Urutan soal dan pilihan jawaban diacak setiap sesi",
+                        "Kuis otomatis dikumpulkan saat waktu habis",
+                        `Kuis bisa dikerjakan ulang maksimal ${MAX_PERCOBAAN}× jika nilai di bawah ${SKOR_LULUS_ULANG}`,
+                      ].map((item, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                        >
+                          <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                            {i + 1}
+                          </span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                )
-              ) : (
-                <Button
-                  variant="outline"
-                  className="w-full py-6 text-base"
-                  disabled
-                >
-                  Soal belum tersedia
-                </Button>
+
+                  {/* Tombol mulai / coba ulang / selesai */}
+                  {soalList.length > 0 ? (
+                    !sudahMengerjakan ? (
+                      <Button
+                        onClick={handleMulaiKuis}
+                        className="w-full py-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white shadow-lg shadow-blue-200 dark:shadow-none"
+                      >
+                        <Trophy className="h-5 w-5 mr-2" /> Mulai Kuis
+                      </Button>
+                    ) : bisaUlang ? (
+                      <Button
+                        onClick={handleMulaiKuis}
+                        className="w-full py-6 text-base font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-200 dark:shadow-none"
+                      >
+                        <Trophy className="h-5 w-5 mr-2" />
+                        Kerjakan Ulang ({MAX_PERCOBAAN - jumlahPercobaan} kesempatan tersisa)
+                      </Button>
+                    ) : (
+                      <div className="w-full py-4 px-6 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-center">
+                        <CheckCircle className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
+                        <p className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">
+                          {(skorSebelumnya ?? 0) >= SKOR_LULUS_ULANG
+                            ? `Kuis selesai — Nilai ${skorSebelumnya}/100`
+                            : `Percobaan habis (${MAX_PERCOBAAN}/${MAX_PERCOBAAN})`}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {(skorSebelumnya ?? 0) >= SKOR_LULUS_ULANG
+                            ? "Kamu sudah mencapai nilai minimum pengerjaan ulang"
+                            : "Kamu telah menggunakan semua kesempatan pengerjaan ulang"}
+                        </p>
+                      </div>
+                    )
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full py-6 text-base"
+                      disabled
+                    >
+                      Soal belum tersedia
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </Card>
