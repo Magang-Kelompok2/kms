@@ -41,6 +41,17 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
       });
     }
 
+    // 0b. Ambil deadline tugas untuk cek keterlambatan
+    const { data: tugas } = await supabase
+      .from("tugas")
+      .select("nama_tugas, deadline")
+      .eq("id_tugas", Number(id_tugas))
+      .maybeSingle();
+
+    const isLate = tugas?.deadline
+      ? new Date() > new Date(tugas.deadline)
+      : false;
+
     // 1. Insert pengumpulan
     const { data: pengumpulan, error: pengumpulanError } = await supabase
       .from("pengumpulan")
@@ -48,6 +59,7 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
         id_tugas: Number(id_tugas),
         answer: answer ?? null,
         id_file: id_file ? Number(id_file) : null,
+        is_late: isLate,
       })
       .select()
       .single();
@@ -63,12 +75,6 @@ router.post("/", verifySupabaseToken, async (req: any, res) => {
       });
 
     if (userPengumpulanError) throw userPengumpulanError;
-
-    const { data: tugas } = await supabase
-      .from("tugas")
-      .select("nama_tugas")
-      .eq("id_tugas", Number(id_tugas))
-      .maybeSingle();
 
     await createNotificationSafe({
       userId: actingUserId,
@@ -154,7 +160,7 @@ router.get("/tugas/:tugasId", verifySupabaseToken, async (req: any, res) => {
     const { data, error, count } = await supabase
       .from("pengumpulan")
       .select(
-        `id_pengumpulan, answer, created_at,
+        `id_pengumpulan, answer, created_at, is_late,
          id_file,
          file_pengumpulan(original_filename, ukuran_file, object_key),
          user_pengumpulan(id_user, user(username, email))`,
@@ -278,7 +284,7 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
       .from("user_pengumpulan")
       .select(
         `id_pengumpulan, created_at, score, feedback,
-         pengumpulan(id_pengumpulan, answer, created_at, id_file, id_tugas,
+         pengumpulan(id_pengumpulan, answer, created_at, is_late, id_file, id_tugas,
            tugas(id_tugas, nama_tugas, id_kelas, type),
            file_pengumpulan(original_filename, ukuran_file, object_key)
          )`,
@@ -302,6 +308,7 @@ router.get("/user/:userId", verifySupabaseToken, async (req: any, res) => {
           title: tugas.nama_tugas ?? "Pengumpulan Tugas",
           answer: pengumpulan.answer ?? null,
           createdAt: pengumpulan.created_at,
+          isLate: pengumpulan.is_late ?? false,
           file: file
             ? {
                 name: file.original_filename,

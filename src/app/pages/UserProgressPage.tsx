@@ -56,6 +56,7 @@ interface SubmissionItem {
   answer: string | null;
   file: { name: string; objectKey: string; size: number; url?: string } | null;
   createdAt: string;
+  isLate?: boolean;
   status: "pending" | "approved" | "rejected";
   user_pengumpulan?: { score: number | null; feedback: string | null };
 }
@@ -887,12 +888,19 @@ export function UserProgressPage() {
                       <span className="text-white/80 text-xs font-medium uppercase tracking-wide">
                         {submission.title ? "Pengumpulan" : "Tugas"}
                       </span>
-                      <span
-                        className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusConfig.className}`}
-                      >
-                        {statusConfig.icon}
-                        {statusConfig.label}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {submission.isLate && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500 text-white">
+                            Terlambat
+                          </span>
+                        )}
+                        <span
+                          className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusConfig.className}`}
+                        >
+                          {statusConfig.icon}
+                          {statusConfig.label}
+                        </span>
+                      </div>
                     </div>
                     <h3 className="text-white font-semibold text-sm leading-tight line-clamp-2">
                       {submission.title || "Pengumpulan Tugas"}

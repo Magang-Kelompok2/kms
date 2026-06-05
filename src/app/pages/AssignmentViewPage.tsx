@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
   Eye,
+  AlertCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Assignment as AssignmentType } from "../types";
@@ -337,6 +338,18 @@ export function AssignmentViewPage() {
       : `${import.meta.env.VITE_API_URL}/${assignment.file_path}`
     : null;
 
+  // Ekstrak nama file asli dari query param ?path=... di URL proxy
+  const assignmentFileName = (() => {
+    if (!assignment.file_path) return "File Tugas";
+    try {
+      const url = new URL(assignment.file_path);
+      const objectKey = url.searchParams.get("path") || "";
+      return objectKey.split("/").pop() || "File Tugas";
+    } catch {
+      return assignment.file_path.split("/").pop()?.split("?")[0] || "File Tugas";
+    }
+  })();
+
   return (
     <AppLayout className="py-6">
       <Button
@@ -529,7 +542,7 @@ export function AssignmentViewPage() {
                     </div>
                     <div>
                       <p className="font-medium text-sm">
-                        {assignment.file_path!.split("/").pop()?.split("?")[0] || "File Tugas"}
+                        {assignmentFileName}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Dokumen Penugasan
@@ -541,8 +554,7 @@ export function AssignmentViewPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        const fileName = assignment.file_path!.split("/").pop()?.split("?")[0] || "File Tugas";
-                        setPreviewFileName(fileName);
+                        setPreviewFileName(assignmentFileName);
                         setPreviewUrl(assignmentFileUrl);
                       }}
                     >
@@ -674,6 +686,15 @@ export function AssignmentViewPage() {
                         </button>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {isOverdue && (
+                  <div className="flex items-start gap-2 p-3 mb-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                    <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      <span className="font-semibold">Pengumpulan Terlambat</span> — Deadline sudah terlewat. Kamu masih bisa mengumpulkan, namun pengumpulan ini akan ditandai sebagai terlambat.
+                    </p>
                   </div>
                 )}
 

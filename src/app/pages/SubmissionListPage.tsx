@@ -33,6 +33,7 @@ interface PengumpulanItem {
   id_pengumpulan: number;
   answer: string | null;
   created_at: string;
+  is_late?: boolean;
   file: {
     original_filename: string;
     ukuran_file: number;
@@ -525,10 +526,17 @@ export function SubmissionListPage() {
                   )}
                 </div>
 
-                <Badge variant="secondary" className="shrink-0">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Dikumpulkan
-                </Badge>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <Badge variant="secondary">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Dikumpulkan
+                  </Badge>
+                  {item.is_late && (
+                    <Badge variant="destructive" className="text-xs">
+                      Terlambat
+                    </Badge>
+                  )}
+                </div>
               </div>
             </Card>
           ))
