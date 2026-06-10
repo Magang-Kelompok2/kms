@@ -8,5 +8,6 @@ export default defineConfig({
     port: 3012,
     strictPort: false,
     host: true,
+    allowedHosts: ['mhkorp.com', 'www.mhkorp.com']
   },
 });
