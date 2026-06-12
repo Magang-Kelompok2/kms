@@ -23,8 +23,11 @@ import {
   Plus,
   Trophy,
   RotateCcw,
+  Maximize2,
+  Minimize2,
+  Download,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface UserData {
   id: number;
@@ -87,6 +90,7 @@ interface TingkatanOption {
 }
 
 const PAGE_SIZE = 9;
+const KUIS_PAGE_SIZE = 5;
 
 export function UserProgressPage() {
   const { userId } = useParams();
@@ -137,6 +141,11 @@ export function UserProgressPage() {
   const [riwayatKuis, setRiwayatKuis] = useState<RiwayatKuisItem[]>([]);
   const [riwayatLoading, setRiwayatLoading] = useState(false);
   const [resettingTugasId, setResettingTugasId] = useState<number | null>(null);
+  const [kuisPage, setKuisPage] = useState(1);
+
+  // --- File preview fullscreen ---
+  const previewModalRef = useRef<HTMLDivElement>(null);
+  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
 
   const offset = (currentPage - 1) * PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(totalSubmissions / PAGE_SIZE));
@@ -371,6 +380,16 @@ export function UserProgressPage() {
   }, [userId]);
 
   useEffect(() => {
+    setKuisPage(1);
+  }, [selectedClassFilter]);
+
+  useEffect(() => {
+    const handler = () => setIsPreviewFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  useEffect(() => {
     if (!token) return;
     if (user?.role !== "superadmin") {
       navigate("/dashboard");
@@ -528,6 +547,30 @@ export function UserProgressPage() {
     if (selectedClassFilter === "all") return riwayatKuis;
     return riwayatKuis.filter((r) => String(r.id_kelas) === selectedClassFilter);
   }, [riwayatKuis, selectedClassFilter]);
+
+  const kuisTotalPages = Math.max(1, Math.ceil(filteredRiwayat.length / KUIS_PAGE_SIZE));
+  const paginatedRiwayat = filteredRiwayat.slice(
+    (kuisPage - 1) * KUIS_PAGE_SIZE,
+    kuisPage * KUIS_PAGE_SIZE,
+  );
+
+  const togglePreviewFullscreen = () => {
+    if (!document.fullscreenElement) {
+      previewModalRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  const handleDownloadFile = () => {
+    if (!previewFile) return;
+    const a = document.createElement("a");
+    a.href = previewFile.url;
+    a.download = previewFile.name;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    a.click();
+  };
 
   if (baseLoading) {
     return (
@@ -765,7 +808,7 @@ export function UserProgressPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredRiwayat.map((item) => (
+            {paginatedRiwayat.map((item) => (
               <Card key={item.id_tugas} className="p-4 border-none shadow-md rounded-2xl bg-white">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   {/* Info kuis */}
@@ -831,6 +874,34 @@ export function UserProgressPage() {
                 </div>
               </Card>
             ))}
+          </div>
+        )}
+
+        {/* Pagination Riwayat Kuis */}
+        {!riwayatLoading && kuisTotalPages > 1 && (
+          <div className="mt-4 flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setKuisPage((p) => Math.max(p - 1, 1))}
+              disabled={kuisPage === 1}
+              className="rounded-xl"
+            >
+              Sebelumnya
+            </Button>
+            <span className="text-sm text-muted-foreground font-semibold">
+              {kuisPage} / {kuisTotalPages}
+              <span className="ml-2 text-xs text-slate-400">({filteredRiwayat.length} kuis)</span>
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setKuisPage((p) => Math.min(p + 1, kuisTotalPages))}
+              disabled={kuisPage >= kuisTotalPages}
+              className="rounded-xl"
+            >
+              Selanjutnya
+            </Button>
           </div>
         )}
       </div>
@@ -1141,34 +1212,58 @@ export function UserProgressPage() {
       {/* --- TAMBAHAN: Modal File Preview --- */}
       {filePreviewOpen && previewFile && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 md:p-10">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl h-full flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-6 border-b flex justify-between items-center bg-white">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-50 rounded-xl">
-                  <FileText className="h-6 w-6 text-[#0C4E8C]" />
+          <div
+            ref={previewModalRef}
+            className="bg-white rounded-[2.5rem] w-full max-w-6xl h-full flex flex-col overflow-hidden shadow-2xl"
+          >
+            <div className="p-4 border-b flex justify-between items-center bg-white gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 bg-blue-50 rounded-xl shrink-0">
+                  <FileText className="h-5 w-5 text-[#0C4E8C]" />
                 </div>
-                <h3 className="font-black text-slate-700 truncate max-w-xs md:max-w-xl">{previewFile.name}</h3>
+                <h3 className="font-black text-slate-700 truncate text-sm md:text-base">{previewFile.name}</h3>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setFilePreviewOpen(false)}
-                className="rounded-full h-12 w-12 hover:bg-rose-50 hover:text-rose-500"
-              >
-                <X className="h-8 w-8" />
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Download */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadFile}
+                  className="rounded-xl gap-1.5 font-bold"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Download</span>
+                </Button>
+                {/* Fullscreen */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={togglePreviewFullscreen}
+                  className="rounded-xl gap-1.5 font-bold"
+                >
+                  {isPreviewFullscreen ? (
+                    <><Minimize2 className="h-4 w-4" /><span className="hidden sm:inline">Keluar Fullscreen</span></>
+                  ) : (
+                    <><Maximize2 className="h-4 w-4" /><span className="hidden sm:inline">Fullscreen</span></>
+                  )}
+                </Button>
+                {/* Tutup */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setFilePreviewOpen(false)}
+                  className="rounded-full h-10 w-10 hover:bg-rose-50 hover:text-rose-500"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
-            <div className="flex-1 bg-slate-100">
+            <div className="flex-1 bg-slate-100 min-h-0">
               <iframe
-                src={`${previewFile.url}#toolbar=0&navpanes=0`}
+                src={previewFile.url}
                 className="w-full h-full border-none"
                 title="Preview File"
               />
-            </div>
-            <div className="p-6 border-t flex justify-center bg-white">
-              <Button className="px-12 h-12 rounded-full font-black bg-slate-800" onClick={() => setFilePreviewOpen(false)}>
-                Tutup Pratinjau
-              </Button>
             </div>
           </div>
         </div>

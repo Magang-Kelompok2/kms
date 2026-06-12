@@ -22,6 +22,8 @@ import { useMateri } from "../hooks/useMateri";
 import { useTugas } from "../hooks/useTugas";
 import { useUsers } from "../hooks/useUsers";
 import { DashboardSkeleton } from "../components/PageSkeletons";
+import { AddKelasModal } from "../components/AddKelasModal";
+import { KelasIcon } from "../utils/kelasIcons";
 
 // ─── Gradient KPI Card ─────────────────────────────────────────────────────────
 interface GradientStatCardProps {
@@ -70,7 +72,7 @@ function GradientStatCard({
   );
 }
 
-// ─── Shared image map ──────────────────────────────────────────────────────────
+// ─── Fallback image map for classes without emoji icon ─────────────────────────
 const classImageMap: Record<string, string> = {
   akuntansi: "/akuntansi.jpg",
   audit: "/audit.jpg",
@@ -87,7 +89,8 @@ export function DashboardPage() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
-  const { classes, loading: classesLoading } = useClasses();
+  const { classes, loading: classesLoading, invalidate, refetch } = useClasses();
+  const [showAddKelasModal, setShowAddKelasModal] = useState(false);
   const { materi, loading: materiLoading } = useMateri();
   const { tugas, loading: tugasLoading } = useTugas();
   const { users, loading: usersLoading, deleteUser, total } = useUsers(10, 0);
@@ -108,7 +111,6 @@ export function DashboardPage() {
   >({});
   const [enrolledClassIds, setEnrolledClassIds] = useState<Set<string> | null>(null);
   const [completedMaterialIds, setCompletedMaterialIds] = useState<Set<string>>(new Set());
-  const [enrollmentsLoaded, setEnrollmentsLoaded] = useState(false);
 
   const tugasByClass = useMemo(() => {
     const stats = new Map<number, { materi: number; tugas: number; kuis: number }>();
@@ -168,10 +170,8 @@ export function DashboardPage() {
           );
           setEnrolledClassIds(ids);
         }
-        setEnrollmentsLoaded(true);
       })
       .catch(() => {
-        setEnrollmentsLoaded(true);
       });
 
     return () => controller.abort();
@@ -298,27 +298,20 @@ export function DashboardPage() {
 
       {/* ── Kelas Anda ── */}
       <div className="mb-8">
-        <h2 className="mb-6 text-2xl font-bold tracking-tight text-black dark:text-white">
-          Kelas Anda
-        </h2>
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-2xl font-bold tracking-tight text-black dark:text-white">
+            Kelas Anda
+          </h2>
+          {user?.role === "superadmin" && (
+            <Button onClick={() => setShowAddKelasModal(true)}>
+              <Plus className="mr-2 size-4" />
+              Tambah Kelas
+            </Button>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {enrolledClassIds === null ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} className="overflow-hidden border-0 shadow-lg">
-                <Skeleton className="h-52 w-full rounded-none" />
-                <CardContent className="space-y-3 pt-4">
-                  <div className="flex gap-2">
-                    <Skeleton className="h-7 w-20 rounded-full" />
-                    <Skeleton className="h-7 w-20 rounded-full" />
-                    <Skeleton className="h-7 w-20 rounded-full" />
-                  </div>
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-2 w-full rounded-full" />
-                </CardContent>
-              </Card>
-            ))
-          ) : visibleClasses.map((cls) => {
+          {visibleClasses.map((cls) => {
             const classStats = tugasByClass.get(cls.id) ?? {
               materi: 0,
               tugas: 0,
@@ -329,31 +322,43 @@ export function DashboardPage() {
                 ? (progressByClass[String(cls.id)] ?? 0)
                 : 0;
 
-            const classImage = getClassImage(cls.name);
-
             return (
               <Card
                 key={cls.id}
                 className="cursor-pointer overflow-hidden transition-all hover:shadow-xl hover:scale-105 border-0 shadow-lg"
                 onClick={() => navigate(`/class/${cls.id}`)}
               >
-                  {/* ── Area Gambar dengan Overlay Gradient ── */}
-                  <div className="relative h-52 w-full overflow-hidden">
-                    <img
-                      src={classImage}
-                      alt={cls.name}
-                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-blue-700/90 via-blue-500/30 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 pt-8">
-                      <h3
-                        className="text-xl font-bold tracking-tight text-white drop-shadow-md"
-                        style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
-                      >
-                        {cls.name}
-                      </h3>
+                  {/* ── Area Header ── */}
+                  {cls.icon ? (
+                    <div className="relative h-52 w-full bg-linear-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+                      <KelasIcon name={cls.icon} className="w-24 h-24 text-white/30" />
+                      <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-blue-900/70 to-transparent px-5 pb-4 pt-8">
+                        <h3
+                          className="text-xl font-bold tracking-tight text-white drop-shadow-md"
+                          style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                        >
+                          {cls.name}
+                        </h3>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="relative h-52 w-full overflow-hidden">
+                      <img
+                        src={getClassImage(cls.name)}
+                        alt={cls.name}
+                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-linear-to-t from-blue-700/90 via-blue-500/30 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 pt-8">
+                        <h3
+                          className="text-xl font-bold tracking-tight text-white drop-shadow-md"
+                          style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                        >
+                          {cls.name}
+                        </h3>
+                      </div>
+                    </div>
+                  )}
 
                   <CardContent className="pt-4">
                     <div className="mb-4 flex gap-3 text-sm flex-wrap">
@@ -384,7 +389,7 @@ export function DashboardPage() {
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                           <div
-                            className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-300"
+                            className="bg-linear-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${userProgress}%` }}
                           />
                         </div>
@@ -576,7 +581,6 @@ export function DashboardPage() {
             ) : null}
             {enrolledClassIds !== null && nextMateri.map((m) => {
               const cls = classes.find((c) => c.id === m.id_kelas);
-              const classImage = cls ? getClassImage(cls.name) : "/akuntansi.jpg";
 
               return (
                 <Card
@@ -585,27 +589,35 @@ export function DashboardPage() {
                   onClick={() => navigate(`/class/${m.id_kelas}`)}
                 >
                   <div className="flex items-stretch">
-                    {/* ── Gambar kiri dengan gradient kiri→kanan ── */}
-                    <div className="relative w-36 shrink-0 overflow-hidden sm:w-44">
-                      <img
-                        src={classImage}
-                        alt={cls?.name ?? "Kelas"}
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
-                      {/* Gradient: biru solid di kiri → transparan ke kanan */}
-                      <div className="absolute inset-0 bg-linear-to-r from-blue-700/90 via-blue-500/40 to-transparent" />
-                      {/* Nama kelas vertikal di atas gradient */}
-                      <div className="absolute inset-0 flex items-center justify-center p-3">
+                    {/* ── Panel kiri ── */}
+                    {cls?.icon ? (
+                      <div className="w-36 shrink-0 sm:w-44 bg-linear-to-br from-blue-500 to-blue-700 flex flex-col items-center justify-center gap-1 p-3">
+                        <KelasIcon name={cls.icon} className="w-8 h-8 text-white" />
                         <span
-                          className="text-sm font-bold leading-tight text-white drop-shadow-md"
-                          style={{
-                            fontFamily: "Plus Jakarta Sans, sans-serif",
-                          }}
+                          className="text-xs font-bold leading-tight text-white drop-shadow-md text-center"
+                          style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
                         >
-                          {cls?.name ?? "—"}
+                          {cls.name}
                         </span>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="relative w-36 shrink-0 overflow-hidden sm:w-44">
+                        <img
+                          src={cls ? getClassImage(cls.name) : "/akuntansi.jpg"}
+                          alt={cls?.name ?? "Kelas"}
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-linear-to-r from-blue-700/90 via-blue-500/40 to-transparent" />
+                        <div className="absolute inset-0 flex items-center justify-center p-3">
+                          <span
+                            className="text-sm font-bold leading-tight text-white drop-shadow-md text-center"
+                            style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                          >
+                            {cls?.name ?? "—"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* ── Konten kanan ── */}
                     <div className="flex flex-1 items-center justify-between gap-4 px-5 py-4">
@@ -631,6 +643,11 @@ export function DashboardPage() {
           </div>
         </div>
       )}
+      <AddKelasModal
+        open={showAddKelasModal}
+        onClose={() => setShowAddKelasModal(false)}
+        onSuccess={() => { invalidate(); refetch(); }}
+      />
     </AppLayout>
   );
 }

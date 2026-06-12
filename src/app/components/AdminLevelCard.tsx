@@ -178,22 +178,22 @@ export function AdminLevelCard({
                     return (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background p-4 hover:shadow-md transition-all cursor-pointer hover:border-blue-200 dark:hover:border-blue-900"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-4 hover:shadow-md transition-all cursor-pointer hover:border-blue-200 dark:hover:border-blue-900"
                         onClick={() => {
                           if (item.type === "materi") navigate(`/material/${item.id}`);
                           if (item.type === "tugas") navigate(`/assignment/${item.id}`);
                           if (item.type === "kuis") navigate(`/quiz/${item.id}`);
                         }}
                       >
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
                           <div
                             className="w-10 h-10 rounded-xl text-white grid place-items-center font-bold text-sm shrink-0 shadow-sm"
                             style={{ background: typeGradient[item.type] }}
                           >
                             {item.number}
                           </div>
-                          <div>
-                            <h4 className="font-semibold text-foreground leading-snug">
+                          <div className="min-w-0">
+                            <h4 className="font-semibold text-foreground leading-snug truncate">
                               {item.title}
                             </h4>
                             {item.subtitle && (

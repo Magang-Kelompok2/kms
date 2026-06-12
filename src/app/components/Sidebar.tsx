@@ -5,46 +5,44 @@ import { Button } from "./ui/button";
 import {
   LayoutDashboard,
   Users,
-  Calculator,      // Cocok untuk Akuntansi
-  FileSearch,      // Cocok untuk Audit
-  Landmark,        // Cocok untuk Perpajakan/Gedung Pajak
   Menu,
   X,
-  BookOpenCheck,   // Icon tambahan untuk header section
+  BookOpenCheck,
+  Calculator,
+  FileSearch,
+  Landmark,
+  BookOpen,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "./ui/utils";
+import { useClasses } from "../hooks/useClasses";
+import { getKelasIcon } from "../utils/kelasIcons";
 
-// Data Kelas (Dinamis)
-const CLASS_DATA = [
-  { id: 1, name: "Akuntansi", icon: Calculator },
-  { id: 2, name: "Audit", icon: FileSearch },
-  { id: 3, name: "Perpajakan", icon: Landmark },
+const CLASS_NAME_ICON_MAP: { key: string; icon: LucideIcon }[] = [
+  { key: "akuntansi", icon: Calculator },
+  { key: "audit", icon: FileSearch },
+  { key: "perpajakan", icon: Landmark },
 ];
+
+function getSidebarIcon(cls: { name: string; icon?: string | null }): LucideIcon {
+  if (cls.icon) return getKelasIcon(cls.icon);
+  const match = CLASS_NAME_ICON_MAP.find((m) => cls.name.toLowerCase().includes(m.key));
+  return match?.icon ?? BookOpen;
+}
 
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const { classes } = useClasses();
 
-  const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + "/");
-  };
+  const isActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(path + "/");
 
-  // Navigasi Admin
   const adminItems = [
-    {
-      label: "Dashboard",
-      icon: LayoutDashboard,
-      path: "/dashboard",
-      show: true,
-    },
-    {
-      label: "User Management",
-      icon: Users,
-      path: "/users",
-      show: user?.role === "superadmin",
-    },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", show: true },
+    { label: "User Management", icon: Users, path: "/users", show: user?.role === "superadmin" },
   ];
 
   return (
@@ -53,7 +51,7 @@ export function Sidebar() {
       <Button
         variant="outline"
         size="icon"
-        className="fixed left-4 top-[4.5rem] z-40 shadow-sm md:hidden"
+        className="fixed left-4 top-18 z-40 shadow-sm md:hidden"
         onClick={() => setIsOpen(!isOpen)}
       >
         {isOpen ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -68,28 +66,25 @@ export function Sidebar() {
       >
         <div className="flex h-full flex-col">
           <nav className="flex-1 space-y-6 p-4">
-            
-            {/* SECTION 1: ADMIN/GENERAL */}
+
+            {/* SECTION 1: MENU UTAMA */}
             <div>
               <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                 Menu Utama
               </p>
               <div className="space-y-1">
-                {adminItems.filter(i => i.show).map((item) => {
+                {adminItems.filter((i) => i.show).map((item) => {
                   const Icon = item.icon;
-                  const isItemActive = isActive(item.path);
+                  const active = isActive(item.path);
                   return (
                     <Button
                       key={item.label}
-                      variant={isItemActive ? "secondary" : "ghost"}
+                      variant={active ? "secondary" : "ghost"}
                       className={cn(
                         "h-10 w-full justify-start gap-3 px-3 font-medium",
-                        isItemActive && "bg-secondary text-secondary-foreground"
+                        active && "bg-secondary text-secondary-foreground",
                       )}
-                      onClick={() => {
-                        navigate(item.path);
-                        setIsOpen(false);
-                      }}
+                      onClick={() => { navigate(item.path); setIsOpen(false); }}
                     >
                       <Icon className="size-4 shrink-0" />
                       <span>{item.label}</span>
@@ -99,7 +94,7 @@ export function Sidebar() {
               </div>
             </div>
 
-            {/* SECTION 2: KELAS (Dinamis) */}
+            {/* SECTION 2: PROGRAM KELAS */}
             <div>
               <div className="mb-2 flex items-center gap-2 px-2">
                 <BookOpenCheck className="size-3 text-primary" />
@@ -108,25 +103,21 @@ export function Sidebar() {
                 </p>
               </div>
               <div className="space-y-1">
-                {CLASS_DATA.map((cls) => {
-                  const Icon = cls.icon;
+                {classes.map((cls) => {
                   const itemPath = `/class/${cls.id}`;
-                  const isItemActive = isActive(itemPath);
-
+                  const active = isActive(itemPath);
+                  const ClsIcon = getSidebarIcon(cls);
                   return (
                     <Button
                       key={cls.id}
-                      variant={isItemActive ? "secondary" : "ghost"}
+                      variant={active ? "secondary" : "ghost"}
                       className={cn(
                         "h-10 w-full justify-start gap-3 px-3 font-medium",
-                        isItemActive && "bg-secondary text-secondary-foreground"
+                        active && "bg-secondary text-secondary-foreground",
                       )}
-                      onClick={() => {
-                        navigate(itemPath);
-                        setIsOpen(false);
-                      }}
+                      onClick={() => { navigate(itemPath); setIsOpen(false); }}
                     >
-                      <Icon className="size-4 shrink-0" />
+                      <ClsIcon className="size-4 shrink-0" />
                       <span>{cls.name}</span>
                     </Button>
                   );

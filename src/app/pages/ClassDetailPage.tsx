@@ -10,16 +10,21 @@ import {
   FileText,
   ClipboardCheck,
   Layers,
+  Plus,
+  BookOpen,
 } from "lucide-react";
 import { UserLevelCard } from "../components/UserLevelCard";
 import { AdminLevelCard } from "../components/AdminLevelCard";
 import { useEffect, useMemo, useState } from "react";
 import { useLevels } from "../hooks/useLevels";
 import { ClassDetailSkeleton } from "../components/PageSkeletons";
+import { KelasIcon } from "../utils/kelasIcons";
+import { AddTingkatanModal } from "../components/AddTingkatanModal";
 
 interface KelasData {
   id: number;
   name: string;
+  icon?: string | null;
   createdAt: string;
 }
 
@@ -246,6 +251,7 @@ export function ClassDetailPage() {
     refetch,
   } = useLevels(classId);
 
+  const [showAddTingkatan, setShowAddTingkatan] = useState(false);
   const [localMaterials, setLocalMaterials] = useState<Material[]>([]);
   const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
   const [localQuizzes, setLocalQuizzes] = useState<Quiz[]>([]);
@@ -357,8 +363,6 @@ export function ClassDetailPage() {
 
   const userProgress = classProgress.progressPercent;
 
-  const classImage = getClassImage(currentClass.name);
-
   // ─── CLASS HEADER ───────────────────────────────────────────────────────────
   const ClassHeader = () => (
     <>
@@ -372,24 +376,36 @@ export function ClassDetailPage() {
       </Button>
 
       <Card className="mb-8 overflow-hidden shadow-sm">
-        <div className="relative h-56 w-full overflow-hidden">
-          <img
-            src={classImage}
-            alt={currentClass.name}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-          {/* Gradient: biru solid di bawah → transparan di atas */}
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-700/90 via-blue-500/30 to-transparent" />
-          {/* Nama kelas di bagian bawah */}
-          <div className="absolute bottom-0 left-0 right-0 px-6 pb-6 pt-10">
-            <h1
-              className="text-center text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-4xl"
-              style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
-            >
-              {currentClass.name}
-            </h1>
+        {currentClass.icon ? (
+          <div className="relative h-56 w-full bg-linear-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+            <KelasIcon name={currentClass.icon} className="w-28 h-28 text-white/25" />
+            <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-blue-900/70 to-transparent px-6 pb-6 pt-10">
+              <h1
+                className="text-center text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-4xl"
+                style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
+              >
+                {currentClass.name}
+              </h1>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="relative h-56 w-full overflow-hidden">
+            <img
+              src={getClassImage(currentClass.name)}
+              alt={currentClass.name}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-blue-700/90 via-blue-500/30 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 px-6 pb-6 pt-10">
+              <h1
+                className="text-center text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-4xl"
+                style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}
+              >
+                {currentClass.name}
+              </h1>
+            </div>
+          </div>
+        )}
       </Card>
     </>
   );
@@ -429,47 +445,70 @@ export function ClassDetailPage() {
         </div>
 
         <div className="space-y-6">
-          <div>
-            <h2 className="mb-2 text-xl font-semibold tracking-tight">
-              Kelola Konten per Tingkatan
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Tambah dan kelola materi, tugas, dan kuis untuk setiap tingkatan
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="mb-1 text-xl font-semibold tracking-tight">
+                Kelola Konten per Tingkatan
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Tambah dan kelola materi, tugas, dan kuis untuk setiap tingkatan
+              </p>
+            </div>
+            {levels.length > 0 && (
+              <Button onClick={() => setShowAddTingkatan(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Tambah Tingkatan
+              </Button>
+            )}
           </div>
-          {levels.map((lvl) => (
-            <AdminLevelCard
-              key={lvl.id}
-              level={lvl.level}
-              levelId={lvl.id}
-              namaLevel={lvl.namaLevel}
-              materials={[
-                ...lvl.materials,
-                ...localMaterials.filter(
-                  (m) => (m as any).level === lvl.level,
-                ),
-              ]}
-              assignments={[
-                ...lvl.assignments,
-                ...localAssignments.filter(
-                  (a) => (a as any).level === lvl.level,
-                ),
-              ]}
-              quizzes={[
-                ...lvl.quizzes,
-                ...localQuizzes.filter((q) => (q as any).level === lvl.level),
-              ]}
-              classId={classId!}
-              onAddMaterial={(material) =>
-                setLocalMaterials([...localMaterials, material])
-              }
-              onAddAssignment={(assignment) =>
-                setLocalAssignments([...localAssignments, assignment])
-              }
-              onAddQuiz={(quiz) => setLocalQuizzes([...localQuizzes, quiz])}
-            />
-          ))}
+
+          {levels.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-16 text-center">
+              <Layers className="mb-4 h-12 w-12 text-muted-foreground/30" />
+              <h3 className="mb-2 text-lg font-semibold">Kelas ini belum memiliki tingkatan</h3>
+              <p className="mb-6 text-sm text-muted-foreground max-w-xs">
+                Mulai dengan membuat tingkatan pertama, lalu tambahkan materi, tugas, dan kuis di dalamnya.
+              </p>
+              <Button onClick={() => setShowAddTingkatan(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Tambah Tingkatan Pertama
+              </Button>
+            </div>
+          ) : (
+            levels.map((lvl) => (
+              <AdminLevelCard
+                key={lvl.id}
+                level={lvl.level}
+                levelId={lvl.id}
+                namaLevel={lvl.namaLevel}
+                materials={[
+                  ...lvl.materials,
+                  ...localMaterials.filter((m) => (m as any).level === lvl.level),
+                ]}
+                assignments={[
+                  ...lvl.assignments,
+                  ...localAssignments.filter((a) => (a as any).level === lvl.level),
+                ]}
+                quizzes={[
+                  ...lvl.quizzes,
+                  ...localQuizzes.filter((q) => (q as any).level === lvl.level),
+                ]}
+                classId={classId!}
+                onAddMaterial={(material) => setLocalMaterials([...localMaterials, material])}
+                onAddAssignment={(assignment) => setLocalAssignments([...localAssignments, assignment])}
+                onAddQuiz={(quiz) => setLocalQuizzes([...localQuizzes, quiz])}
+              />
+            ))
+          )}
         </div>
+
+        <AddTingkatanModal
+          open={showAddTingkatan}
+          onClose={() => setShowAddTingkatan(false)}
+          onSuccess={() => refetch()}
+          classId={classId!}
+          nextLevel={levels.length + 1}
+        />
       </AppLayout>
     );
   }
@@ -524,22 +563,32 @@ export function ClassDetailPage() {
         <h2 className="text-xl font-semibold tracking-tight">
           Progres Pembelajaran
         </h2>
-        {levels.map((lvl) => (
-          <UserLevelCard
-            key={lvl.id}
-            namaLevel={lvl.namaLevel}
-            materials={lvl.materials}
-            assignments={lvl.assignments}
-            quizzes={lvl.quizzes}
-            isLocked={!canAccessLevel(lvl.level)}
-            lockReason={!isEnrolledInClass ? "not-enrolled" : "level"}
-            defaultOpen={openLevel === lvl.level}
-            activeMaterialId={activeMaterialId}
-            completedMaterialIds={completedMaterialIds}
-            completedAssignmentIds={completedAssignmentIds}
-            completedQuizIds={completedQuizIds}
-          />
-        ))}
+        {levels.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-16 text-center">
+            <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/30" />
+            <h3 className="mb-2 text-lg font-semibold">Belum ada materi</h3>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Kelas ini sedang dalam persiapan. Silakan cek kembali nanti.
+            </p>
+          </div>
+        ) : (
+          levels.map((lvl) => (
+            <UserLevelCard
+              key={lvl.id}
+              namaLevel={lvl.namaLevel}
+              materials={lvl.materials}
+              assignments={lvl.assignments}
+              quizzes={lvl.quizzes}
+              isLocked={!canAccessLevel(lvl.level)}
+              lockReason={!isEnrolledInClass ? "not-enrolled" : "level"}
+              defaultOpen={openLevel === lvl.level}
+              activeMaterialId={activeMaterialId}
+              completedMaterialIds={completedMaterialIds}
+              completedAssignmentIds={completedAssignmentIds}
+              completedQuizIds={completedQuizIds}
+            />
+          ))
+        )}
       </div>
     </AppLayout>
   );

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
+import { verifySupabaseToken } from "../middleware/auth";
 
 const router = Router();
 
@@ -8,7 +9,7 @@ router.get("/", async (_req, res) => {
   try {
     const { data, error } = await supabase
       .from("kelas")
-      .select("id_kelas, nama_kelas, created_at")
+      .select("id_kelas, nama_kelas, icon, created_at")
       .order("id_kelas", { ascending: true });
 
     if (error) throw error;
@@ -18,12 +19,46 @@ router.get("/", async (_req, res) => {
       data: (data ?? []).map((k) => ({
         id: k.id_kelas,
         name: k.nama_kelas,
+        icon: (k as any).icon ?? null,
         createdAt: k.created_at,
       })),
     });
   } catch (error) {
     console.error("Error fetching kelas:", error);
     res.status(500).json({ success: false, error: "Failed to fetch kelas" });
+  }
+});
+
+// POST /api/kelas — superadmin only
+router.post("/", verifySupabaseToken, async (req: any, res) => {
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+
+  const { nama_kelas, icon } = req.body;
+  if (!nama_kelas?.trim())
+    return res.status(400).json({ success: false, error: "Nama kelas wajib diisi" });
+
+  try {
+    const { data, error } = await supabase
+      .from("kelas")
+      .insert({ nama_kelas: nama_kelas.trim(), icon: icon ?? null })
+      .select("id_kelas, nama_kelas, icon, created_at")
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: (data as any).id_kelas,
+        name: (data as any).nama_kelas,
+        icon: (data as any).icon ?? null,
+        createdAt: (data as any).created_at,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error creating kelas:", error);
+    res.status(500).json({ success: false, error: "Gagal membuat kelas", detail: error?.message });
   }
 });
 
@@ -38,7 +73,7 @@ router.get("/:classId", async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("kelas")
-      .select("id_kelas, nama_kelas, created_at")
+      .select("id_kelas, nama_kelas, icon, created_at")
       .eq("id_kelas", classId)
       .single();
 
@@ -49,12 +84,58 @@ router.get("/:classId", async (req, res) => {
       data: {
         id: data.id_kelas,
         name: data.nama_kelas,
+        icon: (data as any).icon ?? null,
         createdAt: data.created_at,
       },
     });
   } catch (error) {
     console.error("Error fetching kelas:", error);
     res.status(500).json({ success: false, error: "Failed to fetch kelas" });
+  }
+});
+
+// POST /api/kelas/:classId/levels — superadmin only
+router.post("/:classId/levels", verifySupabaseToken, async (req: any, res) => {
+  if (req.user.role !== "superadmin")
+    return res.status(403).json({ success: false, error: "Akses ditolak" });
+
+  const classId = Number(req.params.classId);
+  if (isNaN(classId))
+    return res.status(400).json({ success: false, error: "classId harus berupa angka" });
+
+  const { nama_tingkatan } = req.body;
+  if (!nama_tingkatan?.trim())
+    return res.status(400).json({ success: false, error: "Nama tingkatan wajib diisi" });
+
+  try {
+    const { data: existing } = await supabase
+      .from("tingkatan")
+      .select("level_urutan")
+      .eq("id_kelas", classId)
+      .order("level_urutan", { ascending: false })
+      .limit(1);
+
+    const nextLevel = ((existing?.[0] as any)?.level_urutan ?? 0) + 1;
+
+    const { data, error } = await supabase
+      .from("tingkatan")
+      .insert({ id_kelas: classId, nama_tingkatan: nama_tingkatan.trim(), level_urutan: nextLevel })
+      .select("id_tingkatan, nama_tingkatan, level_urutan")
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: String((data as any).id_tingkatan),
+        level: (data as any).level_urutan,
+        namaLevel: (data as any).nama_tingkatan,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error creating tingkatan:", error);
+    res.status(500).json({ success: false, error: "Gagal membuat tingkatan", detail: error?.message });
   }
 });
 

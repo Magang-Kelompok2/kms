@@ -4,6 +4,7 @@ import { useQueryCache, invalidateCache } from "./useQueryCache";
 export interface KelasData {
   id: number;
   name: string;
+  icon?: string | null;
   createdAt: string;
 }
 

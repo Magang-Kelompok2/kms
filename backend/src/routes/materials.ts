@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase";
 import { verifySupabaseToken } from "../middleware/auth";
+import { minioClient, BUCKET } from "../lib/minio";
 import {
   buildErrorNotificationMessage,
   buildNotificationMessage,
@@ -537,6 +538,111 @@ router.post(
     }
   },
 );
+
+// POST /api/materials/:materialId/videos  — tambah YouTube URL ke materi yang sudah ada
+router.post("/:materialId/videos", verifySupabaseToken, async (req: any, res) => {
+  if (req.user?.role !== "superadmin") {
+    return res.status(403).json({ success: false, error: "Forbidden" });
+  }
+
+  const materialId = Number(req.params.materialId);
+  if (isNaN(materialId)) {
+    return res.status(400).json({ success: false, error: "materialId harus berupa angka" });
+  }
+
+  const { title_video, video_path } = req.body;
+  if (!video_path?.trim()) {
+    return res.status(400).json({ success: false, error: "video_path wajib diisi" });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("video")
+      .insert({
+        id_materi: materialId,
+        title_video: title_video?.trim() || null,
+        video_path: video_path.trim(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: String(data.id_video),
+        name: data.title_video ?? "Video",
+        url: data.video_path,
+        type: "video",
+      },
+    });
+  } catch (err: any) {
+    console.error("Error adding video to material:", err);
+    return res.status(500).json({ success: false, error: err?.message ?? "Gagal menambah video" });
+  }
+});
+
+// DELETE /api/materials/:materialId/files/:fileId?type=pdf|video
+router.delete("/:materialId/files/:fileId", verifySupabaseToken, async (req: any, res) => {
+  if (req.user?.role !== "superadmin") {
+    return res.status(403).json({ success: false, error: "Forbidden" });
+  }
+
+  const materialId = Number(req.params.materialId);
+  const fileId = Number(req.params.fileId);
+  const fileType = String(req.query.type ?? "").toLowerCase();
+
+  if (isNaN(materialId) || isNaN(fileId) || !["pdf", "video"].includes(fileType)) {
+    return res.status(400).json({ success: false, error: "materialId, fileId, dan type (pdf|video) wajib valid" });
+  }
+
+  try {
+    const table = fileType === "pdf" ? "pdf" : "video";
+    const idCol = fileType === "pdf" ? "id_pdf" : "id_video";
+    const pathCol = fileType === "pdf" ? "pdf_path" : "video_path";
+
+    // Ambil path dulu untuk hapus dari storage
+    const { data: fileRow, error: fetchErr } = await supabase
+      .from(table)
+      .select(`${idCol}, ${pathCol}`)
+      .eq(idCol, fileId)
+      .eq("id_materi", materialId)
+      .maybeSingle();
+
+    if (fetchErr) throw fetchErr;
+    if (!fileRow) {
+      return res.status(404).json({ success: false, error: "File tidak ditemukan" });
+    }
+
+    // Hapus dari DB
+    const { error: delErr } = await supabase
+      .from(table)
+      .delete()
+      .eq(idCol, fileId);
+
+    if (delErr) throw delErr;
+
+    // Hapus dari MinIO jika bukan YouTube URL
+    const filePath: string = (fileRow as any)[pathCol] ?? "";
+    const isYoutube = /(?:youtube\.com|youtu\.be)/i.test(filePath);
+    if (filePath && !isYoutube) {
+      try {
+        const objectKey = filePath.includes("/storage/v1/")
+          ? decodeURIComponent(filePath.split(/\/storage\/v1\/object\/(?:sign|public)\/[^/]+\//)[1]?.split("?")[0] ?? filePath)
+          : filePath;
+        await minioClient.removeObject(BUCKET, objectKey);
+      } catch (minioErr) {
+        console.warn("MinIO removeObject warning:", minioErr);
+      }
+    }
+
+    return res.json({ success: true, message: "File berhasil dihapus" });
+  } catch (err: any) {
+    console.error("Error deleting material file:", err);
+    return res.status(500).json({ success: false, error: err?.message ?? "Gagal menghapus file" });
+  }
+});
 
 // DELETE /api/materials/:materialId
 router.delete("/:materialId", async (req, res) => {

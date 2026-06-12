@@ -14,7 +14,9 @@ import {
   Trash2,
   ChevronsLeft,
   ChevronsRight,
+  FolderOpen,
 } from "lucide-react";
+import { ManageMaterialFilesModal } from "../components/ManageMaterialFilesModal";
 import { useState, useEffect, useRef } from "react";
 import type { Material as MaterialType } from "../types";
 
@@ -37,7 +39,7 @@ export function MaterialViewPage() {
   const [materialRetryKey, setMaterialRetryKey] = useState(0);
   const [userLevel, setUserLevel] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
-
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
@@ -45,6 +47,8 @@ export function MaterialViewPage() {
   const [videoBufferedEnd, setVideoBufferedEnd] = useState(0);
   const [, setIsFullscreen] = useState(false);
   const [showVideoControls, setShowVideoControls] = useState(true);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   const getFileKey = (file: { id: string; type: "pdf" | "video" }) =>
     `${file.type}:${file.id}`;
@@ -306,6 +310,19 @@ export function MaterialViewPage() {
     }
   }, [material, selectedFile]);
 
+  // Sync playbackRate ke video element saat berubah
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
+
+  // Reset speed saat ganti file
+  useEffect(() => {
+    setPlaybackRate(1);
+    setShowSpeedMenu(false);
+  }, [selectedFile]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (!videoRef.current) return;
@@ -340,15 +357,44 @@ export function MaterialViewPage() {
         `${import.meta.env.VITE_API_URL}/api/materials/${material.id}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         },
       );
       if (!res.ok) throw new Error("Gagal menghapus materi");
       navigate(`/class/${material.classId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    }
+  };
+
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [showManageFiles, setShowManageFiles] = useState(false);
+
+  const handleDeleteFile = async (fileId: string, fileType: "pdf" | "video") => {
+    if (!material) return;
+    if (!confirm("Hapus file ini? Aksi ini tidak dapat dibatalkan.")) return;
+    setDeletingFileId(fileId);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/materials/${material.id}/files/${fileId}?type=${fileType}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (!res.ok) throw new Error("Gagal menghapus file");
+      // Hapus dari state lokal
+      setMaterial((prev) =>
+        prev ? { ...prev, files: prev.files.filter((f) => f.id !== fileId) } : prev,
+      );
+      if (selectedFile === fileId) {
+        const remaining = material.files.filter((f) => f.id !== fileId);
+        setSelectedFile(remaining[0]?.id ?? null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    } finally {
+      setDeletingFileId(null);
     }
   };
 
@@ -530,12 +576,26 @@ export function MaterialViewPage() {
         <div className="w-full lg:w-96 shrink-0 lg:h-full lg:min-h-0">
           <Card className="lg:h-full lg:min-h-0 flex flex-col overflow-hidden">
             <div className="sticky top-0 z-10 border-b border-border bg-card/95 p-5 backdrop-blur supports-backdrop-filter:bg-card/80">
-              <h2 className="mb-1 text-lg font-semibold tracking-tight">
-                Daftar Materi
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {material.files.length} file tersedia
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="mb-1 text-lg font-semibold tracking-tight">
+                    Daftar Materi
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {material.files.length} file tersedia
+                  </p>
+                </div>
+                {user?.role === "superadmin" && (
+                  <button
+                    onClick={() => setShowManageFiles(true)}
+                    title="Kelola File"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 px-2.5 py-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition shrink-0"
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    Kelola File
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pr-3 space-y-5">
@@ -576,9 +636,7 @@ export function MaterialViewPage() {
                                   <h4 className="font-bold text-base leading-tight">
                                     {file.name}
                                   </h4>
-                                  {completedFiles.includes(
-                                    getFileKey(file),
-                                  ) && (
+                                  {completedFiles.includes(getFileKey(file)) && (
                                     <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                                   )}
                                 </div>
@@ -586,6 +644,19 @@ export function MaterialViewPage() {
                                   {getYouTubeEmbedUrl(file.url) ? "YouTube" : (file.duration || "Video")}
                                 </p>
                               </div>
+                              {user?.role === "superadmin" && (
+                                <button
+                                  title="Hapus file"
+                                  disabled={deletingFileId === file.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteFile(file.id, "video");
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 hover:text-red-700 transition shrink-0 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -621,9 +692,7 @@ export function MaterialViewPage() {
                                   <h4 className="font-semibold text-base leading-tight">
                                     {file.name}
                                   </h4>
-                                  {completedFiles.includes(
-                                    getFileKey(file),
-                                  ) && (
+                                  {completedFiles.includes(getFileKey(file)) && (
                                     <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                                   )}
                                 </div>
@@ -631,6 +700,19 @@ export function MaterialViewPage() {
                                   Dokumen
                                 </p>
                               </div>
+                              {user?.role === "superadmin" && (
+                                <button
+                                  title="Hapus file"
+                                  disabled={deletingFileId === file.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteFile(file.id, "pdf");
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 hover:text-red-700 transition shrink-0 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -806,7 +888,7 @@ export function MaterialViewPage() {
                       </div>
 
                       <div
-                        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 transition-opacity duration-300 ${
+                        className={`absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent px-4 py-3 transition-opacity duration-300 ${
                           showVideoControls
                             ? "opacity-100"
                             : "opacity-0 pointer-events-none"
@@ -851,6 +933,36 @@ export function MaterialViewPage() {
 
                           <div className="flex-1" />
 
+                          {/* Speed control */}
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowSpeedMenu((v) => !v)}
+                              className="text-xs font-bold px-2 py-1 rounded hover:bg-white/20 transition min-w-10 text-center"
+                            >
+                              {playbackRate === 1 ? "1×" : `${playbackRate}×`}
+                            </button>
+                            {showSpeedMenu && (
+                              <div className="absolute bottom-full right-0 mb-2 bg-black/90 rounded-lg overflow-hidden shadow-xl border border-white/10 min-w-20">
+                                {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                                  <button
+                                    key={rate}
+                                    onClick={() => {
+                                      setPlaybackRate(rate);
+                                      setShowSpeedMenu(false);
+                                    }}
+                                    className={`w-full text-sm px-4 py-2 text-left transition hover:bg-white/20 ${
+                                      playbackRate === rate
+                                        ? "text-blue-400 font-bold bg-white/10"
+                                        : "text-white"
+                                    }`}
+                                  >
+                                    {rate === 1 ? "Normal" : `${rate}×`}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
                           <button
                             onClick={toggleFullscreen}
                             className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-white/20 transition"
@@ -874,6 +986,21 @@ export function MaterialViewPage() {
           </div>
         </div>
       </div>
+      {showManageFiles && material && (
+        <ManageMaterialFilesModal
+          isOpen={showManageFiles}
+          onClose={() => setShowManageFiles(false)}
+          materialId={material.id}
+          materialTitle={material.title}
+          initialFiles={material.files}
+          onFilesChanged={(updated) => {
+            setMaterial((prev) => prev ? { ...prev, files: updated } : prev);
+            if (selectedFile && !updated.find((f) => f.id === selectedFile)) {
+              setSelectedFile(updated[0]?.id ?? null);
+            }
+          }}
+        />
+      )}
     </AppLayout>
   );
 }
