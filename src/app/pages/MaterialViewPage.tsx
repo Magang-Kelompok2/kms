@@ -39,7 +39,7 @@ export function MaterialViewPage() {
   const [materialRetryKey, setMaterialRetryKey] = useState(0);
   const [userLevel, setUserLevel] = useState(1);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
+  const [, setCompletionMessage] = useState<string | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
@@ -536,9 +536,9 @@ export function MaterialViewPage() {
     }
   };
 
-  const completedCurrentMaterialFiles = material.files.filter((file) =>
-    completedFiles.includes(getFileKey(file)),
-  ).length;
+  // const completedCurrentMaterialFiles = material.files.filter((file) =>
+  //   completedFiles.includes(getFileKey(file)),
+  // ).length;
 
 
   const videoFiles = material.files.filter((f) => f.type === "video");

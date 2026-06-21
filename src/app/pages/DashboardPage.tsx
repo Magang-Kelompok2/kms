@@ -93,7 +93,7 @@ export function DashboardPage() {
   const [showAddKelasModal, setShowAddKelasModal] = useState(false);
   const { materi, loading: materiLoading } = useMateri();
   const { tugas, loading: tugasLoading } = useTugas();
-  const { users, loading: usersLoading, deleteUser, total } = useUsers(10, 0);
+  const { users, loading: usersLoading, deleteUser } = useUsers(10, 0);
 
   const penugasan = useMemo(
     () => tugas.filter((t) => t.type !== "Kuis"),
@@ -134,7 +134,7 @@ export function DashboardPage() {
   useEffect(() => {
     if (user?.role === "superadmin") {
       setEnrolledClassIds(new Set());
-      setEnrollmentsLoaded(true);
+      //setEnrollmentsLoaded(true);
       return;
     }
     if (!user?.id || !token) return;
