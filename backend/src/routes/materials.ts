@@ -209,6 +209,7 @@ router.get("/:materialId", verifySupabaseToken, async (req: any, res) => {
           console.error(`Gagal membuat signed URL pdf ${p.id_pdf}:`, err);
           // Fallback ke proxy jika generate Signed URL gagal atau file 404
           const apiBase =
+            process.env.API_BASE_URL ??
             process.env.VITE_API_URL ??
             `http://localhost:${process.env.PORT ?? 4000}`;
           finalUrl = `${apiBase}/api/files/proxy?path=${encodeURIComponent(p.pdf_path)}`;
@@ -588,12 +589,10 @@ router.post(
       });
     } catch (err: any) {
       console.error("Error adding video to material:", err);
-      return res
-        .status(500)
-        .json({
-          success: false,
-          error: err?.message ?? "Gagal menambah video",
-        });
+      return res.status(500).json({
+        success: false,
+        error: err?.message ?? "Gagal menambah video",
+      });
     }
   },
 );
@@ -616,12 +615,10 @@ router.delete(
       isNaN(fileId) ||
       !["pdf", "video"].includes(fileType)
     ) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "materialId, fileId, dan type (pdf|video) wajib valid",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "materialId, fileId, dan type (pdf|video) wajib valid",
+      });
     }
 
     try {
@@ -673,12 +670,10 @@ router.delete(
       return res.json({ success: true, message: "File berhasil dihapus" });
     } catch (err: any) {
       console.error("Error deleting material file:", err);
-      return res
-        .status(500)
-        .json({
-          success: false,
-          error: err?.message ?? "Gagal menghapus file",
-        });
+      return res.status(500).json({
+        success: false,
+        error: err?.message ?? "Gagal menghapus file",
+      });
     }
   },
 );
