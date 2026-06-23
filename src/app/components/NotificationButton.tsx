@@ -113,6 +113,12 @@ export function NotificationButton() {
   }, [fetchNotifications]);
 
   useEffect(() => {
+    const refreshNotifications = () => void fetchNotifications();
+    window.addEventListener("notifications:refresh", refreshNotifications);
+    return () => window.removeEventListener("notifications:refresh", refreshNotifications);
+  }, [fetchNotifications]);
+
+  useEffect(() => {
     if (!token || !user) return;
 
     const intervalId = window.setInterval(() => {

@@ -24,6 +24,16 @@ import { useUsers } from "../hooks/useUsers";
 import { DashboardSkeleton } from "../components/PageSkeletons";
 import { AddKelasModal } from "../components/AddKelasModal";
 import { KelasIcon } from "../utils/kelasIcons";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 
 // ─── Gradient KPI Card ─────────────────────────────────────────────────────────
 interface GradientStatCardProps {
@@ -91,9 +101,11 @@ export function DashboardPage() {
 
   const { classes, loading: classesLoading, invalidate, refetch } = useClasses();
   const [showAddKelasModal, setShowAddKelasModal] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [deletingClassId, setDeletingClassId] = useState<number | null>(null);
   const { materi, loading: materiLoading } = useMateri();
   const { tugas, loading: tugasLoading } = useTugas();
-  const { users, loading: usersLoading, deleteUser, total } = useUsers(10, 0);
+  const { users, loading: usersLoading, deleteUser } = useUsers(10, 0);
 
   const penugasan = useMemo(
     () => tugas.filter((t) => t.type !== "Kuis"),
@@ -134,7 +146,6 @@ export function DashboardPage() {
   useEffect(() => {
     if (user?.role === "superadmin") {
       setEnrolledClassIds(new Set());
-      setEnrollmentsLoaded(true);
       return;
     }
     if (!user?.id || !token) return;
@@ -188,6 +199,34 @@ export function DashboardPage() {
       setDeletingUserId(null);
       if (success) alert("Pengguna berhasil dihapus!");
       else alert("Gagal menghapus pengguna.");
+    }
+  };
+
+  const handleDeleteClass = async () => {
+    if (!classToDelete || !token || deletingClassId !== null) return;
+
+    setDeletingClassId(classToDelete.id);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/kelas/${classToDelete.id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const json = await res.json().catch(() => null);
+      window.dispatchEvent(new Event("notifications:refresh"));
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.error ?? "Gagal menghapus kelas");
+      }
+
+      setClassToDelete(null);
+      invalidate();
+      refetch();
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : "Gagal menghapus kelas");
+    } finally {
+      setDeletingClassId(null);
     }
   };
 
@@ -325,7 +364,7 @@ export function DashboardPage() {
             return (
               <Card
                 key={cls.id}
-                className="cursor-pointer overflow-hidden transition-all hover:shadow-xl hover:scale-105 border-0 shadow-lg"
+                className="group relative cursor-pointer overflow-hidden transition-all hover:shadow-xl hover:scale-105 border-0 shadow-lg"
                 onClick={() => navigate(`/class/${cls.id}`)}
               >
                   {/* ── Area Header ── */}
@@ -376,6 +415,22 @@ export function DashboardPage() {
                       Dibuat:{" "}
                       {new Date(cls.createdAt).toLocaleDateString("id-ID")}
                     </p>
+
+                    {user?.role === "superadmin" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full border-destructive/40 text-destructive hover:border-destructive hover:bg-destructive hover:text-white"
+                        aria-label={`Hapus kelas ${cls.name}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setClassToDelete({ id: cls.id, name: cls.name });
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        Hapus Kelas
+                      </Button>
+                    )}
 
                     {user?.role !== "superadmin" && (
                       <div className="pt-4 border-t border-border">
@@ -648,6 +703,38 @@ export function DashboardPage() {
         onClose={() => setShowAddKelasModal(false)}
         onSuccess={() => { invalidate(); refetch(); }}
       />
+      <AlertDialog
+        open={classToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && deletingClassId === null) setClassToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-1 flex size-11 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <Trash2 className="size-5" />
+            </div>
+            <AlertDialogTitle>Hapus kelas {classToDelete?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tindakan ini permanen. Seluruh tingkatan, materi, tugas, kuis, akses, dan
+              progress user pada kelas ini ikut dihapus dan tidak dapat dipulihkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingClassId !== null}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={deletingClassId !== null}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteClass();
+              }}
+            >
+              {deletingClassId !== null ? "Menghapus..." : "Ya, hapus kelas"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
