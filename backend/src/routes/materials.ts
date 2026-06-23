@@ -145,7 +145,8 @@ router.get("/:materialId", verifySupabaseToken, async (req: any, res) => {
     // ── CONFIG SUPABASE STORAGE STREAMING ──
     const BUCKET_NAME = "alpha"; //
     const EXPIRE_IN_SECONDS = 60 * 60 * 3; // Signed URL aktif selama 3 jam
-    const isYouTubeUrl = (url: string) => /(?:youtube\.com|youtu\.be)/i.test(url);
+    const isYouTubeUrl = (url: string) =>
+      /(?:youtube\.com|youtu\.be)/i.test(url);
 
     // 4. Generate Signed URL untuk file Video (Bypass Proxy agar mendukung Range Requests)
     const videoFiles = await Promise.all(
@@ -175,6 +176,7 @@ router.get("/:materialId", verifySupabaseToken, async (req: any, res) => {
           console.error(`Gagal membuat signed URL video ${v.id_video}:`, err);
           // Fallback ke proxy jika generate Signed URL gagal atau file 404
           const apiBase =
+            process.env.API_BASE_URL ??
             process.env.VITE_API_URL ??
             `http://localhost:${process.env.PORT ?? 4000}`;
           finalUrl = `${apiBase}/api/files/proxy?path=${encodeURIComponent(v.video_path)}`;
@@ -207,6 +209,7 @@ router.get("/:materialId", verifySupabaseToken, async (req: any, res) => {
           console.error(`Gagal membuat signed URL pdf ${p.id_pdf}:`, err);
           // Fallback ke proxy jika generate Signed URL gagal atau file 404
           const apiBase =
+            process.env.API_BASE_URL ??
             process.env.VITE_API_URL ??
             `http://localhost:${process.env.PORT ?? 4000}`;
           finalUrl = `${apiBase}/api/files/proxy?path=${encodeURIComponent(p.pdf_path)}`;
@@ -540,109 +543,140 @@ router.post(
 );
 
 // POST /api/materials/:materialId/videos  — tambah YouTube URL ke materi yang sudah ada
-router.post("/:materialId/videos", verifySupabaseToken, async (req: any, res) => {
-  if (req.user?.role !== "superadmin") {
-    return res.status(403).json({ success: false, error: "Forbidden" });
-  }
+router.post(
+  "/:materialId/videos",
+  verifySupabaseToken,
+  async (req: any, res) => {
+    if (req.user?.role !== "superadmin") {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
 
-  const materialId = Number(req.params.materialId);
-  if (isNaN(materialId)) {
-    return res.status(400).json({ success: false, error: "materialId harus berupa angka" });
-  }
+    const materialId = Number(req.params.materialId);
+    if (isNaN(materialId)) {
+      return res
+        .status(400)
+        .json({ success: false, error: "materialId harus berupa angka" });
+    }
 
-  const { title_video, video_path } = req.body;
-  if (!video_path?.trim()) {
-    return res.status(400).json({ success: false, error: "video_path wajib diisi" });
-  }
+    const { title_video, video_path } = req.body;
+    if (!video_path?.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, error: "video_path wajib diisi" });
+    }
 
-  try {
-    const { data, error } = await supabase
-      .from("video")
-      .insert({
-        id_materi: materialId,
-        title_video: title_video?.trim() || null,
-        video_path: video_path.trim(),
-      })
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("video")
+        .insert({
+          id_materi: materialId,
+          title_video: title_video?.trim() || null,
+          video_path: video_path.trim(),
+        })
+        .select()
+        .single();
 
-    if (error) throw error;
+      if (error) throw error;
 
-    return res.status(201).json({
-      success: true,
-      data: {
-        id: String(data.id_video),
-        name: data.title_video ?? "Video",
-        url: data.video_path,
-        type: "video",
-      },
-    });
-  } catch (err: any) {
-    console.error("Error adding video to material:", err);
-    return res.status(500).json({ success: false, error: err?.message ?? "Gagal menambah video" });
-  }
-});
+      return res.status(201).json({
+        success: true,
+        data: {
+          id: String(data.id_video),
+          name: data.title_video ?? "Video",
+          url: data.video_path,
+          type: "video",
+        },
+      });
+    } catch (err: any) {
+      console.error("Error adding video to material:", err);
+      return res.status(500).json({
+        success: false,
+        error: err?.message ?? "Gagal menambah video",
+      });
+    }
+  },
+);
 
 // DELETE /api/materials/:materialId/files/:fileId?type=pdf|video
-router.delete("/:materialId/files/:fileId", verifySupabaseToken, async (req: any, res) => {
-  if (req.user?.role !== "superadmin") {
-    return res.status(403).json({ success: false, error: "Forbidden" });
-  }
-
-  const materialId = Number(req.params.materialId);
-  const fileId = Number(req.params.fileId);
-  const fileType = String(req.query.type ?? "").toLowerCase();
-
-  if (isNaN(materialId) || isNaN(fileId) || !["pdf", "video"].includes(fileType)) {
-    return res.status(400).json({ success: false, error: "materialId, fileId, dan type (pdf|video) wajib valid" });
-  }
-
-  try {
-    const table = fileType === "pdf" ? "pdf" : "video";
-    const idCol = fileType === "pdf" ? "id_pdf" : "id_video";
-    const pathCol = fileType === "pdf" ? "pdf_path" : "video_path";
-
-    // Ambil path dulu untuk hapus dari storage
-    const { data: fileRow, error: fetchErr } = await supabase
-      .from(table)
-      .select(`${idCol}, ${pathCol}`)
-      .eq(idCol, fileId)
-      .eq("id_materi", materialId)
-      .maybeSingle();
-
-    if (fetchErr) throw fetchErr;
-    if (!fileRow) {
-      return res.status(404).json({ success: false, error: "File tidak ditemukan" });
+router.delete(
+  "/:materialId/files/:fileId",
+  verifySupabaseToken,
+  async (req: any, res) => {
+    if (req.user?.role !== "superadmin") {
+      return res.status(403).json({ success: false, error: "Forbidden" });
     }
 
-    // Hapus dari DB
-    const { error: delErr } = await supabase
-      .from(table)
-      .delete()
-      .eq(idCol, fileId);
+    const materialId = Number(req.params.materialId);
+    const fileId = Number(req.params.fileId);
+    const fileType = String(req.query.type ?? "").toLowerCase();
 
-    if (delErr) throw delErr;
+    if (
+      isNaN(materialId) ||
+      isNaN(fileId) ||
+      !["pdf", "video"].includes(fileType)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "materialId, fileId, dan type (pdf|video) wajib valid",
+      });
+    }
 
-    // Hapus dari MinIO jika bukan YouTube URL
-    const filePath: string = (fileRow as any)[pathCol] ?? "";
-    const isYoutube = /(?:youtube\.com|youtu\.be)/i.test(filePath);
-    if (filePath && !isYoutube) {
-      try {
-        const objectKey = filePath.includes("/storage/v1/")
-          ? decodeURIComponent(filePath.split(/\/storage\/v1\/object\/(?:sign|public)\/[^/]+\//)[1]?.split("?")[0] ?? filePath)
-          : filePath;
-        await minioClient.removeObject(BUCKET, objectKey);
-      } catch (minioErr) {
-        console.warn("MinIO removeObject warning:", minioErr);
+    try {
+      const table = fileType === "pdf" ? "pdf" : "video";
+      const idCol = fileType === "pdf" ? "id_pdf" : "id_video";
+      const pathCol = fileType === "pdf" ? "pdf_path" : "video_path";
+
+      // Ambil path dulu untuk hapus dari storage
+      const { data: fileRow, error: fetchErr } = await supabase
+        .from(table)
+        .select(`${idCol}, ${pathCol}`)
+        .eq(idCol, fileId)
+        .eq("id_materi", materialId)
+        .maybeSingle();
+
+      if (fetchErr) throw fetchErr;
+      if (!fileRow) {
+        return res
+          .status(404)
+          .json({ success: false, error: "File tidak ditemukan" });
       }
-    }
 
-    return res.json({ success: true, message: "File berhasil dihapus" });
-  } catch (err: any) {
-    console.error("Error deleting material file:", err);
-    return res.status(500).json({ success: false, error: err?.message ?? "Gagal menghapus file" });
-  }
-});
+      // Hapus dari DB
+      const { error: delErr } = await supabase
+        .from(table)
+        .delete()
+        .eq(idCol, fileId);
+
+      if (delErr) throw delErr;
+
+      // Hapus dari MinIO jika bukan YouTube URL
+      const filePath: string = (fileRow as any)[pathCol] ?? "";
+      const isYoutube = /(?:youtube\.com|youtu\.be)/i.test(filePath);
+      if (filePath && !isYoutube) {
+        try {
+          const objectKey = filePath.includes("/storage/v1/")
+            ? decodeURIComponent(
+                filePath
+                  .split(/\/storage\/v1\/object\/(?:sign|public)\/[^/]+\//)[1]
+                  ?.split("?")[0] ?? filePath,
+              )
+            : filePath;
+          await minioClient.removeObject(BUCKET, objectKey);
+        } catch (minioErr) {
+          console.warn("MinIO removeObject warning:", minioErr);
+        }
+      }
+
+      return res.json({ success: true, message: "File berhasil dihapus" });
+    } catch (err: any) {
+      console.error("Error deleting material file:", err);
+      return res.status(500).json({
+        success: false,
+        error: err?.message ?? "Gagal menghapus file",
+      });
+    }
+  },
+);
 
 // DELETE /api/materials/:materialId
 router.delete("/:materialId", async (req, res) => {

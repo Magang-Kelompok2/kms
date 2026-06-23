@@ -1,5 +1,15 @@
-import { useState, useRef } from "react";
-import { X, FileText, Video, Trash2, Loader2, Upload, Link, Plus, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import {
+  X,
+  FileText,
+  Video,
+  Trash2,
+  Loader2,
+  Upload,
+  Link,
+  Plus,
+  AlertTriangle,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { useAuth } from "../context/AuthContext";
 import { useUpload, UPLOAD_CANCELLED } from "../hooks/useUpload";
@@ -50,7 +60,10 @@ export function ManageMaterialFilesModal({
   };
 
   // ── Upload PDF / Video file ──────────────────────────────────────────────
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: "pdf" | "video") => {
+  const handleFileSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "pdf" | "video",
+  ) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -112,7 +125,8 @@ export function ManageMaterialFilesModal({
       });
 
       const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error ?? "Gagal menyimpan URL");
+      if (!res.ok || !json.success)
+        throw new Error(json.error ?? "Gagal menyimpan URL");
 
       const newFile: MaterialFile = {
         id: json.data.id,
@@ -144,7 +158,8 @@ export function ManageMaterialFilesModal({
         },
       );
       const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error ?? "Gagal menghapus");
+      if (!res.ok || !json.success)
+        throw new Error(json.error ?? "Gagal menghapus");
 
       setFiles((prev) => prev.filter((f) => f.id !== file.id));
       setConfirmDelete(null);
@@ -165,8 +180,12 @@ export function ManageMaterialFilesModal({
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-gray-200 dark:border-gray-800 shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Kelola File Materi</h2>
-            <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{materialTitle}</p>
+            <h2 className="text-lg font-bold text-foreground">
+              Kelola File Materi
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
+              {materialTitle}
+            </p>
           </div>
           <button
             onClick={handleClose}
@@ -198,7 +217,8 @@ export function ManageMaterialFilesModal({
                     onClick={() => cancelUpload()}
                     className="text-xs font-semibold text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 shrink-0"
                   >
-                    <X className="h-3 w-3 inline mr-1" />Batalkan
+                    <X className="h-3 w-3 inline mr-1" />
+                    Batalkan
                   </button>
                 )}
               </div>
@@ -210,7 +230,9 @@ export function ManageMaterialFilesModal({
                       style={{ width: `${uploadPercent}%` }}
                     />
                   </div>
-                  <p className="text-xs text-blue-500 text-right font-semibold">{uploadPercent}%</p>
+                  <p className="text-xs text-blue-500 text-right font-semibold">
+                    {uploadPercent}%
+                  </p>
                 </>
               )}
             </div>
@@ -246,7 +268,9 @@ export function ManageMaterialFilesModal({
             {pdfFiles.length === 0 ? (
               <div className="py-6 text-center rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30">
                 <FileText className="h-7 w-7 mx-auto mb-1.5 text-gray-300 dark:text-gray-600" />
-                <p className="text-xs text-muted-foreground">Belum ada file PDF</p>
+                <p className="text-xs text-muted-foreground">
+                  Belum ada file PDF
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -269,31 +293,36 @@ export function ManageMaterialFilesModal({
                 <Video className="h-4 w-4 text-red-600" />
                 Video ({videoFiles.length})
               </h3>
-              {!uploading && addMode !== "video-file" && addMode !== "video-url" && (
-                <div className="flex gap-2">
-                  <input
-                    type="file"
-                    id="add-video"
-                    accept="video/*"
-                    className="hidden"
-                    onChange={(e) => handleFileSelect(e, "video")}
-                  />
-                  <label
-                    htmlFor="add-video"
-                    className="flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 cursor-pointer px-2 py-1 hover:bg-red-50 rounded-lg transition"
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    Upload
-                  </label>
-                  <button
-                    onClick={() => { setAddMode("video-url"); setError(null); }}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded-lg transition"
-                  >
-                    <Link className="h-3.5 w-3.5" />
-                    YouTube URL
-                  </button>
-                </div>
-              )}
+              {!uploading &&
+                addMode !== "video-file" &&
+                addMode !== "video-url" && (
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      id="add-video"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(e) => handleFileSelect(e, "video")}
+                    />
+                    <label
+                      htmlFor="add-video"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 cursor-pointer px-2 py-1 hover:bg-red-50 rounded-lg transition"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Upload
+                    </label>
+                    <button
+                      onClick={() => {
+                        setAddMode("video-url");
+                        setError(null);
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded-lg transition"
+                    >
+                      <Link className="h-3.5 w-3.5" />
+                      YouTube URL
+                    </button>
+                  </div>
+                )}
             </div>
 
             {/* YouTube URL form */}
@@ -314,8 +343,25 @@ export function ManageMaterialFilesModal({
                   className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handleAddVideoUrl} className="flex-1">Tambahkan</Button>
-                  <Button size="sm" variant="outline" onClick={() => { setAddMode(null); setVideoUrl(""); setVideoName(""); }} className="flex-1">Batal</Button>
+                  <Button
+                    size="sm"
+                    onClick={handleAddVideoUrl}
+                    className="flex-1"
+                  >
+                    Tambahkan
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setAddMode(null);
+                      setVideoUrl("");
+                      setVideoName("");
+                    }}
+                    className="flex-1"
+                  >
+                    Batal
+                  </Button>
                 </div>
               </div>
             )}
@@ -343,7 +389,9 @@ export function ManageMaterialFilesModal({
 
         {/* Footer */}
         <div className="shrink-0 border-t border-gray-200 dark:border-gray-800 p-5">
-          <Button onClick={handleClose} className="w-full">Selesai</Button>
+          <Button onClick={handleClose} className="w-full">
+            Selesai
+          </Button>
         </div>
       </div>
 
@@ -357,7 +405,9 @@ export function ManageMaterialFilesModal({
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Hapus File</h3>
-                <p className="text-sm text-muted-foreground line-clamp-2">{confirmDelete.name}</p>
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {confirmDelete.name}
+                </p>
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-5">
@@ -371,8 +421,13 @@ export function ManageMaterialFilesModal({
                 onClick={() => handleDelete(confirmDelete)}
               >
                 {deletingId === confirmDelete.id ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Menghapus…</>
-                ) : "Hapus"}
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Menghapus…
+                  </>
+                ) : (
+                  "Hapus"
+                )}
               </Button>
               <Button
                 variant="outline"
@@ -410,11 +465,15 @@ function FileRow({
       : "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800";
 
   return (
-    <div className={`flex items-center justify-between p-3 rounded-xl border ${bgColor}`}>
+    <div
+      className={`flex items-center justify-between p-3 rounded-xl border ${bgColor}`}
+    >
       <div className="flex items-center gap-2.5 min-w-0">
         <Icon className={`h-4 w-4 shrink-0 ${iconColor}`} />
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate text-foreground">{file.name}</p>
+          <p className="text-sm font-medium truncate text-foreground">
+            {file.name}
+          </p>
           {isYoutube && (
             <p className="text-xs text-muted-foreground">YouTube URL</p>
           )}
